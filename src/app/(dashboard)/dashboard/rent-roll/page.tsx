@@ -2,6 +2,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Euro, Home } from 'lucide-react';
 import ImportButton from '@/components/rent-roll/import-button';
@@ -202,7 +203,12 @@ export default async function RentRollPage() {
                                                 {unitCode(lease.unit.property.address, lease.unit.unitNumber)}
                                             </td>
                                             <td className="p-3 whitespace-nowrap font-medium">
-                                                {lease.mainTenant.firstName} {lease.mainTenant.lastName}
+                                                <Link
+                                                    href={`/dashboard/rent-roll/tenant/${lease.mainTenant.id}`}
+                                                    className="text-primary hover:underline"
+                                                >
+                                                    {lease.mainTenant.firstName} {lease.mainTenant.lastName}
+                                                </Link>
                                             </td>
                                             <td className="p-3 whitespace-nowrap">{lease.unit.unitNumber}</td>
                                             <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm} m²</td>
