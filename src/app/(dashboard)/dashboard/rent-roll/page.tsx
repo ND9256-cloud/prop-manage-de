@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Euro, Home } from 'lucide-react';
+import ImportButton from '@/components/rent-roll/import-button';
 
 export default async function RentRollPage() {
     const session = await auth();
@@ -108,11 +109,14 @@ export default async function RentRollPage() {
 
     return (
         <main className="p-6">
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold">Rent Roll</h1>
-                <p className="text-muted-foreground">
-                    Übersicht aller aktiven Mietverhältnisse
-                </p>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="text-2xl font-bold">Rent Roll</h1>
+                    <p className="text-muted-foreground">
+                        Übersicht aller aktiven Mietverhältnisse
+                    </p>
+                </div>
+                <ImportButton />
             </div>
 
             {/* KPI Cards */}
