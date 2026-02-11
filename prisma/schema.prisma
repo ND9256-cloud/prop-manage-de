@@ -8,7 +8,6 @@ generator client {
 
 datasource db {
   provider   = "postgresql"
-  extensions = [vector]
 }
 
 // User Roles
@@ -37,21 +36,7 @@ enum LeaseStatus {
   CANCELLED
 }
 
-// Maintenance Ticket Status
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  RESOLVED
-  CLOSED
-}
 
-// Maintenance Ticket Priority
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  EMERGENCY
-}
 
 // Organization (Tenant) - The Property Management Company
 model Organization {
@@ -65,10 +50,6 @@ model Organization {
   users      User[]
   properties Property[]
   tenants    Person[]
-  vendors    Vendor[]
-  tickets    Ticket[]
-  folders    Folder[]
-  documents  Document[]
 }
 
 // User - System users (Admins, Managers, Accountants)
@@ -86,9 +67,7 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Relations
-  assignedTickets Ticket[] // Tickets assigned to this user (e.g. property manager)
-  uploadedDocuments Document[] // Documents uploaded by this user
+
 }
 
 // Property - A physical building or complex
@@ -106,8 +85,6 @@ model Property {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   units     Unit[]
-  documents Document[]
-  folders   Folder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -128,9 +105,7 @@ model Unit {
   property     Property @relation(fields: [propertyId], references: [id])
 
   leases       Lease[]
-  currentTenant Lease? @relation("CurrentLease") // Optimization relation
-  documents    Document[]
-  folders      Folder[]
+  currentTenant Lease? @relation("CurrentLease")
   
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -189,166 +164,13 @@ model Lease {
   currentUnit Unit? @relation("CurrentLease", fields: [currentUnitId], references: [id])
   currentUnitId String? @unique 
 
-  documents Document[]
+
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// Vendor - Service providers
-model Vendor {
-  id        String   @id @default(uuid())
-  companyName String
-  serviceType String // Plumbing, Electrical, cleaning...
-  email     String?
-  phone     String?
-  
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  tickets   Ticket[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-// Ticket - Maintenance requests
-model Ticket {
-  id          String   @id @default(uuid())
-  title       String
-  description String
-  status      TicketStatus @default(OPEN)
-  priority    TicketPriority @default(MEDIUM)
-  
-  // Images/Files
-  images      String[] // URLs
-
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  vendorId    String?
-  vendor      Vendor?   @relation(fields: [vendorId], references: [id])
-
-  assignedToId String?
-  assignedTo   User?   @relation(fields: [assignedToId], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-// Folder - Hierarchical folder structure for documents (Google Drive-like)
-model Folder {
-  id        String   @id @default(uuid())
-  name      String
-  
-  // Parent folder for nesting (null = root folder)
-  parentId  String?
-  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
-  children  Folder[] @relation("FolderHierarchy")
-  
-  // Scope: A folder belongs to either a Property OR a Unit OR Organization-level
-  propertyId String?
-  property   Property? @relation(fields: [propertyId], references: [id])
-  
-  unitId    String?
-  unit      Unit?     @relation(fields: [unitId], references: [id])
-  
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  
-  documents Document[]
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  @@index([propertyId])
-  @@index([unitId])
-  @@index([organizationId])
-}
-
-// Document - Enhanced file storage with metadata
-model Document {
-  id        String   @id @default(uuid())
-  name      String   // Original filename
-  
-  // File metadata
-  storagePath  String   // Path in Supabase Storage bucket
-  mimeType     String   // e.g., "application/pdf", "image/jpeg"
-  sizeBytes    Int      // File size in bytes
-  
-  // Document categorization
-  type      String?  // Contract, Invoice, Protocol, Photo, Receipt, etc.
-  description String?
-  
-  // Versioning
-  version    Int      @default(1)
-  isLatest   Boolean  @default(true)
-  previousVersionId String?
-  previousVersion   Document? @relation("DocumentVersions", fields: [previousVersionId], references: [id])
-  newerVersions     Document[] @relation("DocumentVersions")
-  
-  // Folder organization (optional - can be at root level)
-  folderId   String?
-  folder     Folder?   @relation(fields: [folderId], references: [id])
-  
-  // Direct property/unit association (for documents not in folders)
-  propertyId String?
-  property   Property? @relation(fields: [propertyId], references: [id])
-  
-  unitId     String?
-  unit       Unit?     @relation(fields: [unitId], references: [id])
-  
-  // Lease association for contract documents
-  leaseId    String?
-  lease      Lease?    @relation(fields: [leaseId], references: [id])
-  
-  // Organization scope
-  organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  
-  // Uploaded by
-  uploadedById String?
-  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
-
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  @@index([propertyId])
-  @@index([unitId])
-  @@index([folderId])
-  @@index([organizationId])
-  @@index([type])
-  
-  // Relation to chunks
-  chunks DocumentChunk[]
-}
-
-// DocumentChunk - Text chunks with embeddings for semantic search (RAG)
-model DocumentChunk {
-  id        String   @id @default(uuid())
-  
-  // Reference to parent document
-  documentId String
-  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  
-  // Chunk content
-  content   String   // The text content of this chunk
-  chunkIndex Int     // Order of chunk within document (0, 1, 2...)
-  
-  // Embedding vector (3072 dimensions for Gemini gemini-embedding-001)
-  embedding Unsupported("vector(3072)")?
-  
-  // Metadata
-  pageNumber Int?    // For PDFs, which page this came from
-  
-  // Organization scope (denormalized for query efficiency)
-  organizationId String
-  
-  createdAt DateTime @default(now())
-  
-  @@index([documentId])
-  @@index([organizationId])
-}
 
 // VPI (Verbraucherpreisindex) – Consumer Price Index from Destatis
 model VpiIndex {
