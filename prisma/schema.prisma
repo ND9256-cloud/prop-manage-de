@@ -1,0 +1,366 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["driverAdapters", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [vector]
+}
+
+// User Roles
+enum UserRole {
+  PLATFORM_ADMIN // Global superuser
+  ORG_ADMIN      // Admin for a specific organization
+  PROPERTY_MANAGER
+  ACCOUNTANT
+  TENANT
+  VENDOR
+}
+
+// Property Types
+enum PropertyType {
+  APARTMENT_BUILDING // Mehrfamilienhaus
+  SINGLE_FAMILY_HOME // Einfamilienhaus
+  MIXED_USE          // Wohn- und Geschäftshaus
+  COMMERCIAL         // Gewerbe
+}
+
+// Lease Status
+enum LeaseStatus {
+  ACTIVE
+  PENDING
+  ENDED
+  CANCELLED
+}
+
+// Maintenance Ticket Status
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+// Maintenance Ticket Priority
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  EMERGENCY
+}
+
+// Organization (Tenant) - The Property Management Company
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique // For diverse subdomains if needed
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users      User[]
+  properties Property[]
+  tenants    Person[]
+  vendors    Vendor[]
+  tickets    Ticket[]
+  folders    Folder[]
+  documents  Document[]
+}
+
+// User - System users (Admins, Managers, Accountants)
+// Tenants have their own profile linked here purely for auth if they log in
+model User {
+  id             String   @id @default(uuid())
+  email          String   @unique
+  name           String?
+  hashedPassword String?  // If using credential auth; optional if using Clerk/Auth.js with social
+  role           UserRole @default(PROPERTY_MANAGER)
+  
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  assignedTickets Ticket[] // Tickets assigned to this user (e.g. property manager)
+  uploadedDocuments Document[] // Documents uploaded by this user
+}
+
+// Property - A physical building or complex
+model Property {
+  id        String   @id @default(uuid())
+  name      String   // E.g. "Sunset Apartments" or "Musterstraße 123"
+  address   String
+  city      String
+  zip       String
+  country   String   @default("DE")
+  yearBuilt Int?
+  type      PropertyType
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  units     Unit[]
+  documents Document[]
+  folders   Folder[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Unit - A rentable space within a property
+model Unit {
+  id           String  @id @default(uuid())
+  unitNumber   String  // E.g. "Top 12", "Apt 4B"
+  floor        Int?
+  sizeSqm      Float   // Square meters (German standard)
+  rooms        Float?  // E.g. 2.5 rooms
+  
+  // Base rent configuration
+  targetColdRent Float? // Kaltmiete prediction
+  
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+
+  leases       Lease[]
+  currentTenant Lease? @relation("CurrentLease") // Optimization relation
+  documents    Document[]
+  folders      Folder[]
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// Person - A repository of people (Tenants, Vendors contacts, etc.)
+// Separated from User because they might not have login access initially
+model Person {
+  id        String   @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  leases    Lease[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Lease (Tenancy) - The contract
+model Lease {
+  id        String      @id @default(uuid())
+  startDate DateTime
+  endDate   DateTime?   // Null means indefinite (unbefristet)
+  status    LeaseStatus @default(ACTIVE)
+  
+  // Financials (German breakdown)
+  coldRent      Float // Kaltmiete
+  utilityAdvance Float // Nebenkosten-Vorauszahlung
+  parkingRent   Float?
+  deposit       Float // Kaution
+
+  // Bank Info for SEPA
+  iban          String?
+  bic           String?
+
+  // Rent increase tracking
+  rentIncreaseRule    String?    // "§ 558 BGB" or "VPI-Index"
+  lastRentIncreaseAt  DateTime?  // Kaltmiete zuletzt erhöht am
+  cpiAtIncrease       Float?     // VPI Stand bei Erhöhung
+  cpiCurrent          Float?     // VPI Stand heute
+
+  unitId    String
+  unit      Unit   @relation(fields: [unitId], references: [id])
+  
+  // For simplicity, one main tenant per lease for now, or use relation table for many-to-many
+  mainTenantId String
+  mainTenant   Person @relation(fields: [mainTenantId], references: [id])
+
+  // Optimization: Relation back to Unit for "current lease" if active?
+  // Prisma doesn't support conditional relations easily, handled in logic.
+  currentUnit Unit? @relation("CurrentLease", fields: [currentUnitId], references: [id])
+  currentUnitId String? @unique 
+
+  documents Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Vendor - Service providers
+model Vendor {
+  id        String   @id @default(uuid())
+  companyName String
+  serviceType String // Plumbing, Electrical, cleaning...
+  email     String?
+  phone     String?
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  tickets   Ticket[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Ticket - Maintenance requests
+model Ticket {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  status      TicketStatus @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  
+  // Images/Files
+  images      String[] // URLs
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  vendorId    String?
+  vendor      Vendor?   @relation(fields: [vendorId], references: [id])
+
+  assignedToId String?
+  assignedTo   User?   @relation(fields: [assignedToId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Folder - Hierarchical folder structure for documents (Google Drive-like)
+model Folder {
+  id        String   @id @default(uuid())
+  name      String
+  
+  // Parent folder for nesting (null = root folder)
+  parentId  String?
+  parent    Folder?  @relation("FolderHierarchy", fields: [parentId], references: [id])
+  children  Folder[] @relation("FolderHierarchy")
+  
+  // Scope: A folder belongs to either a Property OR a Unit OR Organization-level
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  
+  unitId    String?
+  unit      Unit?     @relation(fields: [unitId], references: [id])
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  
+  documents Document[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([organizationId])
+}
+
+// Document - Enhanced file storage with metadata
+model Document {
+  id        String   @id @default(uuid())
+  name      String   // Original filename
+  
+  // File metadata
+  storagePath  String   // Path in Supabase Storage bucket
+  mimeType     String   // e.g., "application/pdf", "image/jpeg"
+  sizeBytes    Int      // File size in bytes
+  
+  // Document categorization
+  type      String?  // Contract, Invoice, Protocol, Photo, Receipt, etc.
+  description String?
+  
+  // Versioning
+  version    Int      @default(1)
+  isLatest   Boolean  @default(true)
+  previousVersionId String?
+  previousVersion   Document? @relation("DocumentVersions", fields: [previousVersionId], references: [id])
+  newerVersions     Document[] @relation("DocumentVersions")
+  
+  // Folder organization (optional - can be at root level)
+  folderId   String?
+  folder     Folder?   @relation(fields: [folderId], references: [id])
+  
+  // Direct property/unit association (for documents not in folders)
+  propertyId String?
+  property   Property? @relation(fields: [propertyId], references: [id])
+  
+  unitId     String?
+  unit       Unit?     @relation(fields: [unitId], references: [id])
+  
+  // Lease association for contract documents
+  leaseId    String?
+  lease      Lease?    @relation(fields: [leaseId], references: [id])
+  
+  // Organization scope
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  
+  // Uploaded by
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@index([propertyId])
+  @@index([unitId])
+  @@index([folderId])
+  @@index([organizationId])
+  @@index([type])
+  
+  // Relation to chunks
+  chunks DocumentChunk[]
+}
+
+// DocumentChunk - Text chunks with embeddings for semantic search (RAG)
+model DocumentChunk {
+  id        String   @id @default(uuid())
+  
+  // Reference to parent document
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  
+  // Chunk content
+  content   String   // The text content of this chunk
+  chunkIndex Int     // Order of chunk within document (0, 1, 2...)
+  
+  // Embedding vector (3072 dimensions for Gemini gemini-embedding-001)
+  embedding Unsupported("vector(3072)")?
+  
+  // Metadata
+  pageNumber Int?    // For PDFs, which page this came from
+  
+  // Organization scope (denormalized for query efficiency)
+  organizationId String
+  
+  createdAt DateTime @default(now())
+  
+  @@index([documentId])
+  @@index([organizationId])
+}
+
+// VPI (Verbraucherpreisindex) – Consumer Price Index from Destatis
+model VpiIndex {
+  id    String @id @default(uuid())
+  year  Int
+  month Int    // 1-12
+  value Float  // VPI value (basis 2020 = 100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([year, month])
+  @@index([year, month])
+}
+
