@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Users, Euro, Home } from 'lucide-react';
+import { Building2, Users, Euro, Home, ArrowLeft } from 'lucide-react';
 import ImportButton from '@/components/rent-roll/import-button';
 
 export default async function RentRollPage() {
@@ -110,6 +110,13 @@ export default async function RentRollPage() {
 
     return (
         <main className="p-6">
+            <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+            >
+                <ArrowLeft className="h-4 w-4" />
+                Zurück zum Dashboard
+            </Link>
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Rent Roll</h1>

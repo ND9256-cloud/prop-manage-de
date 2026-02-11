@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Plus, MapPin, Home, FileText, Users } from 'lucide-react';
+import { Building2, Plus, MapPin, Home, FileText, Users, ArrowLeft } from 'lucide-react';
 import PropertyForm from '@/components/properties/property-form';
 
 export default async function PropertiesPage() {
@@ -49,6 +49,13 @@ export default async function PropertiesPage() {
 
     return (
         <main className="p-6">
+            <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+            >
+                <ArrowLeft className="h-4 w-4" />
+                Zurück zum Dashboard
+            </Link>
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h1 className="text-2xl font-bold">Immobilien</h1>
