@@ -1,14 +1,34 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+let _supabase: SupabaseClient | null = null;
+let _supabaseAdmin: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export function getSupabase(): SupabaseClient {
+    if (!_supabase) {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+        if (!url || !key) throw new Error('Supabase env vars not set');
+        _supabase = createClient(url, key);
+    }
+    return _supabase;
+}
 
-// For server-side operations with service role (admin access)
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+export function getSupabaseAdmin(): SupabaseClient | null {
+    if (!_supabaseAdmin) {
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!url || !key) return null;
+        _supabaseAdmin = createClient(url, key);
+    }
+    return _supabaseAdmin;
+}
 
-export const supabaseAdmin = supabaseServiceRoleKey
-    ? createClient(supabaseUrl, supabaseServiceRoleKey)
-    : null;
+// Keep backward-compatible exports (lazy getters)
+export const supabase = new Proxy({} as SupabaseClient, {
+    get(_, prop) { return (getSupabase() as any)[prop]; },
+});
+
+export const supabaseAdmin = new Proxy({} as SupabaseClient, {
+    get(_, prop) { return (getSupabaseAdmin() as any)?.[prop]; },
+});
