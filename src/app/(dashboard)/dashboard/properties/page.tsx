@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Building2, Plus, MapPin, Home, FileText, Users, ArrowLeft } from 'lucide-react';
+import { Building2, Plus, MapPin, Home, Users, ArrowLeft } from 'lucide-react';
 import PropertyForm from '@/components/properties/property-form';
 
 export default async function PropertiesPage() {
@@ -27,7 +27,7 @@ export default async function PropertiesPage() {
     const properties = await prisma.property.findMany({
         where: { organizationId: user.organizationId },
         include: {
-            _count: { select: { units: true, documents: true } },
+            _count: { select: { units: true } },
             units: {
                 include: {
                     leases: {
@@ -152,10 +152,7 @@ export default async function PropertiesPage() {
                                             <Users className="h-4 w-4" />
                                             {propertyOccupancy}% belegt
                                         </span>
-                                        <span className="flex items-center gap-1">
-                                            <FileText className="h-4 w-4" />
-                                            {property._count.documents}
-                                        </span>
+
                                     </div>
                                     <div className="flex gap-2">
                                         <Link href={`/dashboard/properties/${property.id}`} className="flex-1">
@@ -163,11 +160,7 @@ export default async function PropertiesPage() {
                                                 Details
                                             </Button>
                                         </Link>
-                                        <Link href={`/dashboard/properties/${property.id}/documents`}>
-                                            <Button variant="ghost" size="sm">
-                                                <FileText className="h-4 w-4" />
-                                            </Button>
-                                        </Link>
+
 
                                     </div>
                                 </CardContent>

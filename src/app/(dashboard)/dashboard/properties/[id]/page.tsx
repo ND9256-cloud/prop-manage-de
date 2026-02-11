@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Edit, Home, FileText, MessageSquare, Plus, Users, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Edit, Home, Plus, Users, Trash2, UserPlus } from 'lucide-react';
 import PropertyForm from '@/components/properties/property-form';
 import UnitForm from '@/components/properties/unit-form';
 import LeaseForm from '@/components/tenants/lease-form';
@@ -48,7 +48,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 },
                 orderBy: { unitNumber: 'asc' },
             },
-            _count: { select: { documents: true } },
+
         },
     });
 
@@ -108,23 +108,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                         </form>
                     </div>
                 </div>
-            </div>
-
-            {/* Quick Links */}
-            <div className="flex gap-2 mb-6">
-                <Link href={`/dashboard/properties/${propertyId}/documents`}>
-                    <Button variant="outline">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Dokumente ({property._count.documents})
-                    </Button>
-                </Link>
-
-                <Link href={`/dashboard/properties/${propertyId}/chat`}>
-                    <Button variant="outline">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        KI-Assistent
-                    </Button>
-                </Link>
             </div>
 
             {/* Stats */}
@@ -256,20 +239,22 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             </Card>
 
             {/* No persons hint */}
-            {persons.length === 0 && property.units.some(u => u.leases.length === 0) && (
-                <Card className="mt-6 border-dashed">
-                    <CardContent className="py-6 text-center">
-                        <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-muted-foreground">
-                            Um Einheiten zu vermieten, legen Sie zuerst{' '}
-                            <Link href="/dashboard/rent-roll" className="text-primary hover:underline">
-                                Mieter an
-                            </Link>
-                            .
-                        </p>
-                    </CardContent>
-                </Card>
-            )}
-        </main>
+            {
+                persons.length === 0 && property.units.some(u => u.leases.length === 0) && (
+                    <Card className="mt-6 border-dashed">
+                        <CardContent className="py-6 text-center">
+                            <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                            <p className="text-muted-foreground">
+                                Um Einheiten zu vermieten, legen Sie zuerst{' '}
+                                <Link href="/dashboard/rent-roll" className="text-primary hover:underline">
+                                    Mieter an
+                                </Link>
+                                .
+                            </p>
+                        </CardContent>
+                    </Card>
+                )
+            }
+        </main >
     );
 }
