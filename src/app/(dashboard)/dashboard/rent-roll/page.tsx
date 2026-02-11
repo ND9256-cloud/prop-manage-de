@@ -179,8 +179,7 @@ export default async function RentRollPage() {
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Warmmiete</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Mieterhöhungsregel</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Zuletzt erhöht</th>
-                                        <th className="text-right p-3 font-medium whitespace-nowrap">VPI bei Erhöhung</th>
-                                        <th className="text-right p-3 font-medium whitespace-nowrap">VPI aktuell</th>
+
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Pot. Erhöhung</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Kaution</th>
                                     </tr>
@@ -208,14 +207,7 @@ export default async function RentRollPage() {
                                                     ? fmtDate(lease.lastRentIncreaseAt)
                                                     : <span className="text-muted-foreground italic">noch keine Erhöhung</span>}
                                             </td>
-                                            <td className="p-3 text-right whitespace-nowrap">
-                                                {lease.lastRentIncreaseAt
-                                                    ? getVpi(lease.lastRentIncreaseAt) ?? '—'
-                                                    : '—'}
-                                            </td>
-                                            <td className="p-3 text-right whitespace-nowrap">
-                                                {latestVpi?.value ?? '—'}
-                                            </td>
+
                                             {(() => {
                                                 const refDate = lease.lastRentIncreaseAt ?? lease.startDate;
                                                 const vpiRef = getVpi(refDate);
@@ -240,7 +232,7 @@ export default async function RentRollPage() {
                                             {fmt(leases.reduce((s, l) => s + l.utilityAdvance, 0))}
                                         </td>
                                         <td className="p-3 text-right">{fmt(totalWarmRent)}</td>
-                                        <td className="p-3" colSpan={5}></td>
+                                        <td className="p-3" colSpan={3}></td>
                                         <td className="p-3 text-right">{fmt(totalDeposit)}</td>
                                     </tr>
                                 </tbody>
