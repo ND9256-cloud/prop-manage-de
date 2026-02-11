@@ -175,6 +175,7 @@ export default async function RentRollPage() {
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Wohnfläche</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Mietstart</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Kaltmiete</th>
+                                        <th className="text-right p-3 font-medium whitespace-nowrap">€/m²/p.a.</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">BK-Vorauszahlung</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Warmmiete</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Mieterhöhungsregel</th>
@@ -197,6 +198,7 @@ export default async function RentRollPage() {
                                             <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm} m²</td>
                                             <td className="p-3 whitespace-nowrap">{fmtDate(lease.startDate)}</td>
                                             <td className="p-3 text-right whitespace-nowrap">{fmt(lease.coldRent)}</td>
+                                            <td className="p-3 text-right whitespace-nowrap">{fmt(lease.coldRent / lease.unit.sizeSqm * 12)}</td>
                                             <td className="p-3 text-right whitespace-nowrap">{fmt(lease.utilityAdvance)}</td>
                                             <td className="p-3 text-right whitespace-nowrap font-medium">
                                                 {fmt(lease.coldRent + lease.utilityAdvance)}
@@ -228,6 +230,7 @@ export default async function RentRollPage() {
                                         <td className="p-3 text-right">{totalArea} m²</td>
                                         <td className="p-3" colSpan={1}></td>
                                         <td className="p-3 text-right">{fmt(totalColdRent)}</td>
+                                        <td className="p-3 text-right">{fmt(totalArea > 0 ? totalColdRent / totalArea * 12 : 0)}</td>
                                         <td className="p-3 text-right">
                                             {fmt(leases.reduce((s, l) => s + l.utilityAdvance, 0))}
                                         </td>
