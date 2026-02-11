@@ -83,6 +83,10 @@ export default async function RentRollPage() {
         return `${streetAbbr}·${house}·${floor}`;
     };
     const totalArea = leases.reduce((sum, l) => sum + l.unit.sizeSqm, 0);
+    const erv = leases.length > 0
+        ? Math.max(...leases.map(l => l.coldRent / l.unit.sizeSqm * 12))
+        : 0;
+    const totalErvTotal = leases.reduce((sum, l) => sum + erv * l.unit.sizeSqm, 0);
 
     const fmt = (n: number) =>
         n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -178,6 +182,8 @@ export default async function RentRollPage() {
                                         <th className="text-right p-3 font-medium whitespace-nowrap">€/m²/p.a.</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">BK-Vorauszahlung</th>
                                         <th className="text-right p-3 font-medium whitespace-nowrap">Warmmiete</th>
+                                        <th className="text-right p-3 font-medium whitespace-nowrap">ERV</th>
+                                        <th className="text-right p-3 font-medium whitespace-nowrap">ERV Total</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Mieterhöhungsregel</th>
                                         <th className="text-left p-3 font-medium whitespace-nowrap">Zuletzt erhöht</th>
 
@@ -203,6 +209,8 @@ export default async function RentRollPage() {
                                             <td className="p-3 text-right whitespace-nowrap font-medium">
                                                 {fmt(lease.coldRent + lease.utilityAdvance)}
                                             </td>
+                                            <td className="p-3 text-right whitespace-nowrap">{fmt(erv)}</td>
+                                            <td className="p-3 text-right whitespace-nowrap">{fmt(erv * lease.unit.sizeSqm)}</td>
                                             <td className="p-3 whitespace-nowrap">{lease.rentIncreaseRule || '—'}</td>
                                             <td className="p-3 whitespace-nowrap">
                                                 {lease.lastRentIncreaseAt
@@ -235,6 +243,8 @@ export default async function RentRollPage() {
                                             {fmt(leases.reduce((s, l) => s + l.utilityAdvance, 0))}
                                         </td>
                                         <td className="p-3 text-right">{fmt(totalWarmRent)}</td>
+                                        <td className="p-3 text-right">{fmt(erv)}</td>
+                                        <td className="p-3 text-right">{fmt(totalErvTotal)}</td>
                                         <td className="p-3" colSpan={3}></td>
                                         <td className="p-3 text-right">{fmt(totalDeposit)}</td>
                                     </tr>
