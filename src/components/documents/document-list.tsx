@@ -49,21 +49,31 @@ export default function DocumentList({
     const [docs, setDocs] = useState(initialDocs);
     const [uploading, setUploading] = useState(false);
     const [selectedType, setSelectedType] = useState('contract');
+    const [extractionMsg, setExtractionMsg] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     async function handleUpload(files: FileList | null) {
         if (!files || files.length === 0) return;
         setUploading(true);
+        setExtractionMsg(null);
         try {
+            const messages: string[] = [];
             for (const file of Array.from(files)) {
                 const fd = new FormData();
                 fd.set('propertyId', propertyId);
                 fd.set('type', selectedType);
                 fd.set('file', file);
-                await uploadDocument(fd);
+                const result = await uploadDocument(fd);
+                if (result.extracted) {
+                    messages.push(`✅ Dienstleister erkannt: ${result.extracted}`);
+                }
             }
-            window.location.reload();
+            if (messages.length > 0) {
+                setExtractionMsg(messages.join('\n'));
+            }
+            // Delay reload slightly so user can see the extraction message
+            setTimeout(() => window.location.reload(), messages.length > 0 ? 2000 : 0);
         } catch (e) {
             alert(`Upload fehlgeschlagen: ${(e as Error).message}`);
         } finally {
@@ -133,8 +143,8 @@ export default function DocumentList({
                 {/* Drop zone */}
                 <div
                     className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors mb-4 ${dragOver
-                            ? 'border-primary bg-primary/5'
-                            : 'border-muted-foreground/20'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-muted-foreground/20'
                         }`}
                     onDragOver={(e) => {
                         e.preventDefault();
@@ -151,6 +161,13 @@ export default function DocumentList({
                         Dateien hierher ziehen oder oben auf &quot;Hochladen&quot; klicken
                     </p>
                 </div>
+
+                {/* Extraction status */}
+                {extractionMsg && (
+                    <div className="mb-4 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-300">
+                        {extractionMsg}
+                    </div>
+                )}
 
                 {/* Document list */}
                 {docs.length === 0 ? (
