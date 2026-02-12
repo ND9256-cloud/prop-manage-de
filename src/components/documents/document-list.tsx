@@ -48,7 +48,6 @@ export default function DocumentList({
 }) {
     const [docs, setDocs] = useState(initialDocs);
     const [uploading, setUploading] = useState(false);
-    const [selectedType, setSelectedType] = useState('contract');
     const [extractionMsg, setExtractionMsg] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -62,7 +61,7 @@ export default function DocumentList({
             for (const file of Array.from(files)) {
                 const fd = new FormData();
                 fd.set('propertyId', propertyId);
-                fd.set('type', selectedType);
+                fd.set('type', 'other');
                 fd.set('file', file);
                 const result = await uploadDocument(fd);
                 if (result.extracted) {
@@ -105,17 +104,6 @@ export default function DocumentList({
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
                 <CardTitle className="text-base">Dokumente</CardTitle>
                 <div className="flex items-center gap-2">
-                    <select
-                        value={selectedType}
-                        onChange={(e) => setSelectedType(e.target.value)}
-                        className="text-sm border rounded-md px-2 py-1.5 bg-background"
-                    >
-                        {DOC_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>
-                                {t.label}
-                            </option>
-                        ))}
-                    </select>
                     <Button
                         variant="outline"
                         size="sm"
@@ -127,7 +115,7 @@ export default function DocumentList({
                         ) : (
                             <Upload className="h-4 w-4 mr-2" />
                         )}
-                        Hochladen
+                        Import
                     </Button>
                     <input
                         ref={inputRef}
