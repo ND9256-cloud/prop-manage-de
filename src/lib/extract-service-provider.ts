@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const SYSTEM_PROMPT = `Du bist ein Experte für deutsche Immobilienverwaltung. Analysiere den folgenden Dokumenttext und extrahiere Informationen über den Dienstleister/Versorger.
+const SYSTEM_PROMPT = `Du bist ein Experte für deutsche Immobilienverwaltung. Analysiere das folgende Dokument und extrahiere Informationen über den Dienstleister/Versorger.
 
 Antworte NUR mit gültigem JSON in diesem Format (keine Erklärungen):
 {
@@ -36,7 +36,8 @@ export interface ExtractedProvider {
 }
 
 export async function extractServiceProvider(
-    documentText: string,
+    fileBuffer: ArrayBuffer,
+    mimeType: string,
 ): Promise<ExtractedProvider> {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -54,12 +55,21 @@ export async function extractServiceProvider(
     });
 
     try {
+        // Convert buffer to base64 for inline data
+        const base64Data = Buffer.from(fileBuffer).toString('base64');
+
         const result = await model.generateContent([
             { text: SYSTEM_PROMPT },
-            { text: documentText.slice(0, 8000) },
+            {
+                inlineData: {
+                    mimeType,
+                    data: base64Data,
+                },
+            },
         ]);
 
         const content = result.response.text();
+        console.log('Gemini extraction result:', content);
         if (!content) return { found: false };
 
         const parsed = JSON.parse(content) as ExtractedProvider;
@@ -67,17 +77,5 @@ export async function extractServiceProvider(
     } catch (err) {
         console.error('AI extraction failed:', err);
         return { found: false };
-    }
-}
-
-export async function extractTextFromPdf(buffer: ArrayBuffer): Promise<string> {
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pdfParse = require('pdf-parse');
-        const result = await pdfParse(Buffer.from(buffer));
-        return result.text;
-    } catch (err) {
-        console.error('PDF parse failed:', err);
-        return '';
     }
 }

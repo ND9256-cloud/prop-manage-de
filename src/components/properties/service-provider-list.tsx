@@ -176,12 +176,13 @@ export default function ServiceProviderList({
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-base font-semibold">Dienstleister & Versorger</h2>
-                    <p className="text-xs text-muted-foreground">
-                        Werden automatisch aus hochgeladenen Dokumenten erkannt
-                    </p>
-                </div>
+                <h2 className="text-base font-semibold">Dienstleister & Versorger</h2>
+                {!showForm && !editingId && (
+                    <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Hinzufügen
+                    </Button>
+                )}
             </div>
 
             {/* 4 Summary Cards */}
