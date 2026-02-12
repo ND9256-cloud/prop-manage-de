@@ -11,6 +11,7 @@ import PropertyForm from '@/components/properties/property-form';
 import UnitForm from '@/components/properties/unit-form';
 import LeaseForm from '@/components/tenants/lease-form';
 import DocumentList from '@/components/documents/document-list';
+import ServiceProviderList from '@/components/properties/service-provider-list';
 import { deleteProperty } from '@/lib/property-actions';
 
 interface PageProps {
@@ -59,6 +60,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     mimeType: true,
                     createdAt: true,
                 },
+            },
+            serviceProviders: {
+                orderBy: { category: 'asc' },
             },
         },
     });
@@ -266,6 +270,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     </Card>
                 )
             }
+
+            {/* Service Providers */}
+            <div className="mt-6">
+                <ServiceProviderList
+                    propertyId={propertyId}
+                    providers={property.serviceProviders}
+                />
+            </div>
 
             {/* Documents */}
             <div className="mt-6">
