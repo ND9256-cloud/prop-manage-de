@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const SYSTEM_PROMPT = `Du bist ein Experte für deutsche Immobilienverwaltung. Analysiere den folgenden Dokumenttext und extrahiere Informationen über den Dienstleister/Versorger.
 
@@ -38,26 +38,28 @@ export interface ExtractedProvider {
 export async function extractServiceProvider(
     documentText: string,
 ): Promise<ExtractedProvider> {
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-        console.warn('OPENAI_API_KEY not set — skipping extraction');
+        console.warn('GEMINI_API_KEY not set — skipping extraction');
         return { found: false };
     }
 
-    const openai = new OpenAI({ apiKey });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({
+        model: 'gemini-2.0-flash',
+        generationConfig: {
+            temperature: 0,
+            responseMimeType: 'application/json',
+        },
+    });
 
     try {
-        const response = await openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            temperature: 0,
-            messages: [
-                { role: 'system', content: SYSTEM_PROMPT },
-                { role: 'user', content: documentText.slice(0, 8000) }, // limit context
-            ],
-            response_format: { type: 'json_object' },
-        });
+        const result = await model.generateContent([
+            { text: SYSTEM_PROMPT },
+            { text: documentText.slice(0, 8000) },
+        ]);
 
-        const content = response.choices[0]?.message?.content;
+        const content = result.response.text();
         if (!content) return { found: false };
 
         const parsed = JSON.parse(content) as ExtractedProvider;
