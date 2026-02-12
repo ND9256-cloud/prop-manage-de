@@ -84,7 +84,8 @@ model Property {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  units     Unit[]
+  units      Unit[]
+  documents  Document[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -186,3 +187,18 @@ model VpiIndex {
   @@index([year, month])
 }
 
+// Document - Files stored in Supabase Storage, linked to a property
+model Document {
+  id          String   @id @default(uuid())
+  name        String   // Original filename or user-given name
+  type        String   // "contract", "invoice", "notice", "other"
+  storagePath String   // Path in Supabase storage bucket
+  fileSize    Int      // Bytes
+  mimeType    String   // "application/pdf", "image/jpeg", etc.
+
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

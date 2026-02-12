@@ -10,6 +10,7 @@ import { ArrowLeft, Edit, Home, Plus, Users, Trash2, UserPlus } from 'lucide-rea
 import PropertyForm from '@/components/properties/property-form';
 import UnitForm from '@/components/properties/unit-form';
 import LeaseForm from '@/components/tenants/lease-form';
+import DocumentList from '@/components/documents/document-list';
 import { deleteProperty } from '@/lib/property-actions';
 
 interface PageProps {
@@ -48,7 +49,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 },
                 orderBy: { unitNumber: 'asc' },
             },
-
+            documents: {
+                orderBy: { createdAt: 'desc' },
+                select: {
+                    id: true,
+                    name: true,
+                    type: true,
+                    fileSize: true,
+                    mimeType: true,
+                    createdAt: true,
+                },
+            },
         },
     });
 
@@ -255,6 +266,17 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     </Card>
                 )
             }
+
+            {/* Documents */}
+            <div className="mt-6">
+                <DocumentList
+                    propertyId={propertyId}
+                    documents={property.documents.map((d) => ({
+                        ...d,
+                        createdAt: d.createdAt.toISOString(),
+                    }))}
+                />
+            </div>
         </main >
     );
 }
