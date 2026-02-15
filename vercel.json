@@ -3,6 +3,10 @@
         {
             "path": "/api/vpi/update",
             "schedule": "0 10 15 * *"
+        },
+        {
+            "path": "/api/banking/sync",
+            "schedule": "0 6 * * *"
         }
     ]
 }

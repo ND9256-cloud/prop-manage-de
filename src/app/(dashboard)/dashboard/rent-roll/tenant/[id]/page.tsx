@@ -5,6 +5,8 @@ import { notFound } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Mail, Phone, User, Home, Euro, Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { getTenantPayments } from '@/lib/bank-actions';
+import TenantPaymentHistory from '@/components/tenants/tenant-payment-history';
 
 export default async function TenantDetailPage({
     params,
@@ -34,6 +36,9 @@ export default async function TenantDetailPage({
     });
 
     if (!person) notFound();
+
+    // Fetch initial payment history
+    const paymentsResult = await getTenantPayments(person.id, 1, 10);
 
     const fmt = (n: number) =>
         n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -172,6 +177,25 @@ export default async function TenantDetailPage({
                     </CardContent>
                 </Card>
             )}
+
+            {/* Payment History */}
+            <Card className="mb-6">
+                <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Euro className="h-4 w-4 text-muted-foreground" />
+                        Zahlungshistorie
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <TenantPaymentHistory
+                        personId={person.id}
+                        initialTransactions={paymentsResult.transactions as any}
+                        initialTotal={paymentsResult.total}
+                        initialPage={paymentsResult.page}
+                        initialTotalPages={paymentsResult.totalPages}
+                    />
+                </CardContent>
+            </Card>
 
             {/* Past Leases */}
             {pastLeases.length > 0 && (

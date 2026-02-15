@@ -47,9 +47,11 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   // Relations
-  users      User[]
-  properties Property[]
-  tenants    Person[]
+  users           User[]
+  properties      Property[]
+  tenants         Person[]
+  bankConnections BankConnection[]
+  bankAccounts    BankAccount[]
 }
 
 // User - System users (Admins, Managers, Accountants)
@@ -87,6 +89,7 @@ model Property {
   units            Unit[]
   documents        Document[]
   serviceProviders ServiceProvider[]
+  bankTransactions BankTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -125,7 +128,8 @@ model Person {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  leases    Lease[]
+  leases           Lease[]
+  bankTransactions BankTransaction[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -222,4 +226,75 @@ model ServiceProvider {
 
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// Bank Connection - A link to a bank via Enable Banking
+model BankConnection {
+  id              String   @id @default(uuid())
+  aspspName       String   // e.g. "Deutsche Kreditbank (DKB)"
+  aspspCountry    String   @default("DE")
+  sessionId       String?  @unique // Enable Banking session ID
+  authorizationId String?  // Enable Banking authorization ID
+  status          String   @default("PENDING") // PENDING, ACTIVE, EXPIRED, ERROR
+
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
+  accounts        BankAccount[]
+
+  validUntil      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// Bank Account - An individual bank account within a connection
+model BankAccount {
+  id               String   @id @default(uuid())
+  externalId       String   @unique // Enable Banking account ID
+  iban             String?
+  ownerName        String?
+
+  bankConnectionId String
+  bankConnection   BankConnection @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+
+  transactions     BankTransaction[]
+  lastSyncedAt     DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Bank Transaction - Individual booking entries (Buchungsjournal)
+model BankTransaction {
+  id                   String   @id @default(uuid())
+  entryReference       String?  // Bank's transaction ID (for dedup)
+  bookingDate          DateTime
+  valueDate            DateTime?
+  amount               Float    // Positive = credit, negative = debit
+  currency             String   @default("EUR")
+  creditDebitIndicator String?  // "CRDT" or "DBIT"
+  debtorName           String?
+  debtorIban           String?
+  creditorName         String?
+  creditorIban         String?
+  purpose              String?  // remittance_information
+  transactionCode      String?
+
+  bankAccountId        String
+  bankAccount          BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  // Manual assignment (auto-propagated by IBAN)
+  propertyId           String?
+  property             Property? @relation(fields: [propertyId], references: [id])
+  tenantId             String?
+  tenant               Person?   @relation(fields: [tenantId], references: [id])
+
+  createdAt            DateTime @default(now())
+
+  @@unique([bankAccountId, entryReference])
+  @@index([bankAccountId, bookingDate])
+  @@index([tenantId])
+  @@index([propertyId])
 }

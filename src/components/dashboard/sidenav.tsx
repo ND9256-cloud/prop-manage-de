@@ -4,6 +4,7 @@ import {
     Home,
     Building,
     Users,
+    Landmark,
     LogOut
 } from 'lucide-react';
 import { SignOut } from '@/components/sign-out';
@@ -39,6 +40,7 @@ const links = [
         icon: Building,
     },
     { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users },
+    { name: 'Konten', href: '/dashboard/banking', icon: Landmark },
 ];
 
 function NavLinks() {
