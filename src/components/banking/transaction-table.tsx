@@ -13,7 +13,13 @@ import {
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2, Tag } from 'lucide-react';
 
 const BOOKING_CATEGORIES = [
-    { value: 'Bruttomieteinnahmen', label: 'Bruttomieteinnahmen' },
+    { value: 'Bruttomieteinnahmen', label: 'Bruttomieteinnahmen', group: 'Mieteinnahmen' },
+    { value: 'NK: Gas', label: 'Gas', group: 'Umlegbare Nebenkosten' },
+    { value: 'NK: Strom', label: 'Strom', group: 'Umlegbare Nebenkosten' },
+    { value: 'NK: Versicherung', label: 'Versicherung', group: 'Umlegbare Nebenkosten' },
+    { value: 'NK: Grundbesitzabgaben', label: 'Grundbesitzabgaben', group: 'Umlegbare Nebenkosten' },
+    { value: 'NK: Verbrauchsdatenerfassung', label: 'Verbrauchsdatenerfassung', group: 'Umlegbare Nebenkosten' },
+    { value: 'NK: Sonstige Dienstleister', label: 'Sonstige Dienstleister', group: 'Umlegbare Nebenkosten' },
 ] as const;
 
 import { assignTransaction } from '@/lib/bank-actions';
@@ -489,11 +495,25 @@ function AssignmentSelect({
                         <SelectItem value="__none__">
                             <span className="text-muted-foreground italic">Keine Kategorie</span>
                         </SelectItem>
-                        {BOOKING_CATEGORIES.map((cat) => (
-                            <SelectItem key={cat.value} value={cat.value}>
-                                {cat.label}
-                            </SelectItem>
-                        ))}
+                        {(() => {
+                            let lastGroup = '';
+                            return BOOKING_CATEGORIES.map((cat) => {
+                                const showGroup = cat.group !== lastGroup;
+                                lastGroup = cat.group;
+                                return (
+                                    <span key={cat.value}>
+                                        {showGroup && (
+                                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                                {cat.group}
+                                            </div>
+                                        )}
+                                        <SelectItem value={cat.value}>
+                                            {cat.label}
+                                        </SelectItem>
+                                    </span>
+                                );
+                            });
+                        })()}
                     </SelectContent>
                 </Select>
             </div>

@@ -27,6 +27,7 @@ const VIEW_LABELS: Record<ViewMode, string> = {
 
 const CATEGORY_LABELS: Record<string, string> = {
     Bruttomieteinnahmen: 'Bruttomieteinnahmen',
+    'Umlegbare Nebenkosten': 'Umlegbare Nebenkosten',
     Kaution: 'Kaution',
     __uncategorized__: 'Nicht kategorisiert',
 };
@@ -66,19 +67,28 @@ function aggregate(transactions: RawTransaction[], mode: ViewMode) {
         return { periods: [], categories: [], periodData: {} as Record<string, Record<string, number>>, periodTotals: {} as Record<string, number>, totals: {} as Record<string, number>, grandTotal: 0 };
     }
 
+    // Map raw categories to display categories (group all NK: into one row)
+    const displayCategory = (cat: string) => cat.startsWith('NK: ') ? 'Umlegbare Nebenkosten' : cat;
+
     const periodsSet = new Set<string>();
     const categoriesSet = new Set<string>();
 
     for (const tx of transactions) {
         const d = new Date(tx.date);
         periodsSet.add(getPeriodKey(d, mode));
-        categoriesSet.add(tx.category);
+        categoriesSet.add(displayCategory(tx.category));
     }
 
     const periods = Array.from(periodsSet).sort();
+
+    // Fixed display order
+    const CATEGORY_ORDER = ['Bruttomieteinnahmen', 'Umlegbare Nebenkosten', 'Kaution', '__uncategorized__'];
     const categories = Array.from(categoriesSet).sort((a, b) => {
-        if (a === '__uncategorized__') return 1;
-        if (b === '__uncategorized__') return -1;
+        const ai = CATEGORY_ORDER.indexOf(a);
+        const bi = CATEGORY_ORDER.indexOf(b);
+        const aIdx = ai >= 0 ? ai : CATEGORY_ORDER.length;
+        const bIdx = bi >= 0 ? bi : CATEGORY_ORDER.length;
+        if (aIdx !== bIdx) return aIdx - bIdx;
         return a.localeCompare(b, 'de');
     });
 
@@ -94,8 +104,9 @@ function aggregate(transactions: RawTransaction[], mode: ViewMode) {
     for (const tx of transactions) {
         const d = new Date(tx.date);
         const p = getPeriodKey(d, mode);
-        periodData[p][tx.category] += tx.amount;
-        totals[tx.category] += tx.amount;
+        const cat = displayCategory(tx.category);
+        periodData[p][cat] += tx.amount;
+        totals[cat] += tx.amount;
     }
 
     const periodTotals: Record<string, number> = {};
