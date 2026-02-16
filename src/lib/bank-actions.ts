@@ -367,14 +367,17 @@ function isKaution(purpose: string | null): boolean {
  */
 export async function assignTransaction(
     transactionId: string,
-    assignment: { propertyId?: string | null; tenantId?: string | null }
+    assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
 ): Promise<{ updated: number }> {
-    // Fetch purpose for category auto-detection
-    const existing = await prisma.bankTransaction.findUnique({
-        where: { id: transactionId },
-        select: { purpose: true },
-    });
-    const autoCategory = isKaution(existing?.purpose ?? null) ? 'Kaution' : 'Bruttomieteinnahmen';
+    // Use user-provided category, or auto-detect from purpose
+    let category = assignment.category;
+    if (!category) {
+        const existing = await prisma.bankTransaction.findUnique({
+            where: { id: transactionId },
+            select: { purpose: true },
+        });
+        category = isKaution(existing?.purpose ?? null) ? 'Kaution' : null;
+    }
 
     // Update the target transaction with auto-detected category
     const tx = await prisma.bankTransaction.update({
@@ -382,7 +385,7 @@ export async function assignTransaction(
         data: {
             propertyId: assignment.propertyId,
             tenantId: assignment.tenantId,
-            category: autoCategory,
+            category: category,
         },
     });
 
