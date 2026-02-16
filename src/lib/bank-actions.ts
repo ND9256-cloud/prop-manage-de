@@ -601,8 +601,8 @@ export async function syncAllBankAccounts(): Promise<{
 }
 
 /**
- * Get cash flow data for a property since inception.
- * Groups all assigned transactions by category and year.
+ * Get raw cash flow transactions for a property.
+ * Returns individual transactions so the client can aggregate by month/quarter/year.
  */
 export async function getPropertyCashFlow(propertyId: string) {
     const transactions = await prisma.bankTransaction.findMany({
@@ -612,70 +612,13 @@ export async function getPropertyCashFlow(propertyId: string) {
             bookingDate: true,
             amount: true,
             category: true,
-            purpose: true,
-            debtorName: true,
-            creditorName: true,
         },
         orderBy: { bookingDate: 'asc' },
     });
 
-    if (transactions.length === 0) {
-        return { years: [], categories: [], yearlyData: {}, totals: {} };
-    }
-
-    // Collect all years and categories
-    const yearsSet = new Set<number>();
-    const categoriesSet = new Set<string>();
-
-    for (const tx of transactions) {
-        yearsSet.add(new Date(tx.bookingDate).getFullYear());
-        categoriesSet.add(tx.category || '__uncategorized__');
-    }
-
-    const years = Array.from(yearsSet).sort();
-    const categories = Array.from(categoriesSet).sort((a, b) => {
-        // Put uncategorized last
-        if (a === '__uncategorized__') return 1;
-        if (b === '__uncategorized__') return -1;
-        return a.localeCompare(b, 'de');
-    });
-
-    // Build year→category→amount aggregation
-    const yearlyData: Record<number, Record<string, number>> = {};
-    const totals: Record<string, number> = {};
-
-    for (const year of years) {
-        yearlyData[year] = {};
-        for (const cat of categories) {
-            yearlyData[year][cat] = 0;
-        }
-    }
-    for (const cat of categories) {
-        totals[cat] = 0;
-    }
-
-    for (const tx of transactions) {
-        const year = new Date(tx.bookingDate).getFullYear();
-        const cat = tx.category || '__uncategorized__';
-        yearlyData[year][cat] += tx.amount;
-        totals[cat] += tx.amount;
-    }
-
-    // Calculate year totals and grand total
-    const yearTotals: Record<number, number> = {};
-    let grandTotal = 0;
-    for (const year of years) {
-        yearTotals[year] = Object.values(yearlyData[year]).reduce((s, v) => s + v, 0);
-        grandTotal += yearTotals[year];
-    }
-
-    return {
-        years,
-        categories,
-        yearlyData,
-        yearTotals,
-        totals,
-        grandTotal,
-        transactionCount: transactions.length,
-    };
+    return transactions.map((tx) => ({
+        date: tx.bookingDate.toISOString(),
+        amount: tx.amount,
+        category: tx.category || '__uncategorized__',
+    }));
 }
