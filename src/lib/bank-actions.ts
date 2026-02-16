@@ -349,19 +349,22 @@ export async function getBankTransactions(
 }
 
 /**
- * Assign a transaction to a property and/or tenant.
- * Auto-propagates to all unassigned transactions with the same counterpart IBAN.
+ * Assign a transaction to a property and/or tenant with an optional category.
+ * Auto-propagates PROPERTY + TENANT to all unassigned transactions with the
+ * same counterpart IBAN.  Category is NOT propagated because the same IBAN
+ * can send both rent and deposit transfers.
  */
 export async function assignTransaction(
     transactionId: string,
-    assignment: { propertyId?: string | null; tenantId?: string | null }
+    assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
 ): Promise<{ updated: number }> {
-    // Update the target transaction
+    // Update the target transaction (including category)
     const tx = await prisma.bankTransaction.update({
         where: { id: transactionId },
         data: {
             propertyId: assignment.propertyId,
             tenantId: assignment.tenantId,
+            category: assignment.category,
         },
     });
 
@@ -373,7 +376,8 @@ export async function assignTransaction(
         // Find the field to match on (debtor for credits, creditor for debits)
         const ibanField = tx.amount >= 0 ? 'debtorIban' : 'creditorIban';
 
-        // Bulk-assign all other unassigned transactions from the same IBAN
+        // Bulk-assign property+tenant to other unassigned transactions from same IBAN
+        // NOTE: category is deliberately excluded from propagation
         const result = await prisma.bankTransaction.updateMany({
             where: {
                 [ibanField]: counterpartIban,

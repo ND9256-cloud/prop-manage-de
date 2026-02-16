@@ -10,7 +10,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2 } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2, Tag } from 'lucide-react';
+
+// Available booking categories
+const BOOKING_CATEGORIES = [
+    { value: 'Bruttomieteinnahmen', label: 'Bruttomieteinnahmen' },
+] as const;
 import { assignTransaction } from '@/lib/bank-actions';
 
 export interface BankTransactionRow {
@@ -31,6 +36,7 @@ export interface BankTransactionRow {
     createdAt: Date | string;
     propertyId?: string | null;
     tenantId?: string | null;
+    category?: string | null;
 }
 
 export interface AssignmentProperty {
@@ -120,11 +126,12 @@ export default function TransactionTable({
     const handleAssign = async (
         txId: string,
         propertyId: string | null,
-        tenantId: string | null
+        tenantId: string | null,
+        category: string | null
     ) => {
         setAssigningId(txId);
         try {
-            await assignTransaction(txId, { propertyId, tenantId });
+            await assignTransaction(txId, { propertyId, tenantId, category });
             onAssigned?.();
         } finally {
             setAssigningId(null);
@@ -210,7 +217,7 @@ export default function TransactionTable({
                                 const isExpanded = expandedId === tx.id;
                                 const propName = getPropertyName(tx.propertyId);
                                 const tName = getTenantName(tx.tenantId);
-                                const hasAssignment = propName || tName;
+                                const hasAssignment = propName || tName || tx.category;
 
                                 return (
                                     <>
@@ -248,6 +255,12 @@ export default function TransactionTable({
                                                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                                                 <User className="h-3 w-3" />
                                                                 {tName}
+                                                            </span>
+                                                        )}
+                                                        {tx.category && (
+                                                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                                                <Tag className="h-3 w-3" />
+                                                                {tx.category}
                                                             </span>
                                                         )}
                                                     </div>
@@ -392,10 +405,11 @@ function AssignmentSelect({
     tx: BankTransactionRow;
     properties: AssignmentProperty[];
     assigning: boolean;
-    onAssign: (txId: string, propertyId: string | null, tenantId: string | null) => void;
+    onAssign: (txId: string, propertyId: string | null, tenantId: string | null, category: string | null) => void;
 }) {
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>(tx.propertyId || '');
     const [selectedTenantId, setSelectedTenantId] = useState<string>(tx.tenantId || '');
+    const [selectedCategory, setSelectedCategory] = useState<string>(tx.category || '');
 
     const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
     const tenants = selectedProperty?.tenants || [];
@@ -405,7 +419,7 @@ function AssignmentSelect({
         setSelectedPropertyId(propId);
         setSelectedTenantId('');
         if (!propId) {
-            onAssign(tx.id, null, null);
+            onAssign(tx.id, null, null, selectedCategory || null);
         }
     };
 
@@ -415,7 +429,19 @@ function AssignmentSelect({
         onAssign(
             tx.id,
             selectedPropertyId || null,
-            tenId || null
+            tenId || null,
+            selectedCategory || null
+        );
+    };
+
+    const handleCategoryChange = (value: string) => {
+        const cat = value === '__none__' ? '' : value;
+        setSelectedCategory(cat);
+        onAssign(
+            tx.id,
+            selectedPropertyId || null,
+            selectedTenantId || null,
+            cat || null
         );
     };
 
@@ -459,6 +485,24 @@ function AssignmentSelect({
                     </Select>
                 </div>
             )}
+            <div>
+                <label className="text-xs text-muted-foreground block mb-1">Kategorie</label>
+                <Select value={selectedCategory || '__none__'} onValueChange={handleCategoryChange} disabled={assigning}>
+                    <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Kategorie wählen..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="__none__">
+                            <span className="text-muted-foreground italic">Keine Kategorie</span>
+                        </SelectItem>
+                        {BOOKING_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                                {cat.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
             {assigning && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" />

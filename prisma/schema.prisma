@@ -290,6 +290,7 @@ model BankTransaction {
   property             Property? @relation(fields: [propertyId], references: [id])
   tenantId             String?
   tenant               Person?   @relation(fields: [tenantId], references: [id])
+  category             String?   // e.g. "Bruttomieteinnahmen", "Kaution", etc.
 
   createdAt            DateTime @default(now())
 
