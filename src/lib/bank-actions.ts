@@ -396,30 +396,21 @@ export async function assignTransaction(
     if (counterpartIban) {
         const ibanField = tx.amount >= 0 ? 'debtorIban' : 'creditorIban';
 
-        // Find ALL other transactions from the same IBAN (assigned or not)
-        const candidates = await prisma.bankTransaction.findMany({
+        // Propagate ONLY property/tenant assignment to other transactions from the same IBAN.
+        // Do NOT propagate category — each transaction should be categorized individually,
+        // because different payments from the same IBAN may be for different purposes.
+        const result = await prisma.bankTransaction.updateMany({
             where: {
                 [ibanField]: counterpartIban,
                 id: { not: transactionId },
+                propertyId: null,  // only update unassigned ones
             },
-            select: { id: true, purpose: true },
+            data: {
+                propertyId: assignment.propertyId,
+                tenantId: assignment.tenantId,
+            },
         });
-
-        // Assign each non-Kaution transaction
-        for (const c of candidates) {
-            const cat = isKaution(c.purpose) ? 'Kaution' : 'Bruttomieteinnahmen';
-            if (cat === 'Kaution') continue; // skip Kaution from propagation
-
-            await prisma.bankTransaction.update({
-                where: { id: c.id },
-                data: {
-                    propertyId: assignment.propertyId,
-                    tenantId: assignment.tenantId,
-                    category: cat,
-                },
-            });
-            propagated++;
-        }
+        propagated = result.count;
     }
 
     revalidatePath('/dashboard/banking');
