@@ -12,7 +12,9 @@ import UnitForm from '@/components/properties/unit-form';
 import LeaseForm from '@/components/tenants/lease-form';
 import DocumentList from '@/components/documents/document-list';
 import ServiceProviderList from '@/components/properties/service-provider-list';
+import PropertyCashFlow from '@/components/properties/property-cash-flow';
 import { deleteProperty } from '@/lib/property-actions';
+import { getPropertyCashFlow } from '@/lib/bank-actions';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -88,6 +90,9 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         'use server';
         await deleteProperty(propertyId);
     }
+
+    // Fetch cash flow data
+    const cashFlowData = await getPropertyCashFlow(propertyId);
 
     return (
         <main className="p-6">
@@ -277,6 +282,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     propertyId={propertyId}
                     providers={property.serviceProviders}
                 />
+            </div>
+
+            {/* Cash Flow */}
+            <div className="mt-6">
+                <PropertyCashFlow data={cashFlowData} />
             </div>
 
             {/* Documents */}
