@@ -628,7 +628,7 @@ const SP_TO_NK: Record<string, string> = {
     strom: 'NK: Strom',
     gas: 'NK: Gas',
     wasser: 'NK: Wasser',
-    heizung: 'NK: Gas',           // Heizung often billed via gas provider
+    heizung: 'NK: Gas',
     versicherung: 'NK: Versicherung',
     grundbesitzabgaben: 'NK: Grundbesitzabgaben',
     verbrauchsdatenerfassung: 'NK: Verbrauchsdatenerfassung',
@@ -637,61 +637,107 @@ const SP_TO_NK: Record<string, string> = {
     sonstige: 'NK: Sonstige Dienstleister',
 };
 
+// Detect frequency from average gap between payment dates
+function detectFrequency(dates: Date[]): string {
+    if (dates.length < 2) return '—';
+    const gaps: number[] = [];
+    for (let i = 1; i < dates.length; i++) {
+        const diffDays = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
+        gaps.push(diffDays);
+    }
+    const avgDays = gaps.reduce((s, v) => s + v, 0) / gaps.length;
+    if (avgDays <= 45) return 'Monatlich';
+    if (avgDays <= 100) return 'Quartalsweise';
+    if (avgDays <= 200) return 'Halbjährlich';
+    return 'Jährlich';
+}
+
+interface ProviderInput {
+    id: string;
+    category: string;
+    contractNumber: string | null;
+}
+
 /**
- * Compute yearly spend and payment frequency per service-provider category
- * from the booking ledger (bank transactions).
+ * Compute yearly spend and payment frequency per service provider.
+ *
+ * Matching priority:
+ * 1. If the provider has a Referenznummer (contractNumber), search for it
+ *    in the booking text (purpose) of ALL property transactions.
+ * 2. Fall back to matching by NK: category.
+ *
+ * Results are keyed by provider ID.
  */
-export async function getServiceProviderCosts(propertyId: string) {
+export async function getServiceProviderCosts(
+    propertyId: string,
+    providers: ProviderInput[]
+) {
     const currentYear = new Date().getFullYear();
 
+    // Fetch all property transactions (we need purpose for reference matching)
     const transactions = await prisma.bankTransaction.findMany({
-        where: {
-            propertyId,
-            category: { startsWith: 'NK: ' },
-        },
+        where: { propertyId },
         select: {
             bookingDate: true,
             amount: true,
             category: true,
+            purpose: true,
         },
         orderBy: { bookingDate: 'asc' },
     });
 
-    // Group by NK category
-    const byCat: Record<string, { dates: Date[]; amounts: number[]; yearlyTotal: number }> = {};
-    for (const tx of transactions) {
-        const cat = tx.category!;
-        if (!byCat[cat]) byCat[cat] = { dates: [], amounts: [], yearlyTotal: 0 };
+    const result: Record<string, { frequency: string; yearlyTotal: number }> = {};
+
+    // Track which tx IDs are already claimed by reference matching
+    const claimedIndices = new Set<number>();
+
+    // Pass 1: Match by Referenznummer in purpose text
+    for (const prov of providers) {
+        if (!prov.contractNumber) continue;
+        const ref = prov.contractNumber.trim().toLowerCase();
+        if (ref.length < 3) continue; // avoid matching trivially short strings
+
+        const matched: { date: Date; amount: number }[] = [];
+        transactions.forEach((tx, idx) => {
+            const purpose = (tx.purpose || '').toLowerCase();
+            if (purpose.includes(ref)) {
+                matched.push({ date: tx.bookingDate, amount: tx.amount });
+                claimedIndices.add(idx);
+            }
+        });
+
+        if (matched.length > 0) {
+            const yearlyTotal = matched
+                .filter((m) => m.date.getFullYear() === currentYear)
+                .reduce((s, m) => s + m.amount, 0);
+            result[prov.id] = {
+                frequency: detectFrequency(matched.map((m) => m.date)),
+                yearlyTotal: Math.abs(yearlyTotal),
+            };
+        }
+    }
+
+    // Pass 2: For providers without reference match, fall back to NK: category
+    // Group unclaimed NK: transactions by category
+    const byCat: Record<string, { dates: Date[]; yearlyTotal: number }> = {};
+    transactions.forEach((tx, idx) => {
+        if (claimedIndices.has(idx)) return;
+        const cat = tx.category;
+        if (!cat || !cat.startsWith('NK: ')) return;
+        if (!byCat[cat]) byCat[cat] = { dates: [], yearlyTotal: 0 };
         byCat[cat].dates.push(tx.bookingDate);
-        byCat[cat].amounts.push(tx.amount);
         if (tx.bookingDate.getFullYear() === currentYear) {
             byCat[cat].yearlyTotal += tx.amount;
         }
-    }
+    });
 
-    // Detect frequency from average gap between payments
-    function detectFrequency(dates: Date[]): string {
-        if (dates.length < 2) return '—';
-        const gaps: number[] = [];
-        for (let i = 1; i < dates.length; i++) {
-            const diffDays = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
-            gaps.push(diffDays);
-        }
-        const avgDays = gaps.reduce((s, v) => s + v, 0) / gaps.length;
-        if (avgDays <= 45) return 'Monatlich';
-        if (avgDays <= 100) return 'Quartalsweise';
-        if (avgDays <= 200) return 'Halbjährlich';
-        return 'Jährlich';
-    }
-
-    // Build result keyed by service-provider category
-    const result: Record<string, { frequency: string; yearlyTotal: number }> = {};
-
-    // Reverse map: NK label → sp categories
-    for (const [spCat, nkLabel] of Object.entries(SP_TO_NK)) {
+    for (const prov of providers) {
+        if (result[prov.id]) continue; // already matched by reference
+        const nkLabel = SP_TO_NK[prov.category];
+        if (!nkLabel) continue;
         const data = byCat[nkLabel];
         if (data) {
-            result[spCat] = {
+            result[prov.id] = {
                 frequency: detectFrequency(data.dates),
                 yearlyTotal: Math.abs(data.yearlyTotal),
             };
@@ -700,3 +746,4 @@ export async function getServiceProviderCosts(propertyId: string) {
 
     return result;
 }
+

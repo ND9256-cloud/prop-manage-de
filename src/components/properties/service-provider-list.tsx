@@ -116,7 +116,7 @@ export default function ServiceProviderList({
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-muted-foreground">Vertragsnummer</label>
+                            <label className="text-xs text-muted-foreground">Referenznummer</label>
                             <input name="contractNumber" defaultValue={defaults?.contractNumber ?? ''}
                                 className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
                         </div>
@@ -184,7 +184,7 @@ export default function ServiceProviderList({
                                 <th className="text-left p-3 font-medium">Kategorie</th>
                                 <th className="text-left p-3 font-medium">Versorger</th>
                                 <th className="text-left p-3 font-medium hidden md:table-cell">Kontakt</th>
-                                <th className="text-left p-3 font-medium hidden lg:table-cell">Vertrag</th>
+                                <th className="text-left p-3 font-medium hidden lg:table-cell">Referenz</th>
                                 <th className="text-right p-3 font-medium">Häufigkeit</th>
                                 <th className="text-right p-3 font-medium">{currentYear}</th>
                                 <th className="p-3 w-8"></th>
@@ -193,7 +193,7 @@ export default function ServiceProviderList({
                         <tbody>
                             {providers.map((p) => {
                                 const cat = catInfo(p.category);
-                                const costData = costs[p.category];
+                                const costData = costs[p.id];
                                 const isEditing = editingId === p.id;
 
                                 if (isEditing) {

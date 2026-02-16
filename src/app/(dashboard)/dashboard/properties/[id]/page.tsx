@@ -94,7 +94,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     // Fetch cash flow and service provider cost data
     const [cashFlowData, spCosts] = await Promise.all([
         getPropertyCashFlow(propertyId),
-        getServiceProviderCosts(propertyId),
+        getServiceProviderCosts(propertyId, property.serviceProviders),
     ]);
 
     return (
