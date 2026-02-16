@@ -393,24 +393,34 @@ export async function assignTransaction(
     const counterpartIban = tx.amount >= 0 ? tx.debtorIban : tx.creditorIban;
 
     let propagated = 0;
-    if (counterpartIban) {
-        const ibanField = tx.amount >= 0 ? 'debtorIban' : 'creditorIban';
 
-        // Propagate ONLY property/tenant assignment to other transactions from the same IBAN.
-        // Do NOT propagate category — each transaction should be categorized individually,
-        // because different payments from the same IBAN may be for different purposes.
-        const result = await prisma.bankTransaction.updateMany({
+    // Only propagate for INCOMING payments (rent from tenants).
+    // Same debtor IBAN = same tenant = same property (safe to propagate).
+    // Do NOT propagate for OUTGOING payments (utilities, insurance, etc.)
+    // because the same creditor IBAN can serve multiple properties.
+    if (counterpartIban && tx.amount >= 0) {
+        // Find unassigned incoming transactions from the same debtor IBAN
+        const candidates = await prisma.bankTransaction.findMany({
             where: {
-                [ibanField]: counterpartIban,
+                debtorIban: counterpartIban,
                 id: { not: transactionId },
-                propertyId: null,  // only update unassigned ones
+                propertyId: null,
             },
-            data: {
-                propertyId: assignment.propertyId,
-                tenantId: assignment.tenantId,
-            },
+            select: { id: true, purpose: true },
         });
-        propagated = result.count;
+
+        for (const c of candidates) {
+            const cat = isKaution(c.purpose) ? 'Kaution' : 'Bruttomieteinnahmen';
+            await prisma.bankTransaction.update({
+                where: { id: c.id },
+                data: {
+                    propertyId: assignment.propertyId,
+                    tenantId: assignment.tenantId,
+                    category: cat,
+                },
+            });
+            propagated++;
+        }
     }
 
     revalidatePath('/dashboard/banking');
@@ -421,12 +431,17 @@ export async function assignTransaction(
 /**
  * Auto-assign newly synced transactions based on previously assigned IBANs.
  * Called internally after sync completes.
+ *
+ * Only propagates for INCOMING payments (same debtor IBAN = same tenant).
+ * Outgoing payments are NOT auto-assigned because the same creditor
+ * IBAN (utility, insurance) can serve multiple properties.
  */
 async function autoAssignNewTransactions(bankAccountId: string) {
-    // Get all distinct counterpart IBANs that have assignments
+    // Get all distinct debtor IBANs (incoming payments) that have assignments
     const assignedTxs = await prisma.bankTransaction.findMany({
         where: {
             bankAccountId,
+            amount: { gte: 0 },  // incoming only
             OR: [
                 { propertyId: { not: null } },
                 { tenantId: { not: null } },
@@ -434,45 +449,28 @@ async function autoAssignNewTransactions(bankAccountId: string) {
         },
         select: {
             debtorIban: true,
-            creditorIban: true,
             propertyId: true,
             tenantId: true,
-            amount: true,
         },
     });
 
-    // Build a map: counterpart IBAN -> assignment
+    // Build a map: debtor IBAN -> assignment (first match wins)
     const ibanAssignments = new Map<string, { propertyId: string | null; tenantId: string | null }>();
     for (const tx of assignedTxs) {
-        const iban = tx.amount >= 0 ? tx.debtorIban : tx.creditorIban;
-        if (iban && !ibanAssignments.has(iban)) {
-            ibanAssignments.set(iban, {
+        if (tx.debtorIban && !ibanAssignments.has(tx.debtorIban)) {
+            ibanAssignments.set(tx.debtorIban, {
                 propertyId: tx.propertyId,
                 tenantId: tx.tenantId,
             });
         }
     }
 
-    // Apply assignments to unassigned transactions
+    // Apply assignments to unassigned incoming transactions only
     for (const [iban, assignment] of ibanAssignments) {
-        // Update credits (debtorIban match)
         await prisma.bankTransaction.updateMany({
             where: {
                 bankAccountId,
                 debtorIban: iban,
-                propertyId: null,
-                tenantId: null,
-            },
-            data: {
-                propertyId: assignment.propertyId,
-                tenantId: assignment.tenantId,
-            },
-        });
-        // Update debits (creditorIban match)
-        await prisma.bankTransaction.updateMany({
-            where: {
-                bankAccountId,
-                creditorIban: iban,
                 propertyId: null,
                 tenantId: null,
             },
