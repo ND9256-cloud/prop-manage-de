@@ -423,6 +423,23 @@ export async function assignTransaction(
         }
     }
 
+    // OUTGOING: IBAN+Property category memory.
+    // When categorizing an outgoing payment, propagate the SAME category to other
+    // uncategorized transactions from the same creditor IBAN + same property.
+    // (creditorIban + propertyId) is unique: Stadtwerke sends separate invoices per property.
+    if (counterpartIban && tx.amount < 0 && category && assignment.propertyId) {
+        const result = await prisma.bankTransaction.updateMany({
+            where: {
+                creditorIban: counterpartIban,
+                propertyId: assignment.propertyId,
+                category: null,
+                id: { not: transactionId },
+            },
+            data: { category },
+        });
+        propagated += result.count;
+    }
+
     revalidatePath('/dashboard/banking');
     revalidatePath('/dashboard/rent-roll');
     return { updated: 1 + propagated };
@@ -479,6 +496,52 @@ async function autoAssignNewTransactions(bankAccountId: string) {
                 tenantId: assignment.tenantId,
             },
         });
+    }
+
+    // OUTGOING: IBAN+Property category memory.
+    // For outgoing transactions that have a property but no category,
+    // look up if we've previously categorized a tx from the same creditorIban + propertyId.
+    const uncategorizedOutgoing = await prisma.bankTransaction.findMany({
+        where: {
+            bankAccountId,
+            amount: { lt: 0 },
+            propertyId: { not: null },
+            category: null,
+            creditorIban: { not: null },
+        },
+        select: { id: true, creditorIban: true, propertyId: true },
+    });
+
+    // Build lookup: (creditorIban + propertyId) -> category from existing categorized outgoing txs
+    const categorizedOutgoing = await prisma.bankTransaction.findMany({
+        where: {
+            bankAccountId,
+            amount: { lt: 0 },
+            category: { not: null },
+            creditorIban: { not: null },
+            propertyId: { not: null },
+        },
+        select: { creditorIban: true, propertyId: true, category: true },
+    });
+
+    const ibanPropertyCategory = new Map<string, string>();
+    for (const tx of categorizedOutgoing) {
+        const key = `${tx.creditorIban}|${tx.propertyId}`;
+        if (!ibanPropertyCategory.has(key)) {
+            ibanPropertyCategory.set(key, tx.category!);
+        }
+    }
+
+    // Apply remembered categories
+    for (const tx of uncategorizedOutgoing) {
+        const key = `${tx.creditorIban}|${tx.propertyId}`;
+        const cat = ibanPropertyCategory.get(key);
+        if (cat) {
+            await prisma.bankTransaction.update({
+                where: { id: tx.id },
+                data: { category: cat },
+            });
+        }
     }
 }
 
