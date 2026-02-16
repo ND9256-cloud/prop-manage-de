@@ -30,9 +30,10 @@ const CATEGORIES = [
     { value: 'heizung', label: 'Heizung', icon: '🌡️', recurring: true },
     { value: 'versicherung', label: 'Versicherung', icon: '🛡️', recurring: true },
     { value: 'grundbesitzabgaben', label: 'Grundbesitzabgaben', icon: '🏛️', recurring: true },
+    { value: 'verbrauchsdatenerfassung', label: 'Verbrauchsdatenerfassung', icon: '📊', recurring: true },
     { value: 'hausverwaltung', label: 'Hausverwaltung', icon: '🏢', recurring: true },
     { value: 'wartung', label: 'Wartung', icon: '🔧', recurring: false },
-    { value: 'sonstige', label: 'Sonstige', icon: '📋', recurring: false },
+    { value: 'sonstige', label: 'Sonstige Dienstleister', icon: '📋', recurring: false },
 ];
 
 function catInfo(value: string) {
