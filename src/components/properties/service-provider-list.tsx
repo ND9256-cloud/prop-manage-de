@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, Fragment } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, Pencil, Trash2, X, Check, Phone, Mail, User, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Check, Phone, Mail, User } from 'lucide-react';
 import {
     createServiceProvider,
     updateServiceProvider,
@@ -22,21 +22,26 @@ interface Provider {
     notes: string | null;
 }
 
+interface CostData {
+    frequency: string;
+    yearlyTotal: number;
+}
+
 const CATEGORIES = [
-    { value: 'strom', label: 'Strom', icon: '⚡', recurring: true },
-    { value: 'gas', label: 'Gas', icon: '🔥', recurring: true },
-    { value: 'wasser', label: 'Wasser', icon: '💧', recurring: true },
-    { value: 'heizung', label: 'Heizung', icon: '🌡️', recurring: true },
-    { value: 'versicherung', label: 'Versicherung', icon: '🛡️', recurring: true },
-    { value: 'grundbesitzabgaben', label: 'Grundbesitzabgaben', icon: '🏛️', recurring: true },
-    { value: 'verbrauchsdatenerfassung', label: 'Verbrauchsdatenerfassung', icon: '📊', recurring: true },
-    { value: 'hausverwaltung', label: 'Hausverwaltung', icon: '🏢', recurring: true },
-    { value: 'wartung', label: 'Wartung', icon: '🔧', recurring: false },
-    { value: 'sonstige', label: 'Sonstige Dienstleister', icon: '📋', recurring: false },
+    { value: 'strom', label: 'Strom', icon: '⚡' },
+    { value: 'gas', label: 'Gas', icon: '🔥' },
+    { value: 'wasser', label: 'Wasser', icon: '💧' },
+    { value: 'heizung', label: 'Heizung', icon: '🌡️' },
+    { value: 'versicherung', label: 'Versicherung', icon: '🛡️' },
+    { value: 'grundbesitzabgaben', label: 'Grundbesitzabgaben', icon: '🏛️' },
+    { value: 'verbrauchsdatenerfassung', label: 'Verbrauchsdatenerfassung', icon: '📊' },
+    { value: 'hausverwaltung', label: 'Hausverwaltung', icon: '🏢' },
+    { value: 'wartung', label: 'Wartung', icon: '🔧' },
+    { value: 'sonstige', label: 'Sonstige Dienstleister', icon: '📋' },
 ];
 
 function catInfo(value: string) {
-    return CATEGORIES.find((c) => c.value === value) ?? { value, label: value, icon: '📋', recurring: false };
+    return CATEGORIES.find((c) => c.value === value) ?? { value, label: value, icon: '📋' };
 }
 
 function fmt(n: number) {
@@ -46,14 +51,15 @@ function fmt(n: number) {
 export default function ServiceProviderList({
     propertyId,
     providers: initialProviders,
+    costs,
 }: {
     propertyId: string;
     providers: Provider[];
+    costs: Record<string, CostData>;
 }) {
     const [providers, setProviders] = useState(initialProviders);
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -87,18 +93,11 @@ export default function ServiceProviderList({
     }
 
     const editing = editingId ? providers.find((p) => p.id === editingId) : null;
-
-    // --- Summary ---
-    const monthlyRecurring = providers
-        .filter((p) => catInfo(p.category).recurring && p.monthlyCost)
-        .reduce((sum, p) => sum + (p.monthlyCost ?? 0), 0);
-    const yearlySum = providers
-        .filter((p) => p.yearlyCost)
-        .reduce((sum, p) => sum + (p.yearlyCost ?? 0), 0);
+    const currentYear = new Date().getFullYear();
 
     const renderForm = (defaults?: Provider) => (
         <tr>
-            <td colSpan={5} className="p-0">
+            <td colSpan={7} className="p-0">
                 <form onSubmit={handleSubmit} className="space-y-4 p-4 bg-muted/30 border-y">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         <div>
@@ -122,18 +121,6 @@ export default function ServiceProviderList({
                                 className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
                         </div>
                         <div>
-                            <label className="text-xs text-muted-foreground">€ / Monat</label>
-                            <input name="monthlyCost" type="number" step="0.01"
-                                defaultValue={defaults?.monthlyCost ?? ''}
-                                className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
-                        </div>
-                        <div>
-                            <label className="text-xs text-muted-foreground">€ / Jahr</label>
-                            <input name="yearlyCost" type="number" step="0.01"
-                                defaultValue={defaults?.yearlyCost ?? ''}
-                                className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
-                        </div>
-                        <div>
                             <label className="text-xs text-muted-foreground">Ansprechpartner</label>
                             <input name="contactName" defaultValue={defaults?.contactName ?? ''}
                                 className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
@@ -148,7 +135,7 @@ export default function ServiceProviderList({
                             <input name="contactEmail" type="email" defaultValue={defaults?.contactEmail ?? ''}
                                 className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
                         </div>
-                        <div>
+                        <div className="sm:col-span-2 lg:col-span-3">
                             <label className="text-xs text-muted-foreground">Notizen</label>
                             <input name="notes" defaultValue={defaults?.notes ?? ''}
                                 className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
@@ -168,6 +155,9 @@ export default function ServiceProviderList({
             </td>
         </tr>
     );
+
+    // Calculate total yearly from costs
+    const totalYearly = Object.values(costs).reduce((sum, c) => sum + c.yearlyTotal, 0);
 
     return (
         <div className="space-y-4">
@@ -191,129 +181,117 @@ export default function ServiceProviderList({
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-muted/50 border-b">
-                                <th className="text-left p-3 font-medium w-8"></th>
                                 <th className="text-left p-3 font-medium">Kategorie</th>
                                 <th className="text-left p-3 font-medium">Versorger</th>
-                                <th className="text-right p-3 font-medium">€ / Monat</th>
-                                <th className="text-right p-3 font-medium">€ / Jahr</th>
+                                <th className="text-left p-3 font-medium hidden md:table-cell">Kontakt</th>
+                                <th className="text-left p-3 font-medium hidden lg:table-cell">Vertrag</th>
+                                <th className="text-right p-3 font-medium">Häufigkeit</th>
+                                <th className="text-right p-3 font-medium">{currentYear}</th>
+                                <th className="p-3 w-8"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {providers.map((p) => {
                                 const cat = catInfo(p.category);
-                                const isExpanded = expandedId === p.id;
+                                const costData = costs[p.category];
                                 const isEditing = editingId === p.id;
 
                                 if (isEditing) {
-                                    return <Fragment key={p.id}>{renderForm(editing ?? undefined)}</Fragment>;
+                                    return renderForm(editing ?? undefined);
                                 }
 
                                 return (
-                                    <Fragment key={p.id}>
-                                        <tr
-                                            className="border-b last:border-b-0 hover:bg-muted/20 cursor-pointer transition-colors"
-                                            onClick={() => setExpandedId(isExpanded ? null : p.id)}
-                                        >
-                                            <td className="p-3 text-muted-foreground">
-                                                {isExpanded
-                                                    ? <ChevronDown className="h-4 w-4" />
-                                                    : <ChevronRight className="h-4 w-4" />}
-                                            </td>
-                                            <td className="p-3">
-                                                <span className="flex items-center gap-2">
-                                                    <span>{cat.icon}</span>
-                                                    <span className="font-medium">{cat.label}</span>
-                                                </span>
-                                            </td>
-                                            <td className="p-3 text-muted-foreground">{p.name}</td>
-                                            <td className="p-3 text-right whitespace-nowrap">
-                                                {p.monthlyCost ? fmt(p.monthlyCost) : <span className="text-muted-foreground">—</span>}
-                                            </td>
-                                            <td className="p-3 text-right whitespace-nowrap">
-                                                {p.yearlyCost ? fmt(p.yearlyCost) : <span className="text-muted-foreground">—</span>}
-                                            </td>
-                                        </tr>
-                                        {isExpanded && (
-                                            <tr className="bg-muted/10 border-b">
-                                                <td></td>
-                                                <td colSpan={4} className="p-4">
-                                                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                                                        {p.contractNumber && (
-                                                            <div>
-                                                                <span className="text-xs text-muted-foreground block">Vertragsnummer</span>
-                                                                <span>{p.contractNumber}</span>
-                                                            </div>
-                                                        )}
-                                                        {p.contactName && (
-                                                            <div>
-                                                                <span className="text-xs text-muted-foreground block">Ansprechpartner</span>
-                                                                <span className="flex items-center gap-1">
-                                                                    <User className="h-3 w-3 text-muted-foreground" />
-                                                                    {p.contactName}
-                                                                </span>
-                                                            </div>
-                                                        )}
-                                                        {p.contactPhone && (
-                                                            <div>
-                                                                <span className="text-xs text-muted-foreground block">Telefon</span>
-                                                                <a href={`tel:${p.contactPhone}`}
-                                                                    className="flex items-center gap-1 hover:text-primary"
-                                                                    onClick={(e) => e.stopPropagation()}>
-                                                                    <Phone className="h-3 w-3 text-muted-foreground" />
-                                                                    {p.contactPhone}
-                                                                </a>
-                                                            </div>
-                                                        )}
-                                                        {p.contactEmail && (
-                                                            <div>
-                                                                <span className="text-xs text-muted-foreground block">E-Mail</span>
-                                                                <a href={`mailto:${p.contactEmail}`}
-                                                                    className="flex items-center gap-1 hover:text-primary"
-                                                                    onClick={(e) => e.stopPropagation()}>
-                                                                    <Mail className="h-3 w-3 text-muted-foreground" />
-                                                                    {p.contactEmail}
-                                                                </a>
-                                                            </div>
-                                                        )}
-                                                        {p.notes && (
-                                                            <div className="sm:col-span-2 lg:col-span-3">
-                                                                <span className="text-xs text-muted-foreground block">Notizen</span>
-                                                                <span>{p.notes}</span>
-                                                            </div>
-                                                        )}
-                                                        {!p.contractNumber && !p.contactName && !p.contactPhone && !p.contactEmail && !p.notes && (
-                                                            <div className="text-muted-foreground italic">
-                                                                Keine weiteren Details hinterlegt.
-                                                            </div>
-                                                        )}
+                                    <tr key={p.id} className="border-b last:border-b-0 hover:bg-muted/20 transition-colors">
+                                        <td className="p-3">
+                                            <span className="flex items-center gap-2">
+                                                <span>{cat.icon}</span>
+                                                <span className="font-medium">{cat.label}</span>
+                                            </span>
+                                        </td>
+                                        <td className="p-3">
+                                            <span className="block font-medium">{p.name}</span>
+                                            {p.notes && (
+                                                <span className="block text-xs text-muted-foreground truncate max-w-[200px]">{p.notes}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 hidden md:table-cell">
+                                            <div className="space-y-0.5">
+                                                {p.contactName && (
+                                                    <div className="flex items-center gap-1 text-xs">
+                                                        <User className="h-3 w-3 text-muted-foreground" />
+                                                        {p.contactName}
                                                     </div>
-                                                    <div className="flex gap-2 mt-3 pt-3 border-t">
-                                                        <Button variant="outline" size="sm"
-                                                            onClick={(e) => { e.stopPropagation(); setEditingId(p.id); setShowForm(false); setExpandedId(null); }}>
-                                                            <Pencil className="h-3 w-3 mr-1" /> Bearbeiten
-                                                        </Button>
-                                                        <Button variant="outline" size="sm"
-                                                            className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                                            onClick={(e) => { e.stopPropagation(); handleDelete(p.id, p.name); }}>
-                                                            <Trash2 className="h-3 w-3 mr-1" /> Löschen
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </Fragment>
+                                                )}
+                                                {p.contactPhone && (
+                                                    <a href={`tel:${p.contactPhone}`} className="flex items-center gap-1 text-xs hover:text-primary">
+                                                        <Phone className="h-3 w-3 text-muted-foreground" />
+                                                        {p.contactPhone}
+                                                    </a>
+                                                )}
+                                                {p.contactEmail && (
+                                                    <a href={`mailto:${p.contactEmail}`} className="flex items-center gap-1 text-xs hover:text-primary">
+                                                        <Mail className="h-3 w-3 text-muted-foreground" />
+                                                        {p.contactEmail}
+                                                    </a>
+                                                )}
+                                                {!p.contactName && !p.contactPhone && !p.contactEmail && (
+                                                    <span className="text-xs text-muted-foreground">—</span>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="p-3 hidden lg:table-cell text-xs text-muted-foreground">
+                                            {p.contractNumber || '—'}
+                                        </td>
+                                        <td className="p-3 text-right whitespace-nowrap text-xs">
+                                            {costData?.frequency || (
+                                                <span className="text-muted-foreground">—</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3 text-right whitespace-nowrap">
+                                            {costData?.yearlyTotal ? (
+                                                <span className="text-red-600 font-medium">{fmt(-costData.yearlyTotal)}</span>
+                                            ) : (
+                                                <span className="text-muted-foreground">—</span>
+                                            )}
+                                        </td>
+                                        <td className="p-3">
+                                            <div className="flex gap-0.5">
+                                                <button
+                                                    className="p-1 hover:text-primary rounded"
+                                                    onClick={() => { setEditingId(p.id); setShowForm(false); }}
+                                                    title="Bearbeiten"
+                                                >
+                                                    <Pencil className="h-3 w-3" />
+                                                </button>
+                                                <button
+                                                    className="p-1 hover:text-red-500 rounded"
+                                                    onClick={() => handleDelete(p.id, p.name)}
+                                                    title="Löschen"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
                                 );
                             })}
 
                             {/* Summary row */}
-                            <tr className="border-t-2 font-bold bg-muted/30">
-                                <td className="p-3"></td>
-                                <td className="p-3" colSpan={2}>Gesamt</td>
-                                <td className="p-3 text-right whitespace-nowrap">{fmt(monthlyRecurring)}</td>
-                                <td className="p-3 text-right whitespace-nowrap">{fmt(yearlySum)}</td>
-                            </tr>
+                            {providers.length > 0 && (
+                                <tr className="border-t-2 font-bold bg-muted/30">
+                                    <td className="p-3" colSpan={5}>Gesamt {currentYear}</td>
+                                    <td className="p-3 text-right whitespace-nowrap">
+                                        {totalYearly > 0 ? (
+                                            <span className="text-red-600">{fmt(-totalYearly)}</span>
+                                        ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                        )}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            )}
 
-                            {/* Add new form */}
+                            {/* Add form */}
                             {showForm && renderForm()}
                         </tbody>
                     </table>

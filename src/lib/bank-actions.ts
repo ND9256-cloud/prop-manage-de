@@ -622,3 +622,81 @@ export async function getPropertyCashFlow(propertyId: string) {
         category: tx.category || '__uncategorized__',
     }));
 }
+
+// Map service-provider categories to booking-ledger NK: labels
+const SP_TO_NK: Record<string, string> = {
+    strom: 'NK: Strom',
+    gas: 'NK: Gas',
+    wasser: 'NK: Wasser',
+    heizung: 'NK: Gas',           // Heizung often billed via gas provider
+    versicherung: 'NK: Versicherung',
+    grundbesitzabgaben: 'NK: Grundbesitzabgaben',
+    verbrauchsdatenerfassung: 'NK: Verbrauchsdatenerfassung',
+    hausverwaltung: 'NK: Sonstige Dienstleister',
+    wartung: 'NK: Sonstige Dienstleister',
+    sonstige: 'NK: Sonstige Dienstleister',
+};
+
+/**
+ * Compute yearly spend and payment frequency per service-provider category
+ * from the booking ledger (bank transactions).
+ */
+export async function getServiceProviderCosts(propertyId: string) {
+    const currentYear = new Date().getFullYear();
+
+    const transactions = await prisma.bankTransaction.findMany({
+        where: {
+            propertyId,
+            category: { startsWith: 'NK: ' },
+        },
+        select: {
+            bookingDate: true,
+            amount: true,
+            category: true,
+        },
+        orderBy: { bookingDate: 'asc' },
+    });
+
+    // Group by NK category
+    const byCat: Record<string, { dates: Date[]; amounts: number[]; yearlyTotal: number }> = {};
+    for (const tx of transactions) {
+        const cat = tx.category!;
+        if (!byCat[cat]) byCat[cat] = { dates: [], amounts: [], yearlyTotal: 0 };
+        byCat[cat].dates.push(tx.bookingDate);
+        byCat[cat].amounts.push(tx.amount);
+        if (tx.bookingDate.getFullYear() === currentYear) {
+            byCat[cat].yearlyTotal += tx.amount;
+        }
+    }
+
+    // Detect frequency from average gap between payments
+    function detectFrequency(dates: Date[]): string {
+        if (dates.length < 2) return '—';
+        const gaps: number[] = [];
+        for (let i = 1; i < dates.length; i++) {
+            const diffDays = (dates[i].getTime() - dates[i - 1].getTime()) / (1000 * 60 * 60 * 24);
+            gaps.push(diffDays);
+        }
+        const avgDays = gaps.reduce((s, v) => s + v, 0) / gaps.length;
+        if (avgDays <= 45) return 'Monatlich';
+        if (avgDays <= 100) return 'Quartalsweise';
+        if (avgDays <= 200) return 'Halbjährlich';
+        return 'Jährlich';
+    }
+
+    // Build result keyed by service-provider category
+    const result: Record<string, { frequency: string; yearlyTotal: number }> = {};
+
+    // Reverse map: NK label → sp categories
+    for (const [spCat, nkLabel] of Object.entries(SP_TO_NK)) {
+        const data = byCat[nkLabel];
+        if (data) {
+            result[spCat] = {
+                frequency: detectFrequency(data.dates),
+                yearlyTotal: Math.abs(data.yearlyTotal),
+            };
+        }
+    }
+
+    return result;
+}

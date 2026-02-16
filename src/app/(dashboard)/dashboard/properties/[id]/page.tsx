@@ -14,7 +14,7 @@ import DocumentList from '@/components/documents/document-list';
 import ServiceProviderList from '@/components/properties/service-provider-list';
 import PropertyCashFlow from '@/components/properties/property-cash-flow';
 import { deleteProperty } from '@/lib/property-actions';
-import { getPropertyCashFlow } from '@/lib/bank-actions';
+import { getPropertyCashFlow, getServiceProviderCosts } from '@/lib/bank-actions';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -91,8 +91,11 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         await deleteProperty(propertyId);
     }
 
-    // Fetch cash flow data
-    const cashFlowData = await getPropertyCashFlow(propertyId);
+    // Fetch cash flow and service provider cost data
+    const [cashFlowData, spCosts] = await Promise.all([
+        getPropertyCashFlow(propertyId),
+        getServiceProviderCosts(propertyId),
+    ]);
 
     return (
         <main className="p-6">
@@ -281,6 +284,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 <ServiceProviderList
                     propertyId={propertyId}
                     providers={property.serviceProviders}
+                    costs={spCosts}
                 />
             </div>
 
