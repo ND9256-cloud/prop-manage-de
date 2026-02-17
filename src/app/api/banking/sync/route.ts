@@ -4,8 +4,9 @@ import { syncAllBankAccounts } from '@/lib/bank-actions';
 /**
  * Cron endpoint to sync all bank transactions daily.
  * Protected by CRON_SECRET for Vercel Cron.
+ * Vercel Cron sends GET requests.
  */
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
     // Verify cron secret in production
     const cronSecret = process.env.CRON_SECRET;
     if (cronSecret) {
@@ -30,3 +31,4 @@ export async function POST(request: NextRequest) {
         );
     }
 }
+
