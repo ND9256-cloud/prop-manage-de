@@ -116,8 +116,6 @@ export interface TransactionsResponse {
     continuation_key?: string;
 }
 
-
-
 export interface AccountDetails {
     uid?: string;
     iban?: string;

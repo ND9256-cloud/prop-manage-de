@@ -4,7 +4,6 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
-import { extractServiceProvider } from '@/lib/extract-service-provider';
 
 const BUCKET = 'documents';
 

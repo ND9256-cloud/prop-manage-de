@@ -245,16 +245,3 @@ export async function deleteUnit(unitId: string) {
     revalidatePath(`/dashboard/properties/${unit.propertyId}`);
 }
 
-/**
- * Delete a lease
- */
-export async function deleteLease(leaseId: string) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-
-    const lease = await prisma.lease.delete({
-        where: { id: leaseId },
-    });
-
-    revalidatePath('/dashboard/rent-roll');
-}
