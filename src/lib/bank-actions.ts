@@ -424,11 +424,27 @@ export async function assignTransaction(
     }
 
     // OUTGOING: IBAN+Property category memory.
-    // When categorizing an outgoing payment, propagate the SAME category to other
-    // uncategorized transactions from the same creditor IBAN + same property.
-    // (creditorIban + propertyId) is unique: Stadtwerke sends separate invoices per property.
+    // When categorizing an outgoing payment, propagate to other transactions
+    // from the same creditor IBAN in two passes:
     if (counterpartIban && tx.amount < 0 && category && assignment.propertyId) {
-        const result = await prisma.bankTransaction.updateMany({
+        // Pass 1: Assign property + category to completely unassigned outgoing txs
+        // from the same creditor IBAN (they have no property yet).
+        const r1 = await prisma.bankTransaction.updateMany({
+            where: {
+                creditorIban: counterpartIban,
+                amount: { lt: 0 },
+                propertyId: null,
+                id: { not: transactionId },
+            },
+            data: {
+                propertyId: assignment.propertyId,
+                category,
+            },
+        });
+
+        // Pass 2: Assign category only to txs that already have THIS property
+        // but are missing a category (e.g., property was assigned manually already).
+        const r2 = await prisma.bankTransaction.updateMany({
             where: {
                 creditorIban: counterpartIban,
                 propertyId: assignment.propertyId,
@@ -437,7 +453,8 @@ export async function assignTransaction(
             },
             data: { category },
         });
-        propagated += result.count;
+
+        propagated += r1.count + r2.count;
     }
 
     revalidatePath('/dashboard/banking');
