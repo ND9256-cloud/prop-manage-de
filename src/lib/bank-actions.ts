@@ -348,9 +348,8 @@ export async function getBankTransactions(
     };
 }
 
-/**
- * Keywords that identify a Kaution (deposit) transaction.
- */
+// --- Constants ---
+
 const KAUTION_KEYWORDS = ['kaution', 'mietkaution', 'mietsicherheit', 'kautionszahlung'];
 
 function isKaution(purpose: string | null): boolean {
@@ -359,25 +358,39 @@ function isKaution(purpose: string | null): boolean {
     return KAUTION_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+/** Map service-provider categories → booking NK: labels */
+const SP_TO_NK: Record<string, string> = {
+    strom: 'NK: Strom',
+    gas: 'NK: Gas',
+    wasser: 'NK: Wasser',
+    heizung: 'NK: Gas',
+    wohngebaeudeversicherung: 'NK: Wohngebäudeversicherung',
+    haftpflichtversicherung: 'NK: Haftpflichtversicherung',
+    grundbesitzabgaben: 'NK: Grundbesitzabgaben',
+    verbrauchsdatenerfassung: 'NK: Verbrauchsdatenerfassung',
+    hausverwaltung: 'NK: Sonstige Dienstleister',
+    wartung: 'NK: Sonstige Dienstleister',
+    sonstige: 'NK: Sonstige Dienstleister',
+};
+
+interface ProviderInput {
+    id: string;
+    category: string;
+    contractNumber: string | null;
+}
+
+// --- Transaction Assignment ---
+
 /**
- * Assign a transaction to a property and/or tenant.
- * Auto-detects category from purpose text (Kaution vs Bruttomieteinnahmen).
- * Auto-propagates to unassigned transactions from the same IBAN,
- * but EXCLUDES Kaution transactions from propagation.
+ * Assign a transaction to a property/tenant with category propagation.
+ * Incoming: propagates property + tenant + auto-Bruttomieteinnahmen to same debtor IBAN.
+ * Outgoing: propagates property + category to same creditor IBAN.
  */
 export async function assignTransaction(
     transactionId: string,
     assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
 ): Promise<{ updated: number }> {
-    // Use user-provided category, or auto-detect from purpose
-    let category = assignment.category;
-    if (!category) {
-        const existing = await prisma.bankTransaction.findUnique({
-            where: { id: transactionId },
-            select: { purpose: true },
-        });
-        category = isKaution(existing?.purpose ?? null) ? 'Kaution' : null;
-    }
+    let category = assignment.category ?? null;
 
     // Update the target transaction with auto-detected category
     const tx = await prisma.bankTransaction.update({
@@ -389,15 +402,10 @@ export async function assignTransaction(
         },
     });
 
-    // Determine counterpart IBAN for propagation
     const counterpartIban = tx.amount >= 0 ? tx.debtorIban : tx.creditorIban;
-
     let propagated = 0;
 
-    // Only propagate for INCOMING payments (rent from tenants).
-    // Same debtor IBAN = same tenant = same property (safe to propagate).
-    // Do NOT propagate for OUTGOING payments (utilities, insurance, etc.)
-    // because the same creditor IBAN can serve multiple properties.
+    // INCOMING: same debtor IBAN = same tenant → propagate property + tenant + category
     if (counterpartIban && tx.amount >= 0) {
         // Find unassigned incoming transactions from the same debtor IBAN
         const candidates = await prisma.bankTransaction.findMany({
@@ -462,14 +470,7 @@ export async function assignTransaction(
     return { updated: 1 + propagated };
 }
 
-/**
- * Auto-assign newly synced transactions based on previously assigned IBANs.
- * Called internally after sync completes.
- *
- * Only propagates for INCOMING payments (same debtor IBAN = same tenant).
- * Outgoing payments are NOT auto-assigned because the same creditor
- * IBAN (utility, insurance) can serve multiple properties.
- */
+/** Auto-assign newly synced transactions. Called after sync. */
 async function autoAssignNewTransactions(bankAccountId: string) {
     // Get all distinct debtor IBANs (incoming payments) that have assignments
     const assignedTxs = await prisma.bankTransaction.findMany({
@@ -769,22 +770,6 @@ export async function getPropertyCashFlow(propertyId: string) {
     }));
 }
 
-// Map service-provider categories to booking-ledger NK: labels
-const SP_TO_NK: Record<string, string> = {
-    strom: 'NK: Strom',
-    gas: 'NK: Gas',
-    wasser: 'NK: Wasser',
-    heizung: 'NK: Gas',
-    wohngebaeudeversicherung: 'NK: Wohngebäudeversicherung',
-    haftpflichtversicherung: 'NK: Haftpflichtversicherung',
-    grundbesitzabgaben: 'NK: Grundbesitzabgaben',
-    verbrauchsdatenerfassung: 'NK: Verbrauchsdatenerfassung',
-    hausverwaltung: 'NK: Sonstige Dienstleister',
-    wartung: 'NK: Sonstige Dienstleister',
-    sonstige: 'NK: Sonstige Dienstleister',
-};
-
-// Detect frequency from average gap between payment dates
 function detectFrequency(dates: Date[]): string {
     if (dates.length < 2) return '—';
     const gaps: number[] = [];
@@ -799,22 +784,7 @@ function detectFrequency(dates: Date[]): string {
     return 'Jährlich';
 }
 
-interface ProviderInput {
-    id: string;
-    category: string;
-    contractNumber: string | null;
-}
-
-/**
- * Compute yearly spend and payment frequency per service provider.
- *
- * Matching priority:
- * 1. If the provider has a Referenznummer (contractNumber), search for it
- *    in the booking text (purpose) of ALL property transactions.
- * 2. Fall back to matching by NK: category.
- *
- * Results are keyed by provider ID.
- */
+/** Compute yearly spend and payment frequency per service provider. */
 export async function getServiceProviderCosts(
     propertyId: string,
     providers: ProviderInput[]
