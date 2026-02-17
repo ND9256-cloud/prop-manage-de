@@ -431,24 +431,60 @@ export async function assignTransaction(
         }
     }
 
-    // OUTGOING: IBAN+Property category memory.
+    // OUTGOING: SP-aware propagation.
     // When categorizing an outgoing payment, propagate to other transactions
-    // from the same creditor IBAN in two passes:
+    // from the same creditor IBAN — but check SP records first so that
+    // different contract numbers route to different properties.
     if (counterpartIban && tx.amount < 0 && category && assignment.propertyId) {
-        // Pass 1: Assign property + category to completely unassigned outgoing txs
-        // from the same creditor IBAN (they have no property yet).
-        const r1 = await prisma.bankTransaction.updateMany({
+        // Fetch unassigned outgoing txs from the same creditor IBAN
+        const candidates = await prisma.bankTransaction.findMany({
             where: {
                 creditorIban: counterpartIban,
                 amount: { lt: 0 },
                 propertyId: null,
                 id: { not: transactionId },
             },
-            data: {
-                propertyId: assignment.propertyId,
-                category,
-            },
+            select: { id: true, purpose: true, creditorName: true },
         });
+
+        if (candidates.length > 0) {
+            // Load all SPs that have a contract number
+            const allSPs = await prisma.serviceProvider.findMany({
+                where: { contractNumber: { not: null } },
+                select: { contractNumber: true, propertyId: true, category: true, name: true },
+            });
+
+            for (const c of candidates) {
+                const purposeLower = (c.purpose || '').toLowerCase();
+                let matched = false;
+
+                // Check if any SP contract number matches this tx's purpose
+                for (const sp of allSPs) {
+                    const ref = (sp.contractNumber || '').trim().toLowerCase();
+                    if (ref.length < 3) continue;
+                    if (purposeLower.includes(ref)) {
+                        // SP match → route to this SP's property + category
+                        const nkCat = SP_TO_NK[sp.category] || category;
+                        await prisma.bankTransaction.update({
+                            where: { id: c.id },
+                            data: { propertyId: sp.propertyId, category: nkCat },
+                        });
+                        matched = true;
+                        propagated++;
+                        break;
+                    }
+                }
+
+                // No SP match → fall back to same property + category as the manual assignment
+                if (!matched) {
+                    await prisma.bankTransaction.update({
+                        where: { id: c.id },
+                        data: { propertyId: assignment.propertyId, category },
+                    });
+                    propagated++;
+                }
+            }
+        }
 
         // Pass 2: Assign category only to txs that already have THIS property
         // but are missing a category (e.g., property was assigned manually already).
@@ -462,7 +498,7 @@ export async function assignTransaction(
             data: { category },
         });
 
-        propagated += r1.count + r2.count;
+        propagated += r2.count;
     }
 
     revalidatePath('/dashboard/banking');
