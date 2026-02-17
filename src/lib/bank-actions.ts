@@ -498,6 +498,83 @@ async function autoAssignNewTransactions(bankAccountId: string) {
         });
     }
 
+    // OUTGOING: Service Provider matching.
+    // Load all service providers and match against unassigned outgoing transactions.
+    // Priority: (1) Referenznummer in purpose, (2) provider name in creditor name.
+    // A match determines both the property (from SP) and the NK: category.
+    const allProviders = await prisma.serviceProvider.findMany({
+        select: {
+            name: true,
+            category: true,
+            contractNumber: true,
+            propertyId: true,
+        },
+    });
+
+    if (allProviders.length > 0) {
+        const unassignedOutgoing = await prisma.bankTransaction.findMany({
+            where: {
+                bankAccountId,
+                amount: { lt: 0 },
+                propertyId: null,
+            },
+            select: {
+                id: true,
+                purpose: true,
+                creditorName: true,
+            },
+        });
+
+        for (const tx of unassignedOutgoing) {
+            const purposeLower = (tx.purpose || '').toLowerCase();
+            const creditorLower = (tx.creditorName || '').toLowerCase();
+
+            let bestMatch: { propertyId: string; category: string } | null = null;
+
+            // Pass 1: Match by Referenznummer in purpose (highest confidence)
+            for (const sp of allProviders) {
+                if (!sp.contractNumber) continue;
+                const ref = sp.contractNumber.trim().toLowerCase();
+                if (ref.length < 3) continue;
+                if (purposeLower.includes(ref)) {
+                    const nkCat = SP_TO_NK[sp.category];
+                    if (nkCat) {
+                        bestMatch = { propertyId: sp.propertyId, category: nkCat };
+                        break; // reference number match is definitive
+                    }
+                }
+            }
+
+            // Pass 2: Match by provider name in creditor name (fallback)
+            if (!bestMatch && creditorLower.length > 0) {
+                for (const sp of allProviders) {
+                    const spNameLower = sp.name.toLowerCase();
+                    // Check both directions: creditor contains SP name, or SP name contains creditor
+                    // Use a minimum of 4 chars to avoid trivial matches
+                    if (spNameLower.length >= 4 && (
+                        creditorLower.includes(spNameLower) || spNameLower.includes(creditorLower)
+                    )) {
+                        const nkCat = SP_TO_NK[sp.category];
+                        if (nkCat) {
+                            bestMatch = { propertyId: sp.propertyId, category: nkCat };
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (bestMatch) {
+                await prisma.bankTransaction.update({
+                    where: { id: tx.id },
+                    data: {
+                        propertyId: bestMatch.propertyId,
+                        category: bestMatch.category,
+                    },
+                });
+            }
+        }
+    }
+
     // OUTGOING: IBAN+Property category memory.
     // For outgoing transactions that have a property but no category,
     // look up if we've previously categorized a tx from the same creditorIban + propertyId.
