@@ -18,7 +18,7 @@ function revalidateBanking() {
     revalidatePath('/dashboard/rent-roll');
 }
 
-// ── Decision Tree Matcher ──────────────────────────────────
+// ── Scoring-based Matcher ──────────────────────────────────
 
 type SPRecord = {
     name: string;
@@ -29,99 +29,78 @@ type SPRecord = {
     monthlyCost: number | null;
 };
 
-const AMOUNT_TOLERANCE = 0.05; // 5% tolerance for amount matching
-
-/**
- * Decision tree for outgoing transaction matching:
- * 1. IBAN match → filter SPs by exact IBAN
- * 2. If IBAN matches found → verify by Referenznummer (even for single match!)
- * 3. IBAN tiebreak → monthlyCost (±5%)
- * 4. No IBAN matches → Referenznummer across ALL SPs
- * 5. Fallback → historical learning (past manual assignments with same IBAN + similar amount)
- */
-async function matchByDecisionTree(
-    creditorIban: string | null,
-    purpose: string | null,
-    amount: number,
-    providers: SPRecord[],
-): Promise<{ propertyId: string; category: string } | null> {
-    if (!creditorIban) return null;
-
-    const normalizedIban = creditorIban.replace(/\s/g, '');
-
-    // Step 1: Filter by IBAN (only SPs that have a known IBAN)
-    const ibanMatches = providers.filter(
-        (sp) => sp.iban !== 'nicht bekannt' && sp.iban.replace(/\s/g, '') === normalizedIban
-    );
-
-    // Step 2: IBAN match(es) found → try Referenznummer to confirm/disambiguate
-    if (ibanMatches.length >= 1 && purpose) {
-        const match = matchByRef(ibanMatches, purpose);
-        if (match) return match;
-    }
-
-    // Step 2b: Exactly 1 IBAN match and the SP has NO known contract number → safe to assign
-    //          (If SP has a known ref and we didn't match it above, the tx likely belongs to a different contract)
-    if (ibanMatches.length === 1) {
-        const sp = ibanMatches[0];
-        if (sp.contractNumber === 'nicht bekannt') {
-            return { propertyId: sp.propertyId, category: sp.category };
-        }
-        // SP has a known contract number but it wasn't found in the purpose → don't blindly assign
-    }
-
-    // Step 3: Multiple IBAN matches → monthlyCost tiebreak
-    if (ibanMatches.length > 1) {
-        const absAmount = Math.abs(amount);
-        const amountMatches = ibanMatches.filter((sp) => {
-            if (!sp.monthlyCost || sp.monthlyCost <= 0) return false;
-            const diff = Math.abs(sp.monthlyCost - absAmount) / sp.monthlyCost;
-            return diff <= AMOUNT_TOLERANCE;
-        });
-        if (amountMatches.length === 1) {
-            return { propertyId: amountMatches[0].propertyId, category: amountMatches[0].category };
-        }
-    }
-
-    // Step 4: No IBAN matches (or IBAN unknown on SPs) → try Referenznummer across ALL providers
-    if (ibanMatches.length === 0 && purpose) {
-        const match = matchByRef(providers, purpose);
-        if (match) return match;
-    }
-
-    // Step 5: Historical learning — check past manually assigned transactions with same IBAN + similar amount
-    const absAmount = Math.abs(amount);
-    const pastAssignments = await prisma.bankTransaction.findMany({
-        where: {
-            creditorIban,
-            propertyId: { not: null },
-            category: { not: null },
-            amount: { gte: -(absAmount * (1 + AMOUNT_TOLERANCE)), lte: -(absAmount * (1 - AMOUNT_TOLERANCE)) },
-        },
-        select: { propertyId: true, category: true },
-        orderBy: { bookingDate: 'desc' },
-        take: 1,
-    });
-    if (pastAssignments.length > 0 && pastAssignments[0].propertyId && pastAssignments[0].category) {
-        return { propertyId: pastAssignments[0].propertyId, category: pastAssignments[0].category };
-    }
-
-    // Can't disambiguate → no auto-assign
-    return null;
+/** Normalize text for comparison: lowercase, strip umlauts, collapse whitespace */
+function normalize(text: string): string {
+    return text
+        .toLowerCase()
+        .replace(/ä/g, 'a').replace(/ö/g, 'o').replace(/ü/g, 'u').replace(/ß/g, 'ss')
+        .replace(/\s+/g, ' ')
+        .trim();
 }
 
-/** Try to match by Referenznummer in purpose text. Longest contract number first. */
-function matchByRef(candidates: SPRecord[], purpose: string): { propertyId: string; category: string } | null {
-    const purposeLower = purpose.toLowerCase();
-    const sorted = [...candidates]
-        .filter(sp => sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim().length >= 3)
-        .sort((a, b) => b.contractNumber.length - a.contractNumber.length);
-    for (const sp of sorted) {
-        const ref = sp.contractNumber.trim().toLowerCase();
-        if (purposeLower.includes(ref)) {
-            return { propertyId: sp.propertyId, category: sp.category };
+/**
+ * Score-based outgoing transaction matching.
+ * For each SP, count how many signals match the transaction:
+ *   +1  IBAN matches (exact, ignoring spaces)
+ *   +1  Referenznummer found in Verwendungszweck
+ *   +1  SP name overlaps with creditor name
+ *
+ * The SP with the highest score wins.
+ * Minimum score of 2 required to auto-assign (avoids false positives from a single weak signal).
+ */
+function matchByScore(
+    creditorName: string | null,
+    creditorIban: string | null,
+    purpose: string | null,
+    providers: SPRecord[],
+): { propertyId: string; category: string } | null {
+
+    const normalizedIban = creditorIban?.replace(/\s/g, '') ?? '';
+    const normalizedName = creditorName ? normalize(creditorName) : '';
+    const normalizedPurpose = purpose ? normalize(purpose) : '';
+
+    let bestMatch: SPRecord | null = null;
+    let bestScore = 0;
+
+    for (const sp of providers) {
+        let score = 0;
+
+        // Signal 1: IBAN match
+        if (normalizedIban && sp.iban !== 'nicht bekannt') {
+            if (sp.iban.replace(/\s/g, '') === normalizedIban) {
+                score += 1;
+            }
+        }
+
+        // Signal 2: Reference number in purpose
+        if (normalizedPurpose && sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim().length >= 3) {
+            if (normalizedPurpose.includes(sp.contractNumber.trim().toLowerCase())) {
+                score += 1;
+            }
+        }
+
+        // Signal 3: Name overlap (creditor name contains SP name or vice versa)
+        if (normalizedName && sp.name) {
+            const spName = normalize(sp.name);
+            // Check if the first significant word (>= 4 chars) of the SP name appears in the creditor name
+            const spWords = spName.split(' ').filter(w => w.length >= 4);
+            const nameHits = spWords.filter(w => normalizedName.includes(w));
+            if (nameHits.length >= 1 && spWords.length > 0) {
+                score += 1;
+            }
+        }
+
+        if (score > bestScore) {
+            bestScore = score;
+            bestMatch = sp;
         }
     }
+
+    // Require at least 2 signals to auto-assign
+    if (bestScore >= 2 && bestMatch) {
+        return { propertyId: bestMatch.propertyId, category: bestMatch.category };
+    }
+
     return null;
 }
 
@@ -204,7 +183,7 @@ export async function autoAssignNewTransactions(bankAccountId: string) {
         });
     }
 
-    // OUTGOING: Decision tree matching (IBAN → ref → amount → history)
+    // OUTGOING: Score-based matching (name + IBAN + reference number)
     const allProviders = await prisma.serviceProvider.findMany({
         select: { id: true, name: true, category: true, contractNumber: true, iban: true, propertyId: true, monthlyCost: true },
     });
@@ -212,11 +191,11 @@ export async function autoAssignNewTransactions(bankAccountId: string) {
     if (allProviders.length > 0) {
         const unassigned = await prisma.bankTransaction.findMany({
             where: { bankAccountId, amount: { lt: 0 }, propertyId: null },
-            select: { id: true, creditorIban: true, purpose: true, amount: true },
+            select: { id: true, creditorName: true, creditorIban: true, purpose: true, amount: true },
         });
 
         for (const tx of unassigned) {
-            const match = await matchByDecisionTree(tx.creditorIban, tx.purpose, tx.amount, allProviders);
+            const match = matchByScore(tx.creditorName, tx.creditorIban, tx.purpose, allProviders);
             if (match) {
                 await prisma.bankTransaction.update({
                     where: { id: tx.id },
