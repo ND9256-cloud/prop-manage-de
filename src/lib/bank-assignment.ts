@@ -76,8 +76,8 @@ function matchByScore(
             }
         }
 
-        // Signal 2: Reference number in purpose
-        const hasKnownRef = sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim().length >= 3;
+        // Signal 2: Reference number in purpose (exact full match from SP record)
+        const hasKnownRef = sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim() !== '';
         const spRef = hasKnownRef ? sp.contractNumber.trim().toLowerCase() : '';
         let refMatched = false;
 
