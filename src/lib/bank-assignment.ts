@@ -60,9 +60,6 @@ function matchByScore(
     const normalizedName = creditorName ? normalize(creditorName) : '';
     const normalizedPurpose = purpose ? normalize(purpose) : '';
 
-    // Extract all number sequences from the purpose that could be reference numbers (5+ digits)
-    const purposeNumbers = normalizedPurpose ? normalizedPurpose.match(/\d{5,}/g) ?? [] : [];
-
     let bestMatch: SPRecord | null = null;
     let bestScore = 0;
 
@@ -88,15 +85,10 @@ function matchByScore(
             }
         }
 
-        // Penalty: SP has a known ref, purpose has number-like references, but NONE match the SP's ref
-        // This means the transaction likely belongs to a different contract with the same provider
-        if (hasKnownRef && !refMatched && purposeNumbers.length > 0) {
-            // Check if any of the purpose numbers look like they could be a contract/reference number
-            // and none of them match this SP's contract number
-            const anyMatch = purposeNumbers.some(n => n === spRef || spRef.includes(n) || n.includes(spRef));
-            if (!anyMatch) {
-                score -= 1;
-            }
+        // Penalty: SP has a known ref, purpose exists, but ref NOT found in purpose
+        // → transaction likely belongs to a different contract with the same provider
+        if (hasKnownRef && !refMatched && normalizedPurpose) {
+            score -= 1;
         }
 
         // Signal 3: Name overlap (creditor name contains SP name or vice versa)
