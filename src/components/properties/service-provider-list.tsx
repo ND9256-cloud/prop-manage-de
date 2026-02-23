@@ -13,7 +13,8 @@ interface Provider {
     id: string;
     name: string;
     category: string;
-    contractNumber: string | null;
+    contractNumber: string;
+    iban: string;
     monthlyCost: number | null;
     yearlyCost: number | null;
     contactName: string | null;
@@ -117,9 +118,16 @@ export default function ServiceProviderList({
                             </select>
                         </div>
                         <div>
-                            <label className="text-xs text-muted-foreground">Referenznummer</label>
-                            <input name="contractNumber" defaultValue={defaults?.contractNumber ?? ''}
-                                className="w-full border rounded-md px-3 py-1.5 text-sm bg-background" />
+                            <label className="text-xs text-muted-foreground">Referenznummer *</label>
+                            <input name="contractNumber" required defaultValue={defaults?.contractNumber ?? ''}
+                                className="w-full border rounded-md px-3 py-1.5 text-sm bg-background"
+                                placeholder="z.B. 3473874" />
+                        </div>
+                        <div>
+                            <label className="text-xs text-muted-foreground">IBAN *</label>
+                            <input name="iban" required defaultValue={defaults?.iban ?? ''}
+                                className="w-full border rounded-md px-3 py-1.5 text-sm bg-background"
+                                placeholder="DE... oder 'nicht bekannt'" />
                         </div>
                         <div>
                             <label className="text-xs text-muted-foreground">Ansprechpartner</label>
@@ -241,7 +249,8 @@ export default function ServiceProviderList({
                                             </div>
                                         </td>
                                         <td className="p-3 hidden lg:table-cell text-xs text-muted-foreground">
-                                            {p.contractNumber || '—'}
+                                            <div>{p.contractNumber !== 'nicht bekannt' ? p.contractNumber : '—'}</div>
+                                            <div className="text-[10px]">{p.iban !== 'nicht bekannt' ? p.iban : 'IBAN unbekannt'}</div>
                                         </td>
                                         <td className="p-3 text-right whitespace-nowrap text-xs">
                                             {costData?.frequency || (

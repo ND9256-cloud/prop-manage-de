@@ -22,6 +22,7 @@ export {
 export {
     assignTransaction,
     autoAssignNewTransactions,
+    getPropertySPCategories,
     getPropertyCashFlow,
     getServiceProviderCosts,
 } from './bank-assignment';

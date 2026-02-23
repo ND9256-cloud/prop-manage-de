@@ -274,8 +274,9 @@ export async function getTenantPayments(personId: string, page: number = 1, page
 }
 
 export async function getAssignmentOptions() {
+    const orgId = await getOrgId();
     const properties = await prisma.property.findMany({
-        where: { organizationId: await getOrgId() },
+        where: { organizationId: orgId },
         select: {
             id: true, name: true, address: true,
             units: {
@@ -286,6 +287,9 @@ export async function getAssignmentOptions() {
                     },
                 },
             },
+            serviceProviders: {
+                select: { category: true },
+            },
         },
         orderBy: { name: 'asc' },
     });
@@ -295,6 +299,7 @@ export async function getAssignmentOptions() {
         for (const unit of p.units) {
             for (const lease of unit.leases) tenantMap.set(lease.mainTenant.id, lease.mainTenant);
         }
-        return { id: p.id, name: p.name, address: p.address, tenants: Array.from(tenantMap.values()) };
+        const spCategories = [...new Set(p.serviceProviders.map((sp) => sp.category))];
+        return { id: p.id, name: p.name, address: p.address, tenants: Array.from(tenantMap.values()), spCategories };
     });
 }

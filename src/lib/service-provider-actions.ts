@@ -3,6 +3,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { autoAssignNewTransactions } from '@/lib/bank-assignment';
 
 async function getOrgId() {
     const session = await auth();
@@ -23,6 +24,17 @@ async function verifyPropertyAccess(propertyId: string, orgId: string) {
     if (!property) throw new Error('Property not found');
 }
 
+/** Trigger auto-assign on all bank accounts linked to this org. */
+async function triggerAutoAssign(orgId: string) {
+    const accounts = await prisma.bankAccount.findMany({
+        where: { organizationId: orgId },
+        select: { id: true },
+    });
+    for (const acc of accounts) {
+        await autoAssignNewTransactions(acc.id);
+    }
+}
+
 export async function createServiceProvider(formData: FormData) {
     const orgId = await getOrgId();
     const propertyId = formData.get('propertyId') as string;
@@ -32,7 +44,8 @@ export async function createServiceProvider(formData: FormData) {
         data: {
             name: formData.get('name') as string,
             category: formData.get('category') as string,
-            contractNumber: (formData.get('contractNumber') as string) || null,
+            contractNumber: (formData.get('contractNumber') as string) || 'nicht bekannt',
+            iban: (formData.get('iban') as string) || 'nicht bekannt',
             monthlyCost: formData.get('monthlyCost') ? parseFloat(formData.get('monthlyCost') as string) : null,
             yearlyCost: formData.get('yearlyCost') ? parseFloat(formData.get('yearlyCost') as string) : null,
             contactName: (formData.get('contactName') as string) || null,
@@ -43,7 +56,11 @@ export async function createServiceProvider(formData: FormData) {
         },
     });
 
+    // Auto-assign existing unassigned transactions that match this new SP
+    await triggerAutoAssign(orgId);
+
     revalidatePath(`/dashboard/properties/${propertyId}`);
+    revalidatePath('/dashboard/banking');
     return { success: true };
 }
 
@@ -64,7 +81,8 @@ export async function updateServiceProvider(formData: FormData) {
         data: {
             name: formData.get('name') as string,
             category: formData.get('category') as string,
-            contractNumber: (formData.get('contractNumber') as string) || null,
+            contractNumber: (formData.get('contractNumber') as string) || 'nicht bekannt',
+            iban: (formData.get('iban') as string) || 'nicht bekannt',
             monthlyCost: formData.get('monthlyCost') ? parseFloat(formData.get('monthlyCost') as string) : null,
             yearlyCost: formData.get('yearlyCost') ? parseFloat(formData.get('yearlyCost') as string) : null,
             contactName: (formData.get('contactName') as string) || null,
@@ -74,7 +92,11 @@ export async function updateServiceProvider(formData: FormData) {
         },
     });
 
+    // Auto-assign after SP update (IBAN or ref might have changed)
+    await triggerAutoAssign(orgId);
+
     revalidatePath(`/dashboard/properties/${existing.propertyId}`);
+    revalidatePath('/dashboard/banking');
     return { success: true };
 }
 
@@ -92,5 +114,6 @@ export async function deleteServiceProvider(id: string) {
     await prisma.serviceProvider.delete({ where: { id } });
 
     revalidatePath(`/dashboard/properties/${existing.property.id}`);
+    revalidatePath('/dashboard/banking');
     return { success: true };
 }

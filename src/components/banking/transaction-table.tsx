@@ -10,18 +10,34 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2, Tag } from 'lucide-react';
+import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2, Tag, RotateCcw } from 'lucide-react';
 
-const BOOKING_CATEGORIES = [
+/** Categories always available (not tied to SPs). */
+const FIXED_CATEGORIES = [
     { value: 'Bruttomieteinnahmen', label: 'Bruttomieteinnahmen', group: 'Mieteinnahmen' },
-    { value: 'NK: Gas', label: 'Gas', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Strom', label: 'Strom', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Wohngebäudeversicherung', label: 'Wohngebäudeversicherung', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Haftpflichtversicherung', label: 'Haftpflichtversicherung', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Grundbesitzabgaben', label: 'Grundbesitzabgaben', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Verbrauchsdatenerfassung', label: 'Verbrauchsdatenerfassung', group: 'Umlegbare Nebenkosten' },
-    { value: 'NK: Sonstige Dienstleister', label: 'Sonstige Dienstleister', group: 'Umlegbare Nebenkosten' },
+    { value: 'Kaution', label: 'Kaution', group: 'Mieteinnahmen' },
 ] as const;
+
+/** Map SP category keys → display labels for the NK group. */
+const NK_DISPLAY: Record<string, string> = {
+    strom: 'Strom',
+    gas: 'Gas',
+    wasser: 'Wasser',
+    heizung: 'Heizung',
+    wohngebaeudeversicherung: 'Wohngebäudeversicherung',
+    haftpflichtversicherung: 'Haftpflichtversicherung',
+    grundbesitzabgaben: 'Grundbesitzabgaben',
+    verbrauchsdatenerfassung: 'Verbrauchsdatenerfassung',
+    hausverwaltung: 'Hausverwaltung',
+    wartung: 'Wartung',
+    'sonstige dienstleister': 'Sonstige Dienstleister',
+};
+
+/** Format a stored category value for display (add NK: prefix for SP categories). */
+function formatCategoryLabel(value: string): string {
+    if (value in NK_DISPLAY) return `NK: ${NK_DISPLAY[value]}`;
+    return value;
+}
 
 import { assignTransaction } from '@/lib/bank-actions';
 
@@ -51,6 +67,7 @@ export interface AssignmentProperty {
     name: string;
     address: string;
     tenants: { id: string; firstName: string; lastName: string }[];
+    spCategories: string[];
 }
 
 interface TransactionTableProps {
@@ -63,6 +80,8 @@ interface TransactionTableProps {
     properties?: AssignmentProperty[];
     onAssigned?: () => void;
 }
+
+
 
 export default function TransactionTable({
     transactions,
@@ -262,6 +281,12 @@ export default function TransactionTable({
                                                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                                                                 <User className="h-3 w-3" />
                                                                 {tName}
+                                                            </span>
+                                                        )}
+                                                        {tx.category && (
+                                                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                                                                <Tag className="h-3 w-3" />
+                                                                {formatCategoryLabel(tx.category)}
                                                             </span>
                                                         )}
                                                     </div>
@@ -496,34 +521,60 @@ function AssignmentSelect({
                         <SelectItem value="__none__">
                             <span className="text-muted-foreground italic">Keine Kategorie</span>
                         </SelectItem>
+                        {/* Fixed categories — always available */}
+                        <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                            Mieteinnahmen
+                        </div>
+                        {FIXED_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                                {cat.label}
+                            </SelectItem>
+                        ))}
+
+                        {/* Dynamic NK categories — only from registered SPs */}
                         {(() => {
-                            let lastGroup = '';
-                            return BOOKING_CATEGORIES.map((cat) => {
-                                const showGroup = cat.group !== lastGroup;
-                                lastGroup = cat.group;
-                                return (
-                                    <span key={cat.value}>
-                                        {showGroup && (
-                                            <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
-                                                {cat.group}
-                                            </div>
-                                        )}
-                                        <SelectItem value={cat.value}>
-                                            {cat.label}
+                            const spCats = selectedProperty?.spCategories ?? [];
+                            if (spCats.length === 0) return null;
+                            return (
+                                <>
+                                    <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                        Umlegbare Nebenkosten
+                                    </div>
+                                    {spCats.map((cat) => (
+                                        <SelectItem key={cat} value={cat}>
+                                            {NK_DISPLAY[cat] ?? cat}
                                         </SelectItem>
-                                    </span>
-                                );
-                            });
+                                    ))}
+                                </>
+                            );
                         })()}
                     </SelectContent>
                 </Select>
             </div>
-            {assigning && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Wird zugeordnet...
-                </div>
-            )}
+            <div className="flex items-center gap-2 pt-1">
+                {assigning && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Wird zugeordnet...
+                    </div>
+                )}
+                {(selectedPropertyId || selectedTenantId || selectedCategory) && !assigning && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                        onClick={() => {
+                            setSelectedPropertyId('');
+                            setSelectedTenantId('');
+                            setSelectedCategory('');
+                            onAssign(tx.id, null, null, null);
+                        }}
+                    >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Zuordnung zurücksetzen
+                    </Button>
+                )}
+            </div>
         </div>
     );
 }

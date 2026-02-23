@@ -212,8 +212,9 @@ model Document {
 model ServiceProvider {
   id             String   @id @default(uuid())
   name           String   // e.g. "Stadtwerke München"
-  category       String   // strom, gas, wasser, heizung, versicherung, grundbesitzabgaben, hausverwaltung, sonstige
-  contractNumber String?  // Vertragsnummer
+  category       String   // Strom, Gas, Wasser, etc.
+  contractNumber String   // Referenznummer (required for matching)
+  iban           String   // IBAN or "nicht bekannt"
   monthlyCost    Float?   // EUR/month
   yearlyCost     Float?   // EUR/year
   contactName    String?
