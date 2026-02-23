@@ -44,6 +44,7 @@ function normalize(text: string): string {
  *   +1  IBAN matches (exact, ignoring spaces)
  *   +1  Referenznummer found in Verwendungszweck
  *   +1  SP name overlaps with creditor name
+ *   -1  SP has a known ref BUT the purpose contains a different ref-like number (same provider, different contract)
  *
  * The SP with the highest score wins.
  * Minimum score of 2 required to auto-assign (avoids false positives from a single weak signal).
@@ -59,6 +60,9 @@ function matchByScore(
     const normalizedName = creditorName ? normalize(creditorName) : '';
     const normalizedPurpose = purpose ? normalize(purpose) : '';
 
+    // Extract all number sequences from the purpose that could be reference numbers (5+ digits)
+    const purposeNumbers = normalizedPurpose ? normalizedPurpose.match(/\d{5,}/g) ?? [] : [];
+
     let bestMatch: SPRecord | null = null;
     let bestScore = 0;
 
@@ -73,9 +77,25 @@ function matchByScore(
         }
 
         // Signal 2: Reference number in purpose
-        if (normalizedPurpose && sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim().length >= 3) {
-            if (normalizedPurpose.includes(sp.contractNumber.trim().toLowerCase())) {
+        const hasKnownRef = sp.contractNumber !== 'nicht bekannt' && sp.contractNumber.trim().length >= 3;
+        const spRef = hasKnownRef ? sp.contractNumber.trim().toLowerCase() : '';
+        let refMatched = false;
+
+        if (normalizedPurpose && hasKnownRef) {
+            if (normalizedPurpose.includes(spRef)) {
                 score += 1;
+                refMatched = true;
+            }
+        }
+
+        // Penalty: SP has a known ref, purpose has number-like references, but NONE match the SP's ref
+        // This means the transaction likely belongs to a different contract with the same provider
+        if (hasKnownRef && !refMatched && purposeNumbers.length > 0) {
+            // Check if any of the purpose numbers look like they could be a contract/reference number
+            // and none of them match this SP's contract number
+            const anyMatch = purposeNumbers.some(n => n === spRef || spRef.includes(n) || n.includes(spRef));
+            if (!anyMatch) {
+                score -= 1;
             }
         }
 
