@@ -33,10 +33,10 @@ const AMOUNT_TOLERANCE = 0.05; // 5% tolerance for amount matching
 
 /**
  * Decision tree for outgoing transaction matching:
- * 1. IBAN match → if exactly 1 SP has this IBAN → assign
- * 2. Multiple IBAN matches → Referenznummer to disambiguate (longest first)
- * 3. Multiple IBAN matches → monthlyCost tiebreak (±5%)
- * 4. No IBAN matches (or SP has "nicht bekannt") → Referenznummer across ALL SPs
+ * 1. IBAN match → filter SPs by exact IBAN
+ * 2. If IBAN matches found → verify by Referenznummer (even for single match!)
+ * 3. IBAN tiebreak → monthlyCost (±5%)
+ * 4. No IBAN matches → Referenznummer across ALL SPs
  * 5. Fallback → historical learning (past manual assignments with same IBAN + similar amount)
  */
 async function matchByDecisionTree(
@@ -54,14 +54,20 @@ async function matchByDecisionTree(
         (sp) => sp.iban !== 'nicht bekannt' && sp.iban.replace(/\s/g, '') === normalizedIban
     );
 
-    if (ibanMatches.length === 1) {
-        return { propertyId: ibanMatches[0].propertyId, category: ibanMatches[0].category };
-    }
-
-    // Step 2: Multiple IBAN matches → disambiguate by Referenznummer (longest first)
-    if (ibanMatches.length > 1 && purpose) {
+    // Step 2: IBAN match(es) found → try Referenznummer to confirm/disambiguate
+    if (ibanMatches.length >= 1 && purpose) {
         const match = matchByRef(ibanMatches, purpose);
         if (match) return match;
+    }
+
+    // Step 2b: Exactly 1 IBAN match and the SP has NO known contract number → safe to assign
+    //          (If SP has a known ref and we didn't match it above, the tx likely belongs to a different contract)
+    if (ibanMatches.length === 1) {
+        const sp = ibanMatches[0];
+        if (sp.contractNumber === 'nicht bekannt') {
+            return { propertyId: sp.propertyId, category: sp.category };
+        }
+        // SP has a known contract number but it wasn't found in the purpose → don't blindly assign
     }
 
     // Step 3: Multiple IBAN matches → monthlyCost tiebreak
