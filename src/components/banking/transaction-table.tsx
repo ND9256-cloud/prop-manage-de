@@ -10,6 +10,14 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog';
 import { Search, ArrowUpDown, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Building2, User, Loader2, Tag, RotateCcw } from 'lucide-react';
 
 /** Categories always available (not tied to SPs). */
@@ -39,7 +47,7 @@ function formatCategoryLabel(value: string): string {
     return value;
 }
 
-import { assignTransaction } from '@/lib/bank-actions';
+import { assignTransaction, countSimilarTransactions, bulkReassignByIban } from '@/lib/bank-actions';
 
 export interface BankTransactionRow {
     id: string;
@@ -149,6 +157,16 @@ export default function TransactionTable({
         setExpandedId(expandedId === id ? null : id);
     };
 
+    // Bulk reassignment dialog state
+    const [bulkConfirm, setBulkConfirm] = useState<{
+        txId: string;
+        propertyId: string | null;
+        tenantId: string | null;
+        category: string | null;
+        count: number;
+        name: string | null;
+    } | null>(null);
+
     const handleAssign = async (
         txId: string,
         propertyId: string | null,
@@ -158,10 +176,41 @@ export default function TransactionTable({
         setAssigningId(txId);
         try {
             await assignTransaction(txId, { propertyId, tenantId, category });
+
+            // If a tenant was assigned, check for similar transactions
+            if (tenantId) {
+                const { count, name } = await countSimilarTransactions(txId);
+                if (count > 0) {
+                    setBulkConfirm({ txId, propertyId, tenantId, category, count, name });
+                    return; // Don't clear assigningId yet — dialog is open
+                }
+            }
+
             onAssigned?.();
         } finally {
             setAssigningId(null);
         }
+    };
+
+    const handleBulkConfirm = async () => {
+        if (!bulkConfirm) return;
+        try {
+            await bulkReassignByIban(bulkConfirm.txId, {
+                propertyId: bulkConfirm.propertyId,
+                tenantId: bulkConfirm.tenantId,
+                category: bulkConfirm.category,
+            });
+        } finally {
+            setBulkConfirm(null);
+            setAssigningId(null);
+            onAssigned?.();
+        }
+    };
+
+    const handleBulkDismiss = () => {
+        setBulkConfirm(null);
+        setAssigningId(null);
+        onAssigned?.();
     };
 
     const getPropertyName = (propertyId: string | null | undefined) => {
@@ -403,6 +452,26 @@ export default function TransactionTable({
                     </div>
                 </div>
             )}
+
+            {/* Bulk reassignment confirmation dialog */}
+            <Dialog open={!!bulkConfirm} onOpenChange={(open) => { if (!open) handleBulkDismiss(); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Zuordnung für alle übernehmen?</DialogTitle>
+                        <DialogDescription>
+                            Es gibt {bulkConfirm?.count} weitere Buchung{bulkConfirm?.count === 1 ? '' : 'en'} von <strong>{bulkConfirm?.name || 'diesem Auftraggeber'}</strong>. Sollen alle Einträge die gleiche Zuordnung erhalten?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={handleBulkDismiss}>
+                            Nur diese Buchung
+                        </Button>
+                        <Button onClick={handleBulkConfirm}>
+                            Alle {(bulkConfirm?.count ?? 0) + 1} Buchungen ändern
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

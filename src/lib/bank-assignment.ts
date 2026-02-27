@@ -129,26 +129,6 @@ export async function assignTransaction(
         data: { propertyId: assignment.propertyId, tenantId: assignment.tenantId, category },
     });
 
-    let propagated = 0;
-
-    // INCOMING only: same debtor IBAN = same tenant
-    const counterpartIban = tx.amount >= 0 ? tx.debtorIban : tx.creditorIban;
-
-    if (counterpartIban && tx.amount >= 0) {
-        const candidates = await prisma.bankTransaction.findMany({
-            where: { debtorIban: counterpartIban, id: { not: transactionId }, propertyId: null },
-            select: { id: true, purpose: true },
-        });
-        for (const c of candidates) {
-            const cat = isKaution(c.purpose) ? 'Kaution' : 'Bruttomieteinnahmen';
-            await prisma.bankTransaction.update({
-                where: { id: c.id },
-                data: { propertyId: assignment.propertyId, tenantId: assignment.tenantId, category: cat },
-            });
-            propagated++;
-        }
-    }
-
     // OUTGOING: Auto-fill SP IBAN if "nicht bekannt"
     if (tx.amount < 0 && tx.creditorIban && category && assignment.propertyId) {
         const unknownIbanSPs = await prisma.serviceProvider.findMany({
@@ -166,7 +146,93 @@ export async function assignTransaction(
     }
 
     revalidateBanking();
-    return { updated: 1 + propagated };
+    return { updated: 1 };
+}
+
+/**
+ * Count how many other transactions share the same debtor IBAN (for incoming)
+ * or creditor IBAN (for outgoing) as the given transaction.
+ * Returns the count and debtor/creditor name for the confirmation dialog.
+ */
+export async function countSimilarTransactions(
+    transactionId: string
+): Promise<{ count: number; name: string | null }> {
+    const tx = await prisma.bankTransaction.findUniqueOrThrow({
+        where: { id: transactionId },
+        select: { amount: true, debtorIban: true, debtorName: true, creditorIban: true, creditorName: true },
+    });
+
+    const isIncoming = tx.amount >= 0;
+    const iban = isIncoming ? tx.debtorIban : tx.creditorIban;
+    const name = isIncoming ? tx.debtorName : tx.creditorName;
+
+    if (!iban) return { count: 0, name };
+
+    const count = await prisma.bankTransaction.count({
+        where: {
+            id: { not: transactionId },
+            ...(isIncoming ? { debtorIban: iban } : { creditorIban: iban }),
+        },
+    });
+
+    return { count, name };
+}
+
+/**
+ * Bulk-reassign all transactions from the same debtor/creditor IBAN.
+ * Used when the user confirms "Apply to all X entries from [name]".
+ */
+export async function bulkReassignByIban(
+    transactionId: string,
+    assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
+): Promise<{ updated: number }> {
+    const tx = await prisma.bankTransaction.findUniqueOrThrow({
+        where: { id: transactionId },
+        select: { amount: true, debtorIban: true, creditorIban: true, purpose: true },
+    });
+
+    const isIncoming = tx.amount >= 0;
+    const iban = isIncoming ? tx.debtorIban : tx.creditorIban;
+
+    if (!iban) return { updated: 0 };
+
+    // For incoming transactions, auto-detect Kaution vs Bruttomieteinnahmen per transaction
+    if (isIncoming) {
+        const allSimilar = await prisma.bankTransaction.findMany({
+            where: {
+                ...(isIncoming ? { debtorIban: iban } : { creditorIban: iban }),
+            },
+            select: { id: true, purpose: true },
+        });
+
+        for (const t of allSimilar) {
+            const cat = isKaution(t.purpose) ? 'Kaution' : 'Bruttomieteinnahmen';
+            await prisma.bankTransaction.update({
+                where: { id: t.id },
+                data: {
+                    propertyId: assignment.propertyId,
+                    tenantId: assignment.tenantId,
+                    category: cat,
+                },
+            });
+        }
+
+        revalidateBanking();
+        return { updated: allSimilar.length };
+    }
+
+    // For outgoing, apply the exact same category to all
+    const result = await prisma.bankTransaction.updateMany({
+        where: { creditorIban: iban },
+        data: {
+            propertyId: assignment.propertyId,
+            tenantId: assignment.tenantId,
+            category: assignment.category ?? null,
+        },
+    });
+
+    revalidateBanking();
+    return { updated: result.count };
 }
 
 /** Auto-assign newly synced transactions. Called after sync and SP create/update. */

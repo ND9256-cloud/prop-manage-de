@@ -21,6 +21,8 @@ export {
 
 export {
     assignTransaction,
+    countSimilarTransactions,
+    bulkReassignByIban,
     autoAssignNewTransactions,
     getPropertySPCategories,
     getPropertyCashFlow,
