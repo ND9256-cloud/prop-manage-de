@@ -188,18 +188,32 @@ export async function applyReviewTask(
         ...(unitId ? { unit_id: unitId } : {}),
     };
 
-    const { error: rpcError } = await supabase.rpc('apply', {
-        p_org_id: orgId,
-        p_document_id: documentId,
-        p_extraction_id: extractionId,
-        p_action: docType === 'lease' ? 'lease.create' : 'ledger.append',
-        p_payload: payload,
-        p_triggered_by: userId,
-        p_trigger_type: 'user_confirmed',
-        p_idempotency_key: `${documentId}_${extractionId}_confirmed`,
-    });
+    const action = docType === 'lease' ? 'lease.create' : 'ledger.append';
+    const idempotencyKey = `${documentId}_${extractionId}_confirmed`;
 
-    if (rpcError) return { error: rpcError.message };
+    // Call connector.apply() via direct SQL (connector schema not exposed via REST)
+    try {
+        const result = await prisma.$queryRawUnsafe<{ apply: string }[]>(
+            `SELECT connector.apply(
+                $1::UUID, $2::UUID, $3::UUID, $4::TEXT, $5::JSONB,
+                $6::TEXT, $7::TEXT, $8::TEXT
+            ) as apply`,
+            orgId, documentId, extractionId, action,
+            JSON.stringify(payload),
+            userId, 'user_confirmed', idempotencyKey,
+        );
+
+        const applyResult = typeof result[0]?.apply === 'string'
+            ? JSON.parse(result[0].apply)
+            : result[0]?.apply;
+
+        if (!applyResult?.success) {
+            return { error: applyResult?.error || 'Apply failed' };
+        }
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Unknown error';
+        return { error: `Apply failed: ${msg}` };
+    }
 
     // Mark review task as resolved
     await supabase
@@ -208,13 +222,6 @@ export async function applyReviewTask(
         .update({ status: 'resolved' })
         .eq('document_id', documentId)
         .eq('status', 'open');
-
-    // Update document status
-    await supabase
-        .schema('warehouse')
-        .from('documents')
-        .update({ status: 'applied', updated_at: new Date().toISOString() })
-        .eq('id', documentId);
 
     return { error: null };
 }
