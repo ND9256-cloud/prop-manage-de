@@ -180,7 +180,11 @@ export async function applyReviewTask(
     if (!supabase) return { error: 'Supabase not configured' };
 
     const session = await auth();
-    const userId = session?.user?.email || null;
+    let userId: string | null = null;
+    if (session?.user?.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
+        userId = dbUser?.id || null;
+    }
 
     const payload = {
         ...extractedFields,
