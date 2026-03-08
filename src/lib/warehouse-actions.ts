@@ -3,6 +3,7 @@
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getSupabaseAdmin } from '@/lib/supabase';
+import { CATEGORIES } from '@/lib/warehouse-categories';
 
 async function getOrgId(): Promise<string | null> {
     const session = await auth();
@@ -136,6 +137,81 @@ export async function getWarehouseDocuments() {
 
     if (error) return { error: error.message, documents: [] };
     return { error: null, documents: data || [] };
+}
+
+
+export async function getPropertyWarehouseDetail(propertyId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', property: null, folders: [], stats: null, unassignedCount: 0 };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured', property: null, folders: [], stats: null, unassignedCount: 0 };
+
+    // Fetch property
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+    });
+    if (!property) return { error: 'Property not found', property: null, folders: [], stats: null, unassignedCount: 0 };
+
+    // Fetch all docs for this property
+    const { data: docs } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('id, status, category, file_size_bytes, created_at')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .neq('status', 'deleted');
+
+    const allDocs = docs || [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Build folder stats
+    const folders = CATEGORIES.map(cat => {
+        const catDocs = allDocs.filter(d => d.category === cat.key);
+        const needsReview = catDocs.filter(d => d.status === 'needs_review').length;
+        const totalSize = catDocs.reduce((s, d) => s + (d.file_size_bytes || 0), 0);
+        const mostRecent = catDocs.length > 0
+            ? catDocs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at
+            : null;
+
+        return {
+            ...cat,
+            count: catDocs.length,
+            needsReview,
+            totalSize,
+            mostRecent,
+        };
+    });
+
+    // Unassigned docs
+    const unassignedCount = allDocs.filter(d => !d.category).length;
+
+    // Property stats
+    const needsReview = allDocs.filter(d => d.status === 'needs_review');
+    const oldestUnreviewed = needsReview.length > 0
+        ? needsReview.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0].created_at
+        : null;
+
+    const stats = {
+        total: allDocs.length,
+        needsReview: needsReview.length,
+        appliedThisMonth: allDocs.filter(d => d.status === 'applied' && d.created_at >= monthStart).length,
+        oldestUnreviewed,
+    };
+
+    return {
+        error: null,
+        property: {
+            id: property.id,
+            name: property.name,
+            address: property.address,
+            shortCode: (property as Record<string, unknown>).short_code as string | null,
+        },
+        folders,
+        stats,
+        unassignedCount,
+    };
 }
 
 export async function uploadWarehouseDocument(formData: FormData) {
