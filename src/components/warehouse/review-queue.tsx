@@ -183,7 +183,7 @@ function ReviewTaskCard({
 }: {
     task: ReviewTask;
     properties: PropertyOption[];
-    onApply: (taskId: string, propertyId?: string, unitId?: string) => void;
+    onApply: (taskId: string, propertyId?: string, unitId?: string, category?: string, displayName?: string) => void;
     onDismiss: (taskId: string) => void;
 }) {
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
@@ -316,6 +316,8 @@ function ReviewTaskCard({
                                     task.id,
                                     selectedPropertyId || undefined,
                                     selectedUnitId || undefined,
+                                    selectedCategory || undefined,
+                                    editDisplayName || undefined,
                                 );
                                 setIsApplying(false);
                             }}
@@ -366,14 +368,30 @@ export default function ReviewQueue({ initialTasks, properties }: Props) {
         }
     }, []);
 
-    const handleApply = useCallback(async (taskId: string, propertyId?: string, unitId?: string) => {
+    const handleApply = useCallback(async (taskId: string, propertyId?: string, unitId?: string, category?: string, displayName?: string) => {
         const task = tasks.find(t => t.id === taskId);
         if (!task || !task.extraction) {
-            setToastMessage('❌ Missing extraction data');
+            setToastMessage('❌ Fehlende Daten / Missing extraction data');
             return;
         }
 
         try {
+            // Step 1: Save metadata first
+            if (category || displayName) {
+                const { updateDocumentMetadata } = await import('@/lib/warehouse-actions');
+                const metaResult = await updateDocumentMetadata(
+                    task.document_id,
+                    displayName || '',
+                    category || '',
+                );
+                if (metaResult.error) {
+                    setToastMessage(`❌ Fehler beim Ablegen / Filing failed: ${metaResult.error}`);
+                    console.error('updateDocumentMetadata failed:', metaResult.error);
+                    return;
+                }
+            }
+
+            // Step 2: Apply via connector
             const { applyReviewTask } = await import('@/lib/warehouse-actions');
             const result = await applyReviewTask(
                 task.document_id,
@@ -386,13 +404,15 @@ export default function ReviewQueue({ initialTasks, properties }: Props) {
             );
 
             if (result.error) {
-                setToastMessage(`❌ ${result.error}`);
+                setToastMessage(`❌ Fehler beim Ablegen / Filing failed: ${result.error}`);
+                console.error('applyReviewTask failed:', result.error);
             } else {
-                setToastMessage('✅ Applied to PM tool');
+                setToastMessage('✅ Dokument abgelegt / Document filed');
                 setTasks(prev => prev.filter(t => t.id !== taskId));
             }
-        } catch {
-            setToastMessage('❌ Apply failed. Please try again.');
+        } catch (e) {
+            setToastMessage('❌ Fehler beim Ablegen / Filing failed');
+            console.error('Apply error:', e);
         }
     }, [tasks]);
 

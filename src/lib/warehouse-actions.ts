@@ -392,6 +392,69 @@ export async function applyReviewTask(
     return { error: null };
 }
 
+export async function updateDocumentMetadata(
+    documentId: string,
+    displayName: string,
+    category: string,
+) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured' };
+
+    // Fetch extraction to get invoice_date for retention calculation
+    let invoiceDate: string | null = null;
+    const { data: extraction } = await supabase
+        .schema('warehouse')
+        .from('document_extractions')
+        .select('extracted_fields')
+        .eq('document_id', documentId)
+        .eq('is_current', true)
+        .single();
+
+    if (extraction?.extracted_fields) {
+        const fields = extraction.extracted_fields as Record<string, unknown>;
+        invoiceDate = (fields.invoice_date as string) || null;
+    }
+
+    // Calculate retention_until
+    let retentionUntil: string;
+    const now = new Date();
+    if (category === 'rechtliches') {
+        const d = new Date(now);
+        d.setFullYear(d.getFullYear() + 30);
+        retentionUntil = d.toISOString();
+    } else if (category === 'kosten_rechnungen' && invoiceDate) {
+        const d = new Date(invoiceDate);
+        d.setFullYear(d.getFullYear() + 10);
+        retentionUntil = d.toISOString();
+    } else {
+        const d = new Date(now);
+        d.setFullYear(d.getFullYear() + 10);
+        retentionUntil = d.toISOString();
+    }
+
+    const updatePayload: Record<string, unknown> = {
+        category,
+        retention_until: retentionUntil,
+        updated_at: new Date().toISOString(),
+    };
+    if (displayName.trim()) {
+        updatePayload.display_name = displayName.trim();
+    }
+
+    const { error } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .update(updatePayload)
+        .eq('id', documentId)
+        .eq('org_id', orgId);
+
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
 export async function dismissReviewTask(taskId: string) {
     const supabase = getSupabaseAdmin();
     if (!supabase) return { error: 'Supabase not configured' };
