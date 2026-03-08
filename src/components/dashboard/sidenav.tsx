@@ -5,7 +5,8 @@ import {
     Building,
     Users,
     Landmark,
-    Archive,
+    Inbox,
+    CheckCircle,
     LogOut
 } from 'lucide-react';
 import { SignOut } from '@/components/sign-out';
@@ -42,7 +43,9 @@ const links = [
     },
     { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users },
     { name: 'Konten', href: '/dashboard/banking', icon: Landmark },
-    { name: 'Warehouse', href: '/dashboard/warehouse', icon: Archive },
+    { name: 'Inbox', href: '/dashboard/warehouse/inbox', icon: Inbox },
+    { name: 'Properties', href: '/dashboard/warehouse', icon: Building },
+    { name: 'Review Queue', href: '/dashboard/warehouse/review', icon: CheckCircle },
 ];
 
 function NavLinks() {
@@ -64,3 +67,4 @@ function NavLinks() {
         </>
     );
 }
+

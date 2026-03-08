@@ -5,6 +5,27 @@ import { prisma } from '@/lib/db';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { CATEGORIES } from '@/lib/warehouse-categories';
 
+export interface InboxDocument {
+    id: string;
+    file_name: string;
+    display_name: string | null;
+    doc_type: string | null;
+    status: string;
+    source: 'email' | 'telegram' | 'ui';
+    created_at: string;
+    mime_type: string | null;
+    file_size_bytes: number | null;
+    property_id: string | null;
+    category: string | null;
+    subcategory: string | null;
+    // Joined fields
+    property_address: string | null;
+    property_short_code: string | null;
+    confidence_score: number | null;
+    applied_by: string | null;
+    applied_at: string | null;
+}
+
 async function getOrgId(): Promise<string | null> {
     const session = await auth();
     if (!session?.user?.email) return null;
@@ -570,5 +591,196 @@ export async function getDocumentPreview(documentId: string) {
             } : null,
             signedUrl,
         },
+    };
+}
+
+export interface InboxFilters {
+    status?: string;
+    propertyId?: string;
+    docType?: string;
+    source?: string;
+    dateRange?: string;
+    search?: string;
+}
+
+export async function getInboxDocuments({
+    filters = {},
+    page = 1,
+    pageSize = 25,
+}: {
+    filters?: InboxFilters;
+    page?: number;
+    pageSize?: number;
+}): Promise<{ documents: InboxDocument[]; total: number; error: string | null }> {
+    const orgId = await getOrgId();
+    if (!orgId) return { documents: [], total: 0, error: 'Not authenticated' };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { documents: [], total: 0, error: 'Supabase not configured' };
+
+    // Build query with Supabase query builder — NO raw SQL
+    let query = supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('*', { count: 'exact' })
+        .eq('org_id', orgId)
+        .neq('status', 'deleted')
+        .order('status', { ascending: true }) // needs_review sorts first alphabetically helpful
+        .order('created_at', { ascending: false });
+
+    // Apply filters dynamically
+    if (filters.status) {
+        query = query.eq('status', filters.status);
+    }
+    if (filters.propertyId) {
+        query = query.eq('property_id', filters.propertyId);
+    }
+    if (filters.docType) {
+        query = query.eq('doc_type', filters.docType);
+    }
+    if (filters.source) {
+        query = query.eq('source', filters.source);
+    }
+    if (filters.search) {
+        query = query.or(
+            `display_name.ilike.%${filters.search}%,file_name.ilike.%${filters.search}%`
+        );
+    }
+    if (filters.dateRange) {
+        const now = new Date();
+        let from: Date;
+        switch (filters.dateRange) {
+            case 'this_week': {
+                from = new Date(now);
+                from.setDate(now.getDate() - now.getDay());
+                from.setHours(0, 0, 0, 0);
+                break;
+            }
+            case 'this_month': {
+                from = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+            }
+            case 'last_3_months': {
+                from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+                break;
+            }
+            default:
+                from = new Date(0); // all time
+        }
+        if (filters.dateRange !== 'all_time') {
+            query = query.gte('created_at', from.toISOString());
+        }
+    }
+
+    // Pagination
+    const offset = (page - 1) * pageSize;
+    query = query.range(offset, offset + pageSize - 1);
+
+    const { data: docs, error, count } = await query;
+
+    if (error) return { documents: [], total: 0, error: error.message };
+
+    // Fetch related data for the page of documents
+    const docIds = (docs || []).map((d: Record<string, unknown>) => d.id as string);
+    const propertyIds = [...new Set((docs || []).map((d: Record<string, unknown>) => d.property_id as string).filter(Boolean))];
+
+    // Fetch properties
+    let propertiesMap: Record<string, { address: string; short_code: string | null }> = {};
+    if (propertyIds.length > 0) {
+        const properties = await prisma.property.findMany({
+            where: { id: { in: propertyIds } },
+            select: { id: true, address: true },
+        });
+        propertiesMap = Object.fromEntries(
+            properties.map(p => [p.id, { address: p.address, short_code: (p as Record<string, unknown>).short_code as string | null }])
+        );
+    }
+
+    // Fetch extractions
+    let extractionsMap: Record<string, number | null> = {};
+    if (docIds.length > 0) {
+        const { data: extractions } = await supabase
+            .schema('warehouse')
+            .from('document_extractions')
+            .select('document_id, confidence_score')
+            .in('document_id', docIds)
+            .eq('is_current', true);
+        if (extractions) {
+            extractionsMap = Object.fromEntries(
+                extractions.map((e: Record<string, unknown>) => [e.document_id, e.confidence_score as number | null])
+            );
+        }
+    }
+
+    // Fetch apply log
+    let applyMap: Record<string, { applied_by: string | null; applied_at: string | null }> = {};
+    if (docIds.length > 0) {
+        const { data: applyLogs } = await supabase
+            .schema('warehouse')
+            .from('apply_log')
+            .select('document_id, applied_by, created_at')
+            .in('document_id', docIds);
+        if (applyLogs) {
+            applyMap = Object.fromEntries(
+                applyLogs.map((a: Record<string, unknown>) => [
+                    a.document_id,
+                    { applied_by: a.applied_by as string | null, applied_at: a.created_at as string | null },
+                ])
+            );
+        }
+    }
+
+    const documents: InboxDocument[] = (docs || []).map((d: Record<string, unknown>) => {
+        const propData = propertiesMap[d.property_id as string];
+        const applyData = applyMap[d.id as string];
+        return {
+            id: d.id as string,
+            file_name: d.file_name as string,
+            display_name: d.display_name as string | null,
+            doc_type: d.doc_type as string | null,
+            status: d.status as string,
+            source: (d.source as 'email' | 'telegram' | 'ui') || 'ui',
+            created_at: d.created_at as string,
+            mime_type: d.mime_type as string | null,
+            file_size_bytes: d.file_size_bytes as number | null,
+            property_id: d.property_id as string | null,
+            category: d.category as string | null,
+            subcategory: d.subcategory as string | null ?? null,
+            property_address: propData?.address ?? null,
+            property_short_code: propData?.short_code ?? null,
+            confidence_score: extractionsMap[d.id as string] ?? null,
+            applied_by: applyData?.applied_by ?? null,
+            applied_at: applyData?.applied_at ?? null,
+        };
+    });
+
+    return { documents, total: count ?? 0, error: null };
+}
+
+export async function getInboxStats() {
+    const orgId = await getOrgId();
+    if (!orgId) return { total: 0, needsReview: 0, appliedThisMonth: 0, failed: 0 };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { total: 0, needsReview: 0, appliedThisMonth: 0, failed: 0 };
+
+    const { data: docs } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('id, status, created_at')
+        .eq('org_id', orgId)
+        .neq('status', 'deleted');
+
+    const allDocs = docs || [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    return {
+        total: allDocs.length,
+        needsReview: allDocs.filter((d: Record<string, unknown>) => d.status === 'needs_review').length,
+        appliedThisMonth: allDocs.filter(
+            (d: Record<string, unknown>) => d.status === 'applied' && (d.created_at as string) >= monthStart
+        ).length,
+        failed: allDocs.filter((d: Record<string, unknown>) => d.status === 'failed').length,
     };
 }
