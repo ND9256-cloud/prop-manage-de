@@ -1,24 +1,15 @@
-
-import { auth } from '@/auth';
-import { notFound } from 'next/navigation';
-import { getWarehouseDocuments, getWarehouseStats } from '@/lib/warehouse-actions';
-import WarehouseDocumentList from '@/components/warehouse/document-list';
+import { getWarehouseOverview, getOpenReviewCount } from '@/lib/warehouse-actions';
+import PropertySelection from '@/components/warehouse/property-selection';
 
 export default async function WarehousePage() {
-    const session = await auth();
-    if (!session?.user?.email) {
-        notFound();
-    }
-
-    const [docResult, stats] = await Promise.all([
-        getWarehouseDocuments(),
-        getWarehouseStats(),
-    ]);
+    const { stats, propertyCards } = await getWarehouseOverview();
+    const reviewCount = await getOpenReviewCount();
 
     return (
-        <WarehouseDocumentList
-            initialDocuments={docResult.documents}
-            initialStats={stats}
+        <PropertySelection
+            stats={stats || { total: 0, needs_review: 0, applied_this_month: 0, properties_with_docs: 0 }}
+            propertyCards={propertyCards}
+            reviewCount={reviewCount}
         />
     );
 }

@@ -14,6 +14,112 @@ async function getOrgId(): Promise<string | null> {
     return user?.organizationId || null;
 }
 
+export async function getWarehouseOverview() {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', stats: null, propertyCards: [] };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured', stats: null, propertyCards: [] };
+
+    // Fetch all documents for this org
+    const { data: docs } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('id, status, property_id, category, created_at')
+        .eq('org_id', orgId)
+        .neq('status', 'deleted');
+
+    const allDocs = docs || [];
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Global stats
+    const stats = {
+        total: allDocs.length,
+        needs_review: allDocs.filter(d => d.status === 'needs_review').length,
+        applied_this_month: allDocs.filter(
+            d => d.status === 'applied' && d.created_at >= monthStart
+        ).length,
+        properties_with_docs: new Set(
+            allDocs.filter(d => d.property_id).map(d => d.property_id)
+        ).size,
+    };
+
+    // Fetch all properties
+    const properties = await prisma.property.findMany({
+        where: { organizationId: orgId },
+        orderBy: { name: 'asc' },
+    });
+
+    // Build per-property card data
+    const propertyCards = properties.map(p => {
+        const propDocs = allDocs.filter(d => d.property_id === p.id);
+        const needsReview = propDocs.filter(d => d.status === 'needs_review').length;
+        const appliedThisMonth = propDocs.filter(
+            d => d.status === 'applied' && d.created_at >= monthStart
+        ).length;
+        const categories = new Set(propDocs.filter(d => d.category).map(d => d.category));
+
+        let statusDot: 'red' | 'green' | 'gray' = 'gray';
+        if (propDocs.length === 0) statusDot = 'gray';
+        else if (needsReview > 0) statusDot = 'red';
+        else statusDot = 'green';
+
+        return {
+            id: p.id,
+            name: p.name,
+            address: p.address,
+            shortCode: (p as Record<string, unknown>).short_code as string | null,
+            totalDocs: propDocs.length,
+            needsReview,
+            appliedThisMonth,
+            categoriesUsed: categories.size,
+            statusDot,
+        };
+    });
+
+    return { error: null, stats, propertyCards };
+}
+
+export async function getOpenReviewCount() {
+    const orgId = await getOrgId();
+    if (!orgId) return 0;
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return 0;
+
+    const { data } = await supabase
+        .schema('warehouse')
+        .from('review_tasks')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('status', 'open');
+
+    return data?.length || 0;
+}
+
+export async function getWarehouseStats() {
+    const orgId = await getOrgId();
+    if (!orgId) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
+
+    const { data } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('status')
+        .eq('org_id', orgId);
+
+    const d = data || [];
+    return {
+        needs_review: d.filter(x => x.status === 'needs_review').length,
+        processing: d.filter(x => x.status === 'processing').length,
+        applied: d.filter(x => x.status === 'applied').length,
+        queued: d.filter(x => x.status === 'queued').length,
+    };
+}
+
 export async function getWarehouseDocuments() {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', documents: [] };
@@ -30,28 +136,6 @@ export async function getWarehouseDocuments() {
 
     if (error) return { error: error.message, documents: [] };
     return { error: null, documents: data || [] };
-}
-
-export async function getWarehouseStats() {
-    const orgId = await getOrgId();
-    if (!orgId) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
-
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
-
-    const { data } = await supabase
-        .schema('warehouse')
-        .from('documents')
-        .select('status')
-        .eq('org_id', orgId);
-
-    const docs = data || [];
-    return {
-        needs_review: docs.filter(d => d.status === 'needs_review').length,
-        processing: docs.filter(d => d.status === 'processing').length,
-        applied: docs.filter(d => d.status === 'applied').length,
-        queued: docs.filter(d => d.status === 'queued').length,
-    };
 }
 
 export async function uploadWarehouseDocument(formData: FormData) {
@@ -89,6 +173,7 @@ export async function uploadWarehouseDocument(formData: FormData) {
         .join('');
 
     // Insert document
+    const propertyId = formData.get('propertyId') as string | null;
     const { error: docError } = await supabase
         .schema('warehouse')
         .from('documents')
@@ -103,6 +188,7 @@ export async function uploadWarehouseDocument(formData: FormData) {
             mime_type: file.type,
             storage_path: storagePath,
             status: 'queued',
+            ...(propertyId ? { property_id: propertyId } : {}),
         });
 
     if (docError) return { error: `Document insert failed: ${docError.message}` };
