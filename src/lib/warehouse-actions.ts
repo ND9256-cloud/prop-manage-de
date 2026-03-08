@@ -306,7 +306,7 @@ export async function getReviewTasks() {
             const { data: doc } = await supabase
                 .schema('warehouse')
                 .from('documents')
-                .select('file_name, doc_type, source, mime_type')
+                .select('file_name, doc_type, source, mime_type, property_id')
                 .eq('id', task.document_id as string)
                 .single();
 
@@ -419,6 +419,8 @@ export async function getProperties() {
     return properties.map(p => ({
         id: p.id,
         name: p.name,
+        address: p.address,
+        shortCode: (p as Record<string, unknown>).short_code as string | null,
         units: p.units.map(u => ({ id: u.id, unitNumber: u.unitNumber })),
     }));
 }

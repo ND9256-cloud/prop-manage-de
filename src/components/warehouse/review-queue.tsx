@@ -36,6 +36,7 @@ interface ReviewTask {
         doc_type: string | null;
         source: string;
         mime_type: string;
+        property_id: string | null;
     } | null;
     extraction: {
         id: string;
@@ -48,6 +49,8 @@ interface ReviewTask {
 interface PropertyOption {
     id: string;
     name: string;
+    address: string;
+    shortCode: string | null;
     units: { id: string; unitNumber: string }[];
 }
 
@@ -419,16 +422,72 @@ export default function ReviewQueue({ initialTasks, properties }: Props) {
                     </CardContent>
                 </Card>
             ) : (
-                <div className="space-y-4">
-                    {tasks.map(task => (
-                        <ReviewTaskCard
-                            key={task.id}
-                            task={task}
-                            properties={properties}
-                            onApply={handleApply}
-                            onDismiss={handleDismiss}
-                        />
-                    ))}
+                <div className="space-y-6">
+                    {(() => {
+                        // Group tasks by property_id
+                        const groups: Record<string, ReviewTask[]> = {};
+                        const unassigned: ReviewTask[] = [];
+                        for (const task of tasks) {
+                            const pid = task.document?.property_id;
+                            if (pid) {
+                                if (!groups[pid]) groups[pid] = [];
+                                groups[pid].push(task);
+                            } else {
+                                unassigned.push(task);
+                            }
+                        }
+                        const propIds = Object.keys(groups);
+                        return (
+                            <>
+                                {propIds.map(pid => {
+                                    const prop = properties.find(p => p.id === pid);
+                                    return (
+                                        <div key={pid}>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Building2 className="h-5 w-5 text-muted-foreground" />
+                                                <h2 className="text-lg font-bold">{prop?.address || prop?.name || pid}</h2>
+                                                {prop?.shortCode && (
+                                                    <Badge variant="secondary">{prop.shortCode}</Badge>
+                                                )}
+                                                <Badge variant="outline" className="ml-auto">{groups[pid].length}</Badge>
+                                            </div>
+                                            <div className="space-y-4 ml-1">
+                                                {groups[pid].map(task => (
+                                                    <ReviewTaskCard
+                                                        key={task.id}
+                                                        task={task}
+                                                        properties={properties}
+                                                        onApply={handleApply}
+                                                        onDismiss={handleDismiss}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {unassigned.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <AlertTriangle className="h-5 w-5 text-amber-500" />
+                                            <h2 className="text-lg font-bold">⚠️ Nicht zugewiesen / Unassigned</h2>
+                                            <Badge variant="outline" className="ml-auto">{unassigned.length}</Badge>
+                                        </div>
+                                        <div className="space-y-4 ml-1">
+                                            {unassigned.map(task => (
+                                                <ReviewTaskCard
+                                                    key={task.id}
+                                                    task={task}
+                                                    properties={properties}
+                                                    onApply={handleApply}
+                                                    onDismiss={handleDismiss}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
                 </div>
             )}
         </main>
