@@ -306,7 +306,7 @@ export async function getReviewTasks() {
             const { data: doc } = await supabase
                 .schema('warehouse')
                 .from('documents')
-                .select('file_name, doc_type, source, mime_type, property_id')
+                .select('file_name, display_name, doc_type, source, mime_type, property_id, category')
                 .eq('id', task.document_id as string)
                 .single();
 

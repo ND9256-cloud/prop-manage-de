@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -12,6 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { CATEGORIES } from '@/lib/warehouse-categories';
 import {
     ArrowLeft,
     Check,
@@ -33,10 +35,12 @@ interface ReviewTask {
     created_at: string;
     document: {
         file_name: string;
+        display_name: string | null;
         doc_type: string | null;
         source: string;
         mime_type: string;
         property_id: string | null;
+        category: string | null;
     } | null;
     extraction: {
         id: string;
@@ -184,6 +188,8 @@ function ReviewTaskCard({
 }) {
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
     const [selectedUnitId, setSelectedUnitId] = useState<string>('');
+    const [selectedCategory, setSelectedCategory] = useState<string>(task.document?.category || '');
+    const [editDisplayName, setEditDisplayName] = useState<string>(task.document?.display_name || '');
     const [isApplying, setIsApplying] = useState(false);
     const [isDismissing, setIsDismissing] = useState(false);
 
@@ -227,6 +233,35 @@ function ReviewTaskCard({
                         <ConfidenceBar score={task.extraction.confidence_score} />
                     </div>
                 )}
+
+                {/* Category + Display Name */}
+                <div className="border-t pt-4 space-y-3">
+                    <div className="flex gap-2">
+                        <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">Kategorie / Category</label>
+                            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Kategorie wählen..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {CATEGORIES.map(cat => (
+                                        <SelectItem key={cat.key} value={cat.key}>
+                                            {cat.de} / {cat.en}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex-1">
+                            <label className="text-xs text-muted-foreground mb-1 block">Dateiname / Filename</label>
+                            <Input
+                                value={editDisplayName}
+                                onChange={e => setEditDisplayName(e.target.value)}
+                                placeholder="YYYYMMDD_Vendor_KO132_Desc"
+                            />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Property Assignment */}
                 <div className="border-t pt-4 space-y-3">
