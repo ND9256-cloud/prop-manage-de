@@ -497,3 +497,52 @@ export async function softDeleteDocument(documentId: string) {
     return { error: null };
 }
 
+export async function getDocumentPreview(documentId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', data: null };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured', data: null };
+
+    // Fetch document
+    const { data: doc } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('id, file_name, display_name, doc_type, status, source, mime_type, storage_path, file_size_bytes, retention_until, created_at')
+        .eq('id', documentId)
+        .eq('org_id', orgId)
+        .single();
+
+    if (!doc) return { error: 'Document not found', data: null };
+
+    // Fetch current extraction
+    const { data: extraction } = await supabase
+        .schema('warehouse')
+        .from('document_extractions')
+        .select('id, extracted_fields, confidence_score, flags')
+        .eq('document_id', documentId)
+        .eq('is_current', true)
+        .single();
+
+    // Generate signed URL (300 second expiry)
+    let signedUrl: string | null = null;
+    if (doc.storage_path) {
+        const { data: urlData } = await supabase.storage
+            .from('property-documents')
+            .createSignedUrl(doc.storage_path, 300);
+        signedUrl = urlData?.signedUrl || null;
+    }
+
+    return {
+        error: null,
+        data: {
+            document: doc,
+            extraction: extraction ? {
+                extracted_fields: extraction.extracted_fields as Record<string, unknown>,
+                confidence_score: extraction.confidence_score as number,
+                flags: extraction.flags,
+            } : null,
+            signedUrl,
+        },
+    };
+}

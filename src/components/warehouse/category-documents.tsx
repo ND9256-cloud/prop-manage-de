@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { renameDocument, softDeleteDocument, uploadWarehouseDocument } from '@/lib/warehouse-actions';
 import { CATEGORIES } from '@/lib/warehouse-categories';
+import DocumentPreviewPanel from '@/components/warehouse/document-preview-panel';
 import {
     FileText,
     ArrowLeft,
@@ -95,6 +96,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
     const [editValue, setEditValue] = useState('');
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [previewId, setPreviewId] = useState<string | null>(null);
 
     const catInfo = CATEGORIES.find(c => c.key === category) || { de: category, en: '', icon: '📁' };
 
@@ -266,7 +268,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         </thead>
                         <tbody>
                             {filtered.map(doc => (
-                                <tr key={doc.id} className="border-t hover:bg-muted/30 group">
+                                <tr key={doc.id} className="border-t hover:bg-muted/30 group cursor-pointer" onClick={() => setPreviewId(doc.id)}>
                                     {/* Name */}
                                     <td className="p-3 max-w-[280px]">
                                         {editingId === doc.id ? (
@@ -367,6 +369,14 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         </CardContent>
                     </Card>
                 </div>
+            )}
+
+            {/* Document preview panel */}
+            {previewId && (
+                <DocumentPreviewPanel
+                    documentId={previewId}
+                    onClose={() => setPreviewId(null)}
+                />
             )}
         </div>
     );
