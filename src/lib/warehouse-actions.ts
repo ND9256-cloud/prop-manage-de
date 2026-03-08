@@ -422,3 +422,78 @@ export async function getProperties() {
         units: p.units.map(u => ({ id: u.id, unitNumber: u.unitNumber })),
     }));
 }
+
+export async function getCategoryDocuments(propertyId: string, category: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', documents: [], property: null };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured', documents: [], property: null };
+
+    // Fetch property info
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+    });
+    if (!property) return { error: 'Property not found', documents: [], property: null };
+
+    const { data, error } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .select('id, file_name, display_name, doc_type, status, source, mime_type, file_size_bytes, retention_until, created_at')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .eq('category', category)
+        .neq('status', 'deleted')
+        .order('created_at', { ascending: false });
+
+    if (error) return { error: error.message, documents: [], property: null };
+
+    return {
+        error: null,
+        documents: data || [],
+        property: {
+            id: property.id,
+            name: property.name,
+            address: property.address,
+            shortCode: (property as Record<string, unknown>).short_code as string | null,
+        },
+    };
+}
+
+export async function renameDocument(documentId: string, newDisplayName: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured' };
+
+    const { error } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .update({ display_name: newDisplayName, updated_at: new Date().toISOString() })
+        .eq('id', documentId)
+        .eq('org_id', orgId);
+
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
+export async function softDeleteDocument(documentId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { error: 'Supabase not configured' };
+
+    // Soft delete only — GoBD compliance: never hard delete
+    const { error } = await supabase
+        .schema('warehouse')
+        .from('documents')
+        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .eq('id', documentId)
+        .eq('org_id', orgId);
+
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
