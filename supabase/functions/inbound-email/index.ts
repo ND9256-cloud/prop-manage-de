@@ -43,17 +43,24 @@ serve(async (req: Request) => {
     }
 
     try {
+        // ─── STEP 1: Verify webhook secret token ─────────────────
+        // Postmark webhook URL should be configured as:
+        //   https://project.supabase.co/functions/v1/inbound-email?token=SECRET
+        const url = new URL(req.url);
+        const token = url.searchParams.get("token") || "";
+        const expectedToken = Deno.env.get("POSTMARK_WEBHOOK_SECRET") || "";
+
+        if (!expectedToken || token !== expectedToken) {
+            // Return 200 silently — never reveal endpoint exists or that auth failed
+            console.log("Step 1: webhook token invalid — silently dropping");
+            return ok({ message: "received" });
+        }
+
+        console.log("Step 1: webhook token verified");
+
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
         const supabase = createClient(supabaseUrl, supabaseKey);
-
-        // ─── STEP 1: Verify webhook (basic auth via Authorization header) ──
-        // Note: Postmark inbound webhooks do NOT send X-Postmark-Signature.
-        // We use HTTP Basic Auth instead — configure in Postmark webhook URL:
-        //   https://USER:SECRET@project.supabase.co/functions/v1/inbound-email
-        // For now, accept all requests (Supabase Edge Functions are not
-        // publicly discoverable and we validate sender in Step 3).
-        console.log("Step 1: webhook request accepted");
 
         // ─── STEP 2: Parse Postmark payload ─────────────────────
         const payload: PostmarkPayload = await req.json();
@@ -125,6 +132,22 @@ serve(async (req: Request) => {
                 return ok({ error: "no organisation", message_id: MessageID });
             }
         }
+
+        // ─── STEP 4b: Rate limit check ──────────────────────────
+        // Max 20 uploads per sender per hour, max 50 per org per hour
+        const { data: isAllowedRate } = await supabase.rpc("check_rate_limit", {
+            p_sender: fromEmail.toLowerCase(),
+            p_org_id: orgId,
+            p_max_per_sender: 20,
+            p_max_per_org: 50,
+        });
+
+        if (isAllowedRate === false) {
+            console.log(`Step 4b: rate limit exceeded for ${fromEmail} / org ${orgId} — silently dropping`);
+            return ok({ message: "received", message_id: MessageID });
+        }
+
+        console.log("Step 4b: rate limit check passed");
 
         // ─── STEP 5: Process each attachment ─────────────────────
         let processed = 0;

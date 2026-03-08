@@ -45,6 +45,14 @@ serve(async (req: Request) => {
     const botToken = Deno.env.get("TELEGRAM_BOT_TOKEN") || "";
     let chatId = 0;
 
+    // ─── STEP 0: Verify Telegram webhook secret ──────────────
+    const telegramSecret = req.headers.get("x-telegram-bot-api-secret-token");
+    const expectedSecret = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") || "";
+    if (!expectedSecret || telegramSecret !== expectedSecret) {
+        // Return 200 silently — do not reveal that verification failed
+        return ok();
+    }
+
     try {
         const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
         const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
