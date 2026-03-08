@@ -99,45 +99,6 @@ export async function getOpenReviewCount() {
     return data?.length || 0;
 }
 
-export async function getWarehouseStats() {
-    const orgId = await getOrgId();
-    if (!orgId) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
-
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { needs_review: 0, processing: 0, applied: 0, queued: 0 };
-
-    const { data } = await supabase
-        .schema('warehouse')
-        .from('documents')
-        .select('status')
-        .eq('org_id', orgId);
-
-    const d = data || [];
-    return {
-        needs_review: d.filter(x => x.status === 'needs_review').length,
-        processing: d.filter(x => x.status === 'processing').length,
-        applied: d.filter(x => x.status === 'applied').length,
-        queued: d.filter(x => x.status === 'queued').length,
-    };
-}
-
-export async function getWarehouseDocuments() {
-    const orgId = await getOrgId();
-    if (!orgId) return { error: 'Not authenticated', documents: [] };
-
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', documents: [] };
-
-    const { data, error } = await supabase
-        .schema('warehouse')
-        .from('documents')
-        .select('id, file_name, doc_type, source, status, mime_type, file_size_bytes, created_at')
-        .eq('org_id', orgId)
-        .order('created_at', { ascending: false });
-
-    if (error) return { error: error.message, documents: [] };
-    return { error: null, documents: data || [] };
-}
 
 
 export async function getPropertyWarehouseDetail(propertyId: string) {
