@@ -2,7 +2,7 @@
 
 import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
-import { getSupabaseAdmin } from '@/lib/supabase';
+import { warehouseDb } from '@/lib/warehouse/db';
 import { CATEGORIES } from '@/lib/warehouse-categories';
 
 export interface InboxDocument {
@@ -36,17 +36,56 @@ async function getOrgId(): Promise<string | null> {
     return user?.organizationId || null;
 }
 
+// ─── Audit logging (silent — never throws) ────────────────────
+export async function logAuditEvent({
+    eventType,
+    documentId,
+    propertyId,
+    unitId,
+    metadata,
+}: {
+    eventType: string;
+    documentId?: string;
+    propertyId?: string;
+    unitId?: string;
+    metadata?: Record<string, unknown>;
+}): Promise<void> {
+    try {
+        const orgId = await getOrgId();
+        if (!orgId) return;
+
+        const session = await auth();
+        const email = session?.user?.email ?? 'system';
+        let userId = 'system';
+        if (email !== 'system') {
+            const dbUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+            userId = dbUser?.id ?? 'system';
+        }
+
+        const db = warehouseDb(orgId);
+        await db.admin.schema('shared').from('audit_log').insert({
+            org_id: orgId,
+            actor_user_id: userId,
+            actor_email: email,
+            event_type: eventType,
+            document_id: documentId ?? null,
+            property_id: propertyId ?? null,
+            unit_id: unitId ?? null,
+            metadata: metadata ?? {},
+        });
+    } catch (err) {
+        console.error('[audit] Failed to log event:', err);
+    }
+}
+
 export async function getWarehouseOverview() {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', stats: null, propertyCards: [] };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', stats: null, propertyCards: [] };
+    const db = warehouseDb(orgId);
 
     // Fetch all documents for this org
-    const { data: docs } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { data: docs } = await db.from('documents')
         .select('id, status, property_id, category, created_at')
         .eq('org_id', orgId)
         .neq('status', 'deleted');
@@ -107,12 +146,9 @@ export async function getOpenReviewCount() {
     const orgId = await getOrgId();
     if (!orgId) return 0;
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return 0;
+    const db = warehouseDb(orgId);
 
-    const { data } = await supabase
-        .schema('warehouse')
-        .from('review_tasks')
+    const { data } = await db.from('review_tasks')
         .select('id')
         .eq('org_id', orgId)
         .eq('status', 'open');
@@ -126,8 +162,7 @@ export async function getPropertyWarehouseDetail(propertyId: string) {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', property: null, folders: [], stats: null, unassignedCount: 0 };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', property: null, folders: [], stats: null, unassignedCount: 0 };
+    const db = warehouseDb(orgId);
 
     // Fetch property
     const property = await prisma.property.findFirst({
@@ -136,9 +171,7 @@ export async function getPropertyWarehouseDetail(propertyId: string) {
     if (!property) return { error: 'Property not found', property: null, folders: [], stats: null, unassignedCount: 0 };
 
     // Fetch all docs for this property
-    const { data: docs } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { data: docs } = await db.from('documents')
         .select('id, status, category, file_size_bytes, created_at')
         .eq('org_id', orgId)
         .eq('property_id', propertyId)
@@ -196,12 +229,433 @@ export async function getPropertyWarehouseDetail(propertyId: string) {
     };
 }
 
+export async function getPropertyStats(propertyId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', data: null };
+
+    // Ownership check
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+        include: { units: { select: { id: true } } },
+    });
+    if (!property) return { error: 'Property not found', data: null };
+
+    const db = warehouseDb(orgId);
+
+    // Fetch all docs for this property
+    const { data: docs } = await db.from('documents')
+        .select('id, status, category')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .neq('status', 'deleted');
+
+    const allDocs = docs || [];
+    const needsReview = allDocs.filter(d => d.status === 'needs_review').length;
+
+    // Total costs this year: sum amounts from applied invoices
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1).toISOString();
+    const yearEnd = new Date(currentYear + 1, 0, 1).toISOString();
+    const { data: costDocs } = await db.from('documents')
+        .select('id, doc_type, category')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .eq('status', 'applied')
+        .gte('applied_at', yearStart)
+        .lt('applied_at', yearEnd)
+        .or('doc_type.eq.invoice,category.eq.kosten_rechnungen');
+
+    let totalCostsThisYear = 0;
+    if (costDocs && costDocs.length > 0) {
+        const costDocIds = costDocs.map(d => d.id);
+        const { data: extractions } = await db.from('document_extractions')
+            .select('extracted_fields')
+            .eq('org_id', orgId)
+            .eq('is_current', true)
+            .in('document_id', costDocIds);
+
+        if (extractions) {
+            for (const ext of extractions) {
+                const fields = ext.extracted_fields as Record<string, unknown> | null;
+                if (fields?.amount) {
+                    const parsed = parseFloat(String(fields.amount).replace(/[^\d.,]/g, '').replace(',', '.'));
+                    if (!isNaN(parsed)) totalCostsThisYear += parsed;
+                }
+            }
+        }
+    }
+
+    // Per-category review counts
+    const categoryStats: Record<string, { total: number; needsReview: number }> = {};
+    for (const d of allDocs) {
+        const cat = (d.category as string) ?? '_unassigned';
+        if (!categoryStats[cat]) categoryStats[cat] = { total: 0, needsReview: 0 };
+        categoryStats[cat].total++;
+        if (d.status === 'needs_review') categoryStats[cat].needsReview++;
+    }
+
+    return {
+        error: null,
+        data: {
+            totalDocs: allDocs.length,
+            needsReview,
+            unitCount: property.units.length,
+            totalCostsThisYear,
+            categoryStats,
+            property: {
+                id: property.id,
+                name: property.name,
+                address: property.address,
+                shortCode: (property as Record<string, unknown>).short_code as string | null,
+                organizationId: property.organizationId,
+            },
+        },
+    };
+}
+
+export async function getPropertyDocuments(
+    propertyId: string,
+    filters?: {
+        search?: string;
+        category?: string;
+        status?: string;
+        sort?: 'newest' | 'oldest';
+        page?: number;
+        pageSize?: number;
+    },
+) {
+    const orgId = await getOrgId();
+    if (!orgId) return { docs: [], total: 0 };
+
+    // Ownership check
+    const prop = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+        select: { id: true },
+    });
+    if (!prop) return { docs: [], total: 0 };
+
+    const db = warehouseDb(orgId);
+    const page = filters?.page ?? 1;
+    const pageSize = filters?.pageSize ?? 50;
+    const ascending = filters?.sort === 'oldest';
+
+    let q = db.from('documents')
+        .select('id, display_name, file_name, category, status, source, mime_type, created_at, property_id, doc_type', { count: 'exact' })
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .neq('status', 'deleted')
+        .order('created_at', { ascending });
+
+    if (filters?.category && filters.category !== 'all') {
+        q = q.eq('category', filters.category);
+    }
+    if (filters?.status && filters.status !== 'all') {
+        q = q.eq('status', filters.status);
+    }
+    if (filters?.search) {
+        q = q.or(`display_name.ilike.%${filters.search}%,file_name.ilike.%${filters.search}%`);
+    }
+
+    const offset = (page - 1) * pageSize;
+    q = q.range(offset, offset + pageSize - 1);
+
+    const { data, count, error } = await q;
+    if (error || !data) return { docs: [], total: 0 };
+
+    // Fetch extractions for amounts/vendor
+    const docIds = data.map(d => d.id);
+    let extractionMap: Record<string, { amount?: string; vendor_name?: string }> = {};
+    if (docIds.length > 0) {
+        const { data: extractions } = await db.from('document_extractions')
+            .select('document_id, extracted_fields')
+            .eq('org_id', orgId)
+            .eq('is_current', true)
+            .in('document_id', docIds);
+
+        if (extractions) {
+            for (const ext of extractions) {
+                const fields = ext.extracted_fields as Record<string, unknown> | null;
+                extractionMap[ext.document_id as string] = {
+                    amount: fields?.amount ? String(fields.amount) : undefined,
+                    vendor_name: fields?.vendor_name ? String(fields.vendor_name) : undefined,
+                };
+            }
+        }
+    }
+
+    const docs = data.map(d => ({
+        id: d.id as string,
+        displayName: (d.display_name as string) ?? (d.file_name as string) ?? 'Unbekannt',
+        category: d.category as string | null,
+        status: d.status as string,
+        source: d.source as string | null,
+        mimeType: d.mime_type as string | null,
+        createdAt: d.created_at as string,
+        amount: extractionMap[d.id as string]?.amount ?? null,
+        vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
+    }));
+
+    return { docs, total: count ?? 0 };
+}
+
+export interface CostRow {
+    documentId: string;
+    displayName: string;
+    vendorName: string | null;
+    amount: number | null;
+    category: string | null;
+    invoiceDate: string | null;
+    appliedAt: string | null;
+    displayDate: string;
+}
+
+export interface CostKpis {
+    totalAmount: number;
+    invoiceCount: number;
+    averageAmount: number;
+    topCategories: Array<{ category: string; amount: number; count: number }>;
+}
+
+export async function getPropertyCosts(
+    propertyId: string,
+    year: number,
+    filters?: { category?: string; vendor?: string },
+): Promise<{ kpis: CostKpis; rows: CostRow[]; total: number }> {
+    const empty = {
+        kpis: { totalAmount: 0, invoiceCount: 0, averageAmount: 0, topCategories: [] },
+        rows: [],
+        total: 0,
+    };
+
+    const orgId = await getOrgId();
+    if (!orgId) return empty;
+
+    const prop = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+        select: { id: true },
+    });
+    if (!prop) return empty;
+
+    const db = warehouseDb(orgId);
+
+    // Fetch applied invoices for the year
+    const yearStart = `${year}-01-01T00:00:00.000Z`;
+    const yearEnd = `${year + 1}-01-01T00:00:00.000Z`;
+
+    let q = db.from('documents')
+        .select('id, display_name, file_name, category, status, applied_at, created_at, doc_type')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .eq('status', 'applied')
+        .or('doc_type.eq.invoice,category.eq.kosten_rechnungen');
+
+    if (filters?.category && filters.category !== 'all') {
+        q = q.eq('category', filters.category);
+    }
+
+    const { data: docs, error } = await q;
+    if (error || !docs || docs.length === 0) return empty;
+
+    // Fetch extractions for all docs
+    const docIds = docs.map(d => d.id as string);
+    const { data: extractions } = await db.from('document_extractions')
+        .select('document_id, extracted_fields')
+        .eq('org_id', orgId)
+        .eq('is_current', true)
+        .in('document_id', docIds);
+
+    const extractionMap: Record<string, Record<string, unknown>> = {};
+    if (extractions) {
+        for (const ext of extractions) {
+            extractionMap[ext.document_id as string] = (ext.extracted_fields as Record<string, unknown>) ?? {};
+        }
+    }
+
+    // Build rows with amounts and dates
+    const allRows: CostRow[] = [];
+    for (const doc of docs) {
+        const fields = extractionMap[doc.id as string] ?? {};
+
+        // Parse amount
+        let amount: number | null = null;
+        if (fields.amount != null) {
+            const parsed = parseFloat(String(fields.amount).replace(/[^\d.,-]/g, '').replace(',', '.'));
+            if (!isNaN(parsed)) amount = parsed;
+        }
+
+        const invoiceDate = fields.invoice_date ? String(fields.invoice_date) : null;
+        const appliedAt = doc.applied_at ? String(doc.applied_at) : null;
+        const displayDate = invoiceDate ?? appliedAt ?? String(doc.created_at);
+
+        // Year filter: check displayDate falls in requested year
+        const displayYear = new Date(displayDate).getFullYear();
+        if (displayYear !== year) continue;
+
+        // Vendor filter
+        if (filters?.vendor) {
+            const vn = fields.vendor_name ? String(fields.vendor_name).toLowerCase() : '';
+            if (!vn.includes(filters.vendor.toLowerCase())) continue;
+        }
+
+        allRows.push({
+            documentId: doc.id as string,
+            displayName: (doc.display_name as string) ?? (doc.file_name as string) ?? 'Unbekannt',
+            vendorName: fields.vendor_name ? String(fields.vendor_name) : null,
+            amount,
+            category: doc.category as string | null,
+            invoiceDate,
+            appliedAt,
+            displayDate,
+        });
+    }
+
+    // Sort by displayDate DESC
+    allRows.sort((a, b) => new Date(b.displayDate).getTime() - new Date(a.displayDate).getTime());
+
+    // Compute KPIs
+    const totalAmount = allRows.reduce((sum, r) => sum + (r.amount ?? 0), 0);
+    const invoiceCount = allRows.length;
+    const averageAmount = invoiceCount > 0 ? totalAmount / invoiceCount : 0;
+
+    // Top categories
+    const catMap: Record<string, { amount: number; count: number }> = {};
+    for (const r of allRows) {
+        const cat = r.category ?? 'sonstiges';
+        if (!catMap[cat]) catMap[cat] = { amount: 0, count: 0 };
+        catMap[cat].amount += r.amount ?? 0;
+        catMap[cat].count++;
+    }
+    const topCategories = Object.entries(catMap)
+        .map(([category, data]) => ({ category, ...data }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 3);
+
+    return {
+        kpis: { totalAmount, invoiceCount, averageAmount, topCategories },
+        rows: allRows,
+        total: allRows.length,
+    };
+}
+
+export async function getPropertyDetails(propertyId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return null;
+
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+        include: {
+            units: {
+                include: {
+                    leases: {
+                        where: { status: 'ACTIVE' },
+                        select: { id: true },
+                    },
+                },
+                orderBy: { unitNumber: 'asc' },
+            },
+        },
+    });
+    if (!property) return null;
+
+    const db = warehouseDb(orgId);
+
+    // Meta: lastAppliedAt and totalDocuments
+    const { data: lastApplied } = await db.from('documents')
+        .select('applied_at')
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .not('applied_at', 'is', null)
+        .order('applied_at', { ascending: false })
+        .limit(1);
+
+    const { count } = await db.from('documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', orgId)
+        .eq('property_id', propertyId)
+        .neq('status', 'deleted');
+
+    const units = property.units.map(u => ({
+        id: u.id,
+        label: u.unitNumber,
+        floor: u.floor != null ? String(u.floor) : null,
+        size: u.sizeSqm ?? null,
+        status: u.leases.length > 0 ? 'occupied' : 'vacant',
+    }));
+
+    return {
+        property: {
+            id: property.id,
+            name: property.name,
+            address: property.address,
+            short_code: (property as Record<string, unknown>).short_code as string | null,
+            notes: (property as Record<string, unknown>).notes as string | null,
+            organizationId: property.organizationId,
+            createdAt: property.createdAt,
+        },
+        units,
+        meta: {
+            lastAppliedAt: lastApplied?.[0]?.applied_at ? String(lastApplied[0].applied_at) : null,
+            totalDocuments: count ?? 0,
+        },
+    };
+}
+
+const ALLOWED_PROPERTY_FIELDS = new Set(['address', 'short_code', 'name', 'notes']);
+
+export async function updatePropertyField(
+    propertyId: string,
+    field: string,
+    value: string,
+): Promise<{ error?: string }> {
+    if (!ALLOWED_PROPERTY_FIELDS.has(field)) {
+        return { error: 'Field not allowed' };
+    }
+
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: orgId },
+        select: { id: true },
+    });
+    if (!property) return { error: 'Property not found' };
+
+    // Normalize short_code
+    let cleanValue = value.trim();
+    if (field === 'short_code') {
+        cleanValue = cleanValue.toUpperCase().slice(0, 5);
+    }
+
+    // Update via Prisma for known fields, raw SQL for extended fields
+    if (field === 'name' || field === 'address') {
+        await prisma.property.update({
+            where: { id: propertyId },
+            data: { [field]: cleanValue },
+        });
+    } else {
+        // short_code, notes — not in Prisma schema, use raw SQL
+        await prisma.$executeRawUnsafe(
+            `UPDATE "Property" SET "${field}" = $1, "updatedAt" = NOW() WHERE id = $2`,
+            cleanValue,
+            propertyId,
+        );
+    }
+
+    // Log audit event (silent)
+    await logAuditEvent({
+        eventType: 'property_updated',
+        propertyId,
+        metadata: { field, new_value: cleanValue },
+    });
+
+    return {};
+}
+
 export async function uploadWarehouseDocument(formData: FormData) {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated' };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    const db = warehouseDb(orgId);
 
     const file = formData.get('file') as File | null;
     if (!file) return { error: 'No file provided' };
@@ -214,7 +668,7 @@ export async function uploadWarehouseDocument(formData: FormData) {
     const bytes = new Uint8Array(buffer);
 
     // Upload to storage
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await db.storage
         .from('property-documents')
         .upload(storagePath, bytes, {
             contentType: file.type,
@@ -232,9 +686,7 @@ export async function uploadWarehouseDocument(formData: FormData) {
 
     // Insert document
     const propertyId = formData.get('propertyId') as string | null;
-    const { error: docError } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { error: docError } = await db.from('documents')
         .insert({
             id: documentId,
             org_id: orgId,
@@ -252,15 +704,21 @@ export async function uploadWarehouseDocument(formData: FormData) {
     if (docError) return { error: `Document insert failed: ${docError.message}` };
 
     // Insert processing job
-    await supabase
-        .schema('warehouse')
-        .from('processing_jobs')
+    await db.from('processing_jobs')
         .insert({
             document_id: documentId,
             org_id: orgId,
             status: 'queued',
             next_attempt_at: new Date().toISOString(),
         });
+
+    // Audit log
+    await logAuditEvent({
+        eventType: 'uploaded',
+        documentId,
+        propertyId: propertyId ?? undefined,
+        metadata: { file_name: sanitisedName, source: 'ui', mime_type: file.type },
+    });
 
     return { error: null, documentId };
 }
@@ -269,12 +727,9 @@ export async function getReviewTasks() {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', tasks: [] };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', tasks: [] };
+    const db = warehouseDb(orgId);
 
-    const { data: tasks, error } = await supabase
-        .schema('warehouse')
-        .from('review_tasks')
+    const { data: tasks, error } = await db.from('review_tasks')
         .select('*')
         .eq('org_id', orgId)
         .eq('status', 'open')
@@ -282,20 +737,18 @@ export async function getReviewTasks() {
 
     if (error) return { error: error.message, tasks: [] };
 
-    // For each task, get document and extraction
+    // For each task, get document and extraction — SECURITY: org-scoped sub-queries
     const enrichedTasks = await Promise.all(
         (tasks || []).map(async (task: Record<string, unknown>) => {
-            const { data: doc } = await supabase
-                .schema('warehouse')
-                .from('documents')
+            const { data: doc } = await db.from('documents')
                 .select('file_name, display_name, doc_type, source, mime_type, property_id, category')
+                .eq('org_id', orgId)
                 .eq('id', task.document_id as string)
                 .single();
 
-            const { data: extraction } = await supabase
-                .schema('warehouse')
-                .from('document_extractions')
+            const { data: extraction } = await db.from('document_extractions')
                 .select('id, extracted_fields, confidence_score, flags')
+                .eq('org_id', orgId)
                 .eq('document_id', task.document_id as string)
                 .eq('is_current', true)
                 .single();
@@ -314,14 +767,28 @@ export async function getReviewTasks() {
 export async function applyReviewTask(
     documentId: string,
     extractionId: string,
-    orgId: string,
     docType: string,
     extractedFields: Record<string, unknown>,
     propertyId?: string,
     unitId?: string,
+    triggerType: 'user_confirmed' | 'user_corrected' = 'user_confirmed',
 ) {
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    // SECURITY: orgId always from session, never from client
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Unauthorized' };
+
+    const db = warehouseDb(orgId);
+
+    // SECURITY: Ownership check — verify document belongs to this org
+    const { data: doc, error: docError } = await db.from('documents')
+        .select('id, org_id')
+        .eq('org_id', orgId)
+        .eq('id', documentId)
+        .single();
+
+    if (docError || !doc) {
+        return { error: 'Unauthorized or document not found' };
+    }
 
     const session = await auth();
     let userId: string | null = null;
@@ -339,17 +806,13 @@ export async function applyReviewTask(
     const action = docType === 'lease' ? 'lease.create' : 'ledger.append';
     const idempotencyKey = `${documentId}_${extractionId}_confirmed`;
 
-    // Call connector.apply() via direct SQL (connector schema not exposed via REST)
+    // Call connector.apply() via parameterized SQL
     try {
-        const result = await prisma.$queryRawUnsafe<{ apply: string }[]>(
-            `SELECT connector.apply(
-                $1::UUID, $2::UUID, $3::UUID, $4::TEXT, $5::JSONB,
-                $6::TEXT, $7::TEXT, $8::TEXT
-            ) as apply`,
-            orgId, documentId, extractionId, action,
-            JSON.stringify(payload),
-            userId, 'user_confirmed', idempotencyKey,
-        );
+        const result = await prisma.$queryRaw<{ apply: string }[]>`
+            SELECT connector.apply(
+                ${orgId}::UUID, ${documentId}::UUID, ${extractionId}::UUID, ${action}::TEXT, ${JSON.stringify(payload)}::JSONB,
+                ${userId}::TEXT, ${triggerType}::TEXT, ${idempotencyKey}::TEXT
+            ) as apply`;
 
         const applyResult = typeof result[0]?.apply === 'string'
             ? JSON.parse(result[0].apply)
@@ -363,13 +826,31 @@ export async function applyReviewTask(
         return { error: `Apply failed: ${msg}` };
     }
 
-    // Mark review task as resolved
-    await supabase
-        .schema('warehouse')
-        .from('review_tasks')
+    // Mark review task as resolved — SECURITY: scoped to org_id
+    await db.from('review_tasks')
         .update({ status: 'resolved' })
+        .eq('org_id', orgId)
         .eq('document_id', documentId)
         .eq('status', 'open');
+
+    // Set applied_at on the document for "Applied this month" view
+    await db.from('documents')
+        .update({ applied_at: new Date().toISOString() })
+        .eq('id', documentId);
+
+    // Audit log
+    await logAuditEvent({
+        eventType: 'applied',
+        documentId,
+        propertyId: propertyId ?? undefined,
+        metadata: {
+            trigger_type: triggerType,
+            doc_type: docType,
+            property_id: propertyId ?? null,
+            ...(extractedFields.vendor_name ? { vendor_name: extractedFields.vendor_name } : {}),
+            ...(extractedFields.amount ? { amount: extractedFields.amount } : {}),
+        },
+    });
 
     return { error: null };
 }
@@ -382,15 +863,13 @@ export async function updateDocumentMetadata(
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated' };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    const db = warehouseDb(orgId);
 
-    // Fetch extraction to get invoice_date for retention calculation
+    // Fetch extraction to get invoice_date for retention calculation — SECURITY: org-scoped
     let invoiceDate: string | null = null;
-    const { data: extraction } = await supabase
-        .schema('warehouse')
-        .from('document_extractions')
+    const { data: extraction } = await db.from('document_extractions')
         .select('extracted_fields')
+        .eq('org_id', orgId)
         .eq('document_id', documentId)
         .eq('is_current', true)
         .single();
@@ -426,28 +905,31 @@ export async function updateDocumentMetadata(
         updatePayload.display_name = displayName.trim();
     }
 
-    const { error } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { error } = await db.from('documents')
         .update(updatePayload)
-        .eq('id', documentId)
-        .eq('org_id', orgId);
+        .eq('org_id', orgId)
+        .eq('id', documentId);
 
     if (error) return { error: error.message };
     return { error: null };
 }
 
 export async function dismissReviewTask(taskId: string) {
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    // SECURITY: orgId always from session, never from client
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Unauthorized' };
 
-    const { error } = await supabase
-        .schema('warehouse')
-        .from('review_tasks')
+    const db = warehouseDb(orgId);
+
+    // SECURITY: org-scoped update with ownership verification
+    const { data, error } = await db.from('review_tasks')
         .update({ status: 'dismissed' })
-        .eq('id', taskId);
+        .eq('org_id', orgId)
+        .eq('id', taskId)
+        .select()
+        .single();
 
-    if (error) return { error: error.message };
+    if (error || !data) return { error: 'Unauthorized or task not found' };
     return { error: null };
 }
 
@@ -474,8 +956,7 @@ export async function getCategoryDocuments(propertyId: string, category: string)
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', documents: [], property: null };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', documents: [], property: null };
+    const db = warehouseDb(orgId);
 
     // Fetch property info
     const property = await prisma.property.findFirst({
@@ -483,9 +964,7 @@ export async function getCategoryDocuments(propertyId: string, category: string)
     });
     if (!property) return { error: 'Property not found', documents: [], property: null };
 
-    const { data, error } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { data, error } = await db.from('documents')
         .select('id, file_name, display_name, doc_type, status, source, mime_type, file_size_bytes, retention_until, created_at')
         .eq('org_id', orgId)
         .eq('property_id', propertyId)
@@ -511,15 +990,12 @@ export async function renameDocument(documentId: string, newDisplayName: string)
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated' };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    const db = warehouseDb(orgId);
 
-    const { error } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { error } = await db.from('documents')
         .update({ display_name: newDisplayName, updated_at: new Date().toISOString() })
-        .eq('id', documentId)
-        .eq('org_id', orgId);
+        .eq('org_id', orgId)
+        .eq('id', documentId);
 
     if (error) return { error: error.message };
     return { error: null };
@@ -529,16 +1005,13 @@ export async function softDeleteDocument(documentId: string) {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated' };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured' };
+    const db = warehouseDb(orgId);
 
     // Soft delete only — GoBD compliance: never hard delete
-    const { error } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { error } = await db.from('documents')
         .update({ status: 'deleted', updated_at: new Date().toISOString() })
-        .eq('id', documentId)
-        .eq('org_id', orgId);
+        .eq('org_id', orgId)
+        .eq('id', documentId);
 
     if (error) return { error: error.message };
     return { error: null };
@@ -548,25 +1021,21 @@ export async function getDocumentPreview(documentId: string) {
     const orgId = await getOrgId();
     if (!orgId) return { error: 'Not authenticated', data: null };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { error: 'Supabase not configured', data: null };
+    const db = warehouseDb(orgId);
 
     // Fetch document
-    const { data: doc } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { data: doc } = await db.from('documents')
         .select('id, file_name, display_name, doc_type, status, source, mime_type, storage_path, file_size_bytes, retention_until, created_at')
-        .eq('id', documentId)
         .eq('org_id', orgId)
+        .eq('id', documentId)
         .single();
 
     if (!doc) return { error: 'Document not found', data: null };
 
-    // Fetch current extraction
-    const { data: extraction } = await supabase
-        .schema('warehouse')
-        .from('document_extractions')
+    // Fetch current extraction — SECURITY: org-scoped
+    const { data: extraction } = await db.from('document_extractions')
         .select('id, extracted_fields, confidence_score, flags')
+        .eq('org_id', orgId)
         .eq('document_id', documentId)
         .eq('is_current', true)
         .single();
@@ -574,7 +1043,7 @@ export async function getDocumentPreview(documentId: string) {
     // Generate signed URL (300 second expiry)
     let signedUrl: string | null = null;
     if (doc.storage_path) {
-        const { data: urlData } = await supabase.storage
+        const { data: urlData } = await db.storage
             .from('property-documents')
             .createSignedUrl(doc.storage_path, 300);
         signedUrl = urlData?.signedUrl || null;
@@ -601,6 +1070,7 @@ export interface InboxFilters {
     source?: string;
     dateRange?: string;
     search?: string;
+    view?: string; // saved view: 'needs_review' | 'all' | 'applied_month'
 }
 
 export async function getInboxDocuments({
@@ -615,21 +1085,28 @@ export async function getInboxDocuments({
     const orgId = await getOrgId();
     if (!orgId) return { documents: [], total: 0, error: 'Not authenticated' };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { documents: [], total: 0, error: 'Supabase not configured' };
+    const db = warehouseDb(orgId);
 
     // Build query with Supabase query builder — NO raw SQL
-    let query = supabase
-        .schema('warehouse')
-        .from('documents')
+    let query = db.from('documents')
         .select('*', { count: 'exact' })
         .eq('org_id', orgId)
         .neq('status', 'deleted')
-        .order('status', { ascending: true }) // needs_review sorts first alphabetically helpful
+        .order('status', { ascending: true })
         .order('created_at', { ascending: false });
 
-    // Apply filters dynamically
-    if (filters.status) {
+    // Apply saved view filters FIRST (before individual filters)
+    if (filters.view === 'needs_review') {
+        query = query.eq('status', 'needs_review');
+    } else if (filters.view === 'applied_month') {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        query = query.eq('status', 'applied')
+            .gte('applied_at', monthStart);
+    }
+
+    // Apply individual filters (status filter only if no view overrides it)
+    if (filters.status && !filters.view) {
         query = query.eq('status', filters.status);
     }
     if (filters.propertyId) {
@@ -696,13 +1173,12 @@ export async function getInboxDocuments({
         );
     }
 
-    // Fetch extractions
+    // Fetch extractions — SECURITY: org-scoped
     let extractionsMap: Record<string, number | null> = {};
     if (docIds.length > 0) {
-        const { data: extractions } = await supabase
-            .schema('warehouse')
-            .from('document_extractions')
+        const { data: extractions } = await db.from('document_extractions')
             .select('document_id, confidence_score')
+            .eq('org_id', orgId)
             .in('document_id', docIds)
             .eq('is_current', true);
         if (extractions) {
@@ -712,13 +1188,12 @@ export async function getInboxDocuments({
         }
     }
 
-    // Fetch apply log
+    // Fetch apply log — SECURITY: org-scoped
     let applyMap: Record<string, { applied_by: string | null; applied_at: string | null }> = {};
     if (docIds.length > 0) {
-        const { data: applyLogs } = await supabase
-            .schema('warehouse')
-            .from('apply_log')
+        const { data: applyLogs } = await db.from('apply_log')
             .select('document_id, applied_by, created_at')
+            .eq('org_id', orgId)
             .in('document_id', docIds);
         if (applyLogs) {
             applyMap = Object.fromEntries(
@@ -761,12 +1236,9 @@ export async function getInboxStats() {
     const orgId = await getOrgId();
     if (!orgId) return { total: 0, needsReview: 0, appliedThisMonth: 0, failed: 0 };
 
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return { total: 0, needsReview: 0, appliedThisMonth: 0, failed: 0 };
+    const db = warehouseDb(orgId);
 
-    const { data: docs } = await supabase
-        .schema('warehouse')
-        .from('documents')
+    const { data: docs } = await db.from('documents')
         .select('id, status, created_at')
         .eq('org_id', orgId)
         .neq('status', 'deleted');
@@ -783,4 +1255,408 @@ export async function getInboxStats() {
         ).length,
         failed: allDocs.filter((d: Record<string, unknown>) => d.status === 'failed').length,
     };
+}
+
+// ─── Quarantine Actions ────────────────────────────────────────
+
+export async function quarantineDocument(
+    documentId: string,
+    reason: string,
+    notes: string | null,
+): Promise<{ error: string | null }> {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const db = warehouseDb(orgId);
+
+    // SECURITY: Ownership check
+    const { data: doc, error: docError } = await db.from('documents')
+        .select('id, property_id')
+        .eq('org_id', orgId)
+        .eq('id', documentId)
+        .single();
+
+    if (docError || !doc) {
+        return { error: 'Unauthorized or document not found' };
+    }
+
+    // Get user id from session
+    const session = await auth();
+    let userId: string | null = null;
+    if (session?.user?.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } });
+        userId = dbUser?.id || null;
+    }
+
+    const { error } = await db.from('documents')
+        .update({
+            status: 'quarantined',
+            quarantine_reason: reason,
+            quarantine_notes: notes,
+            quarantined_by: userId,
+            quarantined_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('id', documentId);
+
+    if (error) return { error: error.message };
+
+    // Also close any open review task for this document
+    await db.from('review_tasks')
+        .update({ status: 'dismissed' })
+        .eq('org_id', orgId)
+        .eq('document_id', documentId)
+        .eq('status', 'open');
+
+    // Audit log
+    await logAuditEvent({
+        eventType: 'quarantined',
+        documentId,
+        propertyId: (doc.property_id as string) ?? undefined,
+        metadata: { reason, notes },
+    });
+
+    return { error: null };
+}
+
+export async function unquarantineDocument(
+    documentId: string,
+): Promise<{ error: string | null }> {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const db = warehouseDb(orgId);
+
+    // SECURITY: Ownership check
+    const { data: doc, error: docError } = await db.from('documents')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('id', documentId)
+        .single();
+
+    if (docError || !doc) {
+        return { error: 'Unauthorized or document not found' };
+    }
+
+    const { error } = await db.from('documents')
+        .update({
+            status: 'needs_review',
+            quarantine_reason: null,
+            quarantine_notes: null,
+            quarantined_by: null,
+            quarantined_at: null,
+            updated_at: new Date().toISOString(),
+        })
+        .eq('org_id', orgId)
+        .eq('id', documentId);
+
+    if (error) return { error: error.message };
+
+    // Audit log
+    await logAuditEvent({
+        eventType: 'unquarantined',
+        documentId,
+    });
+
+    return { error: null };
+}
+
+// ─── Triage Overlay Data ───────────────────────────────────────
+
+export async function getTriageDocument(documentId: string) {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated', data: null };
+
+    const db = warehouseDb(orgId);
+
+    // 1) Full document row
+    const { data: doc, error: docError } = await db.from('documents')
+        .select('*')
+        .eq('org_id', orgId)
+        .eq('id', documentId)
+        .single();
+
+    if (docError || !doc) {
+        return { error: 'Document not found', data: null };
+    }
+
+    // 2) Current extraction
+    const { data: extraction } = await db.from('document_extractions')
+        .select('id, extracted_fields, confidence_score, flags, model, created_at')
+        .eq('org_id', orgId)
+        .eq('document_id', documentId)
+        .eq('is_current', true)
+        .single();
+
+    // 3) Signed URL (300s)
+    let signedUrl: string | null = null;
+    if (doc.storage_path) {
+        const { data: urlData } = await db.storage
+            .from('property-documents')
+            .createSignedUrl(doc.storage_path, 300);
+        signedUrl = urlData?.signedUrl || null;
+    }
+
+    // 4) All org properties
+    const properties = await prisma.property.findMany({
+        where: { organizationId: orgId },
+        select: { id: true, name: true, address: true },
+        orderBy: { name: 'asc' },
+    });
+
+    // 5) Units for matched property (if any)
+    let units: { id: string; unitNumber: string }[] = [];
+    if (doc.property_id) {
+        units = await prisma.unit.findMany({
+            where: { propertyId: doc.property_id },
+            select: { id: true, unitNumber: true },
+            orderBy: { unitNumber: 'asc' },
+        });
+    }
+
+    // 6) Last apply log entry
+    const { data: applyLogEntries } = await db.from('apply_log')
+        .select('id, trigger_type, status, created_at')
+        .eq('org_id', orgId)
+        .eq('document_id', documentId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+    const applyLog = applyLogEntries?.[0] || null;
+
+    // 7) Confidence info
+    const confidenceScore = extraction?.confidence_score as number | null;
+    const flags = (extraction?.flags as string[]) || [];
+    let confidenceLevel: 'high' | 'medium' | 'low' = 'low';
+    if (confidenceScore !== null) {
+        if (confidenceScore >= 85) confidenceLevel = 'high';
+        else if (confidenceScore >= 60) confidenceLevel = 'medium';
+    }
+
+    // Determine review reason from flags or review_tasks
+    let reviewReason: string | null = null;
+    if (flags.length > 0) {
+        reviewReason = flags.join(', ');
+    } else {
+        const { data: reviewTask } = await db.from('review_tasks')
+            .select('reason')
+            .eq('org_id', orgId)
+            .eq('document_id', documentId)
+            .eq('status', 'open')
+            .limit(1)
+            .single();
+        reviewReason = (reviewTask?.reason as string) || null;
+    }
+
+    return {
+        error: null,
+        data: {
+            document: doc,
+            extraction: extraction ? {
+                id: extraction.id,
+                extracted_fields: extraction.extracted_fields as Record<string, unknown>,
+                confidence_score: extraction.confidence_score as number | null,
+                flags: extraction.flags as string[],
+                model: extraction.model as string,
+                created_at: extraction.created_at as string,
+            } : null,
+            signedUrl,
+            properties,
+            units,
+            applyLog,
+            confidence: {
+                score: confidenceScore,
+                level: confidenceLevel,
+                reason: reviewReason,
+            },
+        },
+    };
+}
+
+export async function updateExtractionField(
+    documentId: string,
+    fieldName: string,
+    fieldValue: unknown,
+): Promise<{ error: string | null }> {
+    const orgId = await getOrgId();
+    if (!orgId) return { error: 'Not authenticated' };
+
+    const db = warehouseDb(orgId);
+
+    // Fetch current extraction — SECURITY: org-scoped
+    const { data: extraction, error: extError } = await db.from('document_extractions')
+        .select('id, extracted_fields')
+        .eq('org_id', orgId)
+        .eq('document_id', documentId)
+        .eq('is_current', true)
+        .single();
+
+    if (extError || !extraction) {
+        return { error: 'Extraction not found' };
+    }
+
+    // Update the specific field in extracted_fields JSONB
+    const currentFields = (extraction.extracted_fields as Record<string, unknown>) || {};
+    const updatedFields = { ...currentFields, [fieldName]: fieldValue };
+
+    const { error } = await db.from('document_extractions')
+        .update({ extracted_fields: updatedFields })
+        .eq('org_id', orgId)
+        .eq('id', extraction.id);
+
+    if (error) return { error: error.message };
+    return { error: null };
+}
+
+// ─── Audit Log Queries ────────────────────────────────────────
+
+export interface AuditEvent {
+    id: string;
+    org_id: string;
+    actor_user_id: string;
+    actor_email: string | null;
+    event_type: string;
+    document_id: string | null;
+    property_id: string | null;
+    unit_id: string | null;
+    metadata: Record<string, unknown>;
+    created_at: string;
+}
+
+const ALLOWED_METADATA_KEYS = new Set([
+    'trigger_type', 'vendor_name', 'amount', 'doc_type',
+    'reason', 'notes', 'file_name', 'display_name', 'source',
+    'mime_type', 'old_role', 'new_role', 'invited_email',
+]);
+
+function stripMetadata(raw: unknown): Record<string, unknown> {
+    if (!raw || typeof raw !== 'object') return {};
+    const obj = raw as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(obj)) {
+        if (ALLOWED_METADATA_KEYS.has(key)) {
+            out[key] = obj[key];
+        }
+    }
+    return out;
+}
+
+export async function getAuditEvents({
+    types,
+    actorId,
+    from,
+    to,
+    query,
+    page,
+    pageSize = 50,
+    propertyId,
+}: {
+    types?: string[];
+    actorId?: string;
+    from?: string;
+    to?: string;
+    query?: string;
+    page: number;
+    pageSize?: number;
+    propertyId?: string;
+}): Promise<{ events: AuditEvent[]; total: number }> {
+    const orgId = await getOrgId();
+    if (!orgId) return { events: [], total: 0 };
+
+    // Owner-only enforcement: verify user belongs to this org
+    const session = await auth();
+    if (!session?.user?.email) return { events: [], total: 0 };
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { organizationId: true },
+    });
+    if (!user || user.organizationId !== orgId) return { events: [], total: 0 };
+
+    const db = warehouseDb(orgId);
+    const shared = db.admin.schema('shared');
+
+    // Build query
+    let q = shared.from('audit_log')
+        .select('*', { count: 'exact' })
+        .eq('org_id', orgId)
+        .order('created_at', { ascending: false });
+
+    // Property-scoped filter
+    if (propertyId) {
+        const prop = await prisma.property.findFirst({
+            where: { id: propertyId, organizationId: orgId },
+            select: { id: true },
+        });
+        if (!prop) return { events: [], total: 0 };
+        q = q.eq('property_id', propertyId);
+    }
+
+    if (types && types.length > 0) {
+        q = q.in('event_type', types);
+    }
+    if (actorId) {
+        q = q.eq('actor_user_id', actorId);
+    }
+    if (from) {
+        q = q.gte('created_at', from);
+    }
+    if (to) {
+        q = q.lte('created_at', to);
+    }
+    if (query) {
+        q = q.or(`actor_email.ilike.%${query}%,metadata->>display_name.ilike.%${query}%,metadata->>file_name.ilike.%${query}%`);
+    }
+
+    // Paginate
+    const offset = (page - 1) * pageSize;
+    q = q.range(offset, offset + pageSize - 1);
+
+    const { data, count, error } = await q;
+
+    if (error) {
+        console.error('[audit] Query failed:', error);
+        return { events: [], total: 0 };
+    }
+
+    const events: AuditEvent[] = (data ?? []).map((row) => ({
+        ...row,
+        metadata: stripMetadata(row.metadata),
+    })) as AuditEvent[];
+
+    return { events, total: count ?? 0 };
+}
+
+export async function getAuditActors(): Promise<{ id: string; email: string }[]> {
+    const orgId = await getOrgId();
+    if (!orgId) return [];
+
+    // Owner-only enforcement: verify user belongs to this org
+    const session = await auth();
+    if (!session?.user?.email) return [];
+    const user = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { organizationId: true },
+    });
+    if (!user || user.organizationId !== orgId) return [];
+
+    const db = warehouseDb(orgId);
+    const shared = db.admin.schema('shared');
+
+    const { data, error } = await shared.from('audit_log')
+        .select('actor_user_id, actor_email')
+        .eq('org_id', orgId)
+        .not('actor_email', 'is', null);
+
+    if (error || !data) return [];
+
+    // Deduplicate
+    const seen = new Map<string, string>();
+    for (const row of data) {
+        if (row.actor_user_id && row.actor_email && !seen.has(row.actor_user_id)) {
+            seen.set(row.actor_user_id, row.actor_email as string);
+        }
+    }
+
+    return Array.from(seen.entries()).map(([id, email]) => ({ id, email }));
 }

@@ -1,12 +1,13 @@
 import { Suspense } from 'react';
-import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
-import { getInboxDocuments, getInboxStats, getProperties } from '@/lib/warehouse-actions';
+import { getInboxDocuments, getInboxStats, getProperties, getOpenReviewCount } from '@/lib/warehouse-actions';
 import { bilingual, t } from '@/lib/i18n/warehouse';
 import { InboxStats } from './inbox-stats';
 import { InboxFilters } from './inbox-filters';
 import { InboxTable } from './inbox-table';
+import { SavedViews } from './saved-views';
 
 const PAGE_SIZE = 25;
 
@@ -17,6 +18,19 @@ interface PageProps {
 export default async function InboxPage({ searchParams }: PageProps) {
     const params = await searchParams;
 
+    // Determine the active view
+    let view = params.view ? String(params.view) : undefined;
+
+    // Default view logic: if no view specified, check needs_review count
+    if (!view) {
+        const reviewCount = await getOpenReviewCount();
+        if (reviewCount > 0) {
+            // Redirect to needs_review view by default
+            redirect('/dashboard/warehouse/inbox?view=needs_review');
+        }
+        view = 'all';
+    }
+
     const page = Math.max(1, parseInt(String(params.page ?? '1'), 10));
     const filters = {
         status: params.status ? String(params.status) : undefined,
@@ -25,6 +39,7 @@ export default async function InboxPage({ searchParams }: PageProps) {
         source: params.source ? String(params.source) : undefined,
         dateRange: params.dateRange ? String(params.dateRange) : undefined,
         search: params.search ? String(params.search) : undefined,
+        view, // Pass the saved view
     };
 
     const [{ documents, total }, stats, properties] = await Promise.all([
@@ -64,6 +79,14 @@ export default async function InboxPage({ searchParams }: PageProps) {
                 appliedThisMonth={stats.appliedThisMonth}
                 failed={stats.failed}
             />
+
+            {/* Saved Views (pills) */}
+            <Suspense fallback={null}>
+                <SavedViews
+                    needsReviewCount={stats.needsReview}
+                    appliedMonthCount={stats.appliedThisMonth}
+                />
+            </Suspense>
 
             {/* Filters */}
             <Suspense fallback={null}>

@@ -1,25 +1,232 @@
-import { getPropertyWarehouseDetail } from '@/lib/warehouse-actions';
-import PropertyFolders from '@/components/warehouse/property-folders';
+import { getPropertyStats, getPropertyWarehouseDetail, getPropertyDocuments, getPropertyCosts, getAuditEvents, getAuditActors, getProperties, getPropertyDetails } from '@/lib/warehouse-actions';
+import { AssetTabs } from '@/components/warehouse/asset-tabs';
+import { DokumenteTab } from '@/components/warehouse/dokumente-tab';
+import { PropertyCosts } from '@/components/warehouse/property-costs';
+import { PropertyAudit } from '@/components/warehouse/property-audit';
+import { PropertyDetails } from '@/components/warehouse/property-details';
 import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
+import { ChevronRight, FileText, AlertCircle, Building, Euro } from 'lucide-react';
 
-export default async function PropertyWarehousePage({
-    params,
-}: {
+interface PageProps {
     params: Promise<{ propertyId: string }>;
-}) {
-    const { propertyId } = await params;
-    const { error, property, folders, stats, unassignedCount } = await getPropertyWarehouseDetail(propertyId);
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
 
-    if (error || !property || !stats) {
-        notFound();
+export default async function PropertyWarehousePage({ params, searchParams }: PageProps) {
+    const { propertyId } = await params;
+    const sp = await searchParams;
+    const tab = (sp.tab as string) ?? 'dokumente';
+
+    // Fetch stats for header — ownership check inside
+    const { error: statsError, data: statsData } = await getPropertyStats(propertyId);
+    if (statsError || !statsData) notFound();
+
+    const { property, totalDocs, needsReview, unitCount, totalCostsThisYear } = statsData;
+
+    // Tab-specific data
+    let foldersData = null;
+    let propertyDocs: Awaited<ReturnType<typeof getPropertyDocuments>> = { docs: [], total: 0 };
+    const docFilters = {
+        search: (sp.q as string) ?? '',
+        category: (sp.cat as string) ?? '',
+        status: (sp.docStatus as string) ?? '',
+        sort: (sp.sort as string) ?? 'newest',
+    };
+
+    if (tab === 'dokumente') {
+        const [detail, docsResult] = await Promise.all([
+            getPropertyWarehouseDetail(propertyId),
+            getPropertyDocuments(propertyId, {
+                search: docFilters.search || undefined,
+                category: docFilters.category || undefined,
+                status: docFilters.status || undefined,
+                sort: (docFilters.sort as 'newest' | 'oldest') || 'newest',
+                page: sp.docPage ? Number(sp.docPage) : 1,
+            }),
+        ]);
+
+        if (!detail.error) {
+            foldersData = {
+                property: detail.property!,
+                folders: detail.folders,
+                stats: detail.stats!,
+                unassignedCount: detail.unassignedCount,
+            };
+        }
+        propertyDocs = docsResult;
+    }
+
+    // Kosten tab data
+    const costYear = sp.year ? Number(sp.year) : new Date().getFullYear();
+    const costFilters = {
+        category: (sp.costCat as string) ?? '',
+        vendor: (sp.vendor as string) ?? '',
+    };
+    let costsData: Awaited<ReturnType<typeof getPropertyCosts>> | null = null;
+    if (tab === 'kosten') {
+        costsData = await getPropertyCosts(propertyId, costYear, {
+            category: costFilters.category || undefined,
+            vendor: costFilters.vendor || undefined,
+        });
+    }
+
+    // Protokoll tab data
+    const DEFAULT_AUDIT_TYPES = ['uploaded', 'applied', 'quarantined', 'unquarantined', 'downloaded'];
+    const auditRange = (sp.auditRange as string) ?? '30d';
+    const auditFilters = {
+        types: sp.auditTypes ? (sp.auditTypes as string).split(',') : [],
+        actorId: (sp.auditActor as string) ?? '',
+        range: auditRange,
+        q: (sp.q as string) ?? '',
+    };
+    const auditPage = sp.auditPage ? Number(sp.auditPage) : 1;
+    let auditData: Awaited<ReturnType<typeof getAuditEvents>> | null = null;
+    let auditActors: { id: string; email: string }[] = [];
+    let auditProperties: { id: string; name: string; address: string; shortCode: string | null }[] = [];
+
+    if (tab === 'protokoll') {
+        // Compute from date
+        let auditFrom: string | undefined;
+        const now = new Date();
+        if (auditRange === '7d') auditFrom = new Date(now.getTime() - 7 * 86400000).toISOString();
+        else if (auditRange === '30d') auditFrom = new Date(now.getTime() - 30 * 86400000).toISOString();
+        else if (auditRange === '90d') auditFrom = new Date(now.getTime() - 90 * 86400000).toISOString();
+
+        const auditTypes = auditFilters.types.length > 0 ? auditFilters.types : DEFAULT_AUDIT_TYPES;
+
+        const [eventsResult, actorsResult, propsResult] = await Promise.all([
+            getAuditEvents({
+                types: auditTypes,
+                actorId: auditFilters.actorId || undefined,
+                from: auditFrom,
+                query: auditFilters.q || undefined,
+                page: auditPage,
+                propertyId,
+            }),
+            getAuditActors(),
+            getProperties(),
+        ]);
+
+        auditData = eventsResult;
+        auditActors = actorsResult;
+        auditProperties = propsResult;
+    }
+
+    // Stammdaten tab data
+    let detailsData: Awaited<ReturnType<typeof getPropertyDetails>> = null;
+    if (tab === 'stammdaten') {
+        detailsData = await getPropertyDetails(propertyId);
     }
 
     return (
-        <PropertyFolders
-            property={property}
-            folders={folders}
-            stats={stats}
-            unassignedCount={unassignedCount}
-        />
+        <div className="w-full space-y-6">
+            {/* ── Breadcrumb ── */}
+            <nav className="flex items-center text-sm text-muted-foreground" aria-label="Breadcrumb">
+                <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
+                    Warehouse
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
+                <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
+                    Properties
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
+                <span className="text-foreground font-medium">
+                    {property.shortCode ?? property.name}
+                </span>
+            </nav>
+
+            {/* ── Property header ── */}
+            <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-semibold text-foreground">{property.name}</h1>
+                    {property.shortCode && (
+                        <Badge variant="outline" className="text-xs font-mono">
+                            {property.shortCode}
+                        </Badge>
+                    )}
+                </div>
+                <p className="text-sm text-muted-foreground">{property.address}</p>
+
+                {/* Stats row */}
+                <div className="flex items-center gap-6 pt-2">
+                    <div className="flex items-center gap-1.5 text-sm">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">{totalDocs}</span>
+                        <span className="text-muted-foreground">Dokumente</span>
+                    </div>
+                    <div className={`flex items-center gap-1.5 text-sm ${needsReview > 0 ? 'text-amber-600' : ''}`}>
+                        <AlertCircle className="h-4 w-4" />
+                        <span className="font-medium">{needsReview}</span>
+                        <span>zu prüfen</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-sm">
+                        <Building className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">{unitCount}</span>
+                        <span className="text-muted-foreground">Einheiten</span>
+                    </div>
+                    <div
+                        className="flex items-center gap-1.5 text-sm"
+                        title="Basierend auf verbuchten Rechnungen / Based on applied invoices"
+                    >
+                        <Euro className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">
+                            {totalCostsThisYear.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                        </span>
+                        <span className="text-muted-foreground">Erfasste Kosten {new Date().getFullYear()}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Tab bar ── */}
+            <AssetTabs propertyId={propertyId} activeTab={tab} />
+
+            {/* ── Tab content ── */}
+            {tab === 'dokumente' && foldersData && (
+                <DokumenteTab
+                    propertyId={propertyId}
+                    foldersData={foldersData}
+                    docs={propertyDocs.docs}
+                    docsTotal={propertyDocs.total}
+                    docsPage={sp.docPage ? Number(sp.docPage) : 1}
+                    currentFilters={docFilters}
+                />
+            )}
+
+            {tab === 'kosten' && costsData && (
+                <PropertyCosts
+                    propertyId={propertyId}
+                    year={costYear}
+                    kpis={costsData.kpis}
+                    rows={costsData.rows}
+                    total={costsData.total}
+                    currentFilters={costFilters}
+                />
+            )}
+
+            {tab === 'protokoll' && auditData && (
+                <PropertyAudit
+                    events={auditData.events}
+                    total={auditData.total}
+                    page={auditPage}
+                    propertyId={propertyId}
+                    actors={auditActors}
+                    properties={auditProperties}
+                    currentFilters={auditFilters}
+                />
+            )}
+
+            {tab === 'stammdaten' && detailsData && (
+                <PropertyDetails
+                    property={{
+                        ...detailsData.property,
+                        createdAt: detailsData.property.createdAt.toISOString(),
+                    }}
+                    units={detailsData.units}
+                    meta={detailsData.meta}
+                />
+            )}
+        </div>
     );
 }

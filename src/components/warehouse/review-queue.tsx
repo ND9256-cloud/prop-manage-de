@@ -396,7 +396,6 @@ export default function ReviewQueue({ initialTasks, properties }: Props) {
             const result = await applyReviewTask(
                 task.document_id,
                 task.extraction.id,
-                task.org_id,
                 task.document?.doc_type || 'other',
                 task.extraction.extracted_fields,
                 propertyId,

@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { TriageOverlay } from '@/components/warehouse/triage-overlay';
 import {
     Table,
     TableBody,
@@ -71,6 +72,7 @@ export function InboxTable({
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [triageDocId, setTriageDocId] = useState<string | null>(null);
 
     const toggleSelect = useCallback((id: string) => {
         setSelected((prev) => {
@@ -208,10 +210,11 @@ export function InboxTable({
                                 return (
                                     <TableRow
                                         key={doc.id}
-                                        className={`group ${isSelected
+                                        className={`group cursor-pointer ${isSelected
                                             ? 'bg-primary/5 border-l-2 border-l-primary'
                                             : 'hover:bg-muted/50'
                                             }`}
+                                        onClick={() => setTriageDocId(doc.id)}
                                     >
                                         {/* Checkbox */}
                                         <TableCell className="py-3 px-4">
@@ -404,6 +407,18 @@ export function InboxTable({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Triage overlay */}
+            {triageDocId && (
+                <TriageOverlay
+                    documentId={triageDocId}
+                    onClose={() => setTriageDocId(null)}
+                    onApplied={() => {
+                        setTriageDocId(null);
+                        router.refresh();
+                    }}
+                />
+            )}
         </div>
     );
 }
