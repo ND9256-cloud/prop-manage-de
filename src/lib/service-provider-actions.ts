@@ -1,20 +1,10 @@
 'use server';
 
-import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { autoAssignNewTransactions } from '@/lib/bank-assignment';
+import { getOrgContextWritable } from '@/lib/org';
 
-async function getOrgId() {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user?.organizationId) throw new Error('No organization');
-    return user.organizationId;
-}
 
 async function verifyPropertyAccess(propertyId: string, orgId: string) {
     const property = await prisma.property.findFirst({
@@ -36,9 +26,9 @@ async function triggerAutoAssign(orgId: string) {
 }
 
 export async function createServiceProvider(formData: FormData) {
-    const orgId = await getOrgId();
+    const ctx = await getOrgContextWritable();
     const propertyId = formData.get('propertyId') as string;
-    await verifyPropertyAccess(propertyId, orgId);
+    await verifyPropertyAccess(propertyId, ctx.orgId);
 
     await prisma.serviceProvider.create({
         data: {
@@ -57,7 +47,7 @@ export async function createServiceProvider(formData: FormData) {
     });
 
     // Auto-assign existing unassigned transactions that match this new SP
-    await triggerAutoAssign(orgId);
+    await triggerAutoAssign(ctx.orgId);
 
     revalidatePath(`/dashboard/properties/${propertyId}`);
     revalidatePath('/dashboard/banking');
@@ -65,16 +55,14 @@ export async function createServiceProvider(formData: FormData) {
 }
 
 export async function updateServiceProvider(formData: FormData) {
-    const orgId = await getOrgId();
+    const ctx = await getOrgContextWritable();
     const id = formData.get('id') as string;
 
-    const existing = await prisma.serviceProvider.findUnique({
-        where: { id },
-        include: { property: { select: { organizationId: true } } },
+    const existing = await prisma.serviceProvider.findFirst({
+        where: { id, property: { organizationId: ctx.orgId } },
+        select: { id: true, propertyId: true },
     });
-    if (!existing || existing.property.organizationId !== orgId) {
-        throw new Error('Not found');
-    }
+    if (!existing) throw new Error('Not found');
 
     await prisma.serviceProvider.update({
         where: { id },
@@ -93,7 +81,7 @@ export async function updateServiceProvider(formData: FormData) {
     });
 
     // Auto-assign after SP update (IBAN or ref might have changed)
-    await triggerAutoAssign(orgId);
+    await triggerAutoAssign(ctx.orgId);
 
     revalidatePath(`/dashboard/properties/${existing.propertyId}`);
     revalidatePath('/dashboard/banking');
@@ -101,19 +89,17 @@ export async function updateServiceProvider(formData: FormData) {
 }
 
 export async function deleteServiceProvider(id: string) {
-    const orgId = await getOrgId();
+    const ctx = await getOrgContextWritable();
 
-    const existing = await prisma.serviceProvider.findUnique({
-        where: { id },
-        include: { property: { select: { organizationId: true, id: true } } },
+    const existing = await prisma.serviceProvider.findFirst({
+        where: { id, property: { organizationId: ctx.orgId } },
+        select: { id: true, propertyId: true },
     });
-    if (!existing || existing.property.organizationId !== orgId) {
-        throw new Error('Not found');
-    }
+    if (!existing) throw new Error('Not found');
 
     await prisma.serviceProvider.delete({ where: { id } });
 
-    revalidatePath(`/dashboard/properties/${existing.property.id}`);
+    revalidatePath(`/dashboard/properties/${existing.propertyId}`);
     revalidatePath('/dashboard/banking');
     return { success: true };
 }

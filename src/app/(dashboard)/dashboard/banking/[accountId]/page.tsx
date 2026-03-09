@@ -160,10 +160,7 @@ export default function AccountDetailPage() {
             </div>
 
             {/* CSV Import */}
-            <CSVUpload
-                bankAccountId={accountId}
-                onSuccess={() => fetchData(page, search)}
-            />
+            <CSVUpload />
 
             {/* Transaction Table */}
             {loading ? (

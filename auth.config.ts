@@ -6,6 +6,18 @@ export const authConfig = {
         signIn: '/login',
     },
     callbacks: {
+        jwt({ token, user }) {
+            if (user?.id) {
+                token.sub = user.id;
+            }
+            return token;
+        },
+        session({ session, token }) {
+            if (token.sub) {
+                session.user.id = token.sub;
+            }
+            return session;
+        },
         authorized({ auth, request: { nextUrl } }) {
             const isLoggedIn = !!auth?.user;
             const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
@@ -14,7 +26,6 @@ export const authConfig = {
                 return false; // Redirect unauthenticated users to login page
             } else if (isLoggedIn) {
                 // Redirect initialized users to dashboard
-                // Note: We might want to handle this better later (e.g. landing page vs app)
                 if (nextUrl.pathname === '/login') {
                     return Response.redirect(new URL('/dashboard', nextUrl));
                 }

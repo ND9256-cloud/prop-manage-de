@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
 import { getInboxDocuments, getInboxStats, getProperties, getOpenReviewCount } from '@/lib/warehouse-actions';
 import { bilingual, t } from '@/lib/i18n/warehouse';
+import { getOrgContext } from '@/lib/org';
 import { InboxStats } from './inbox-stats';
 import { InboxFilters } from './inbox-filters';
 import { InboxTable } from './inbox-table';
@@ -17,6 +18,10 @@ interface PageProps {
 
 export default async function InboxPage({ searchParams }: PageProps) {
     const params = await searchParams;
+
+    // Role for viewer enforcement (defense-in-depth — middleware redirects viewers)
+    const ctx = await getOrgContext().catch(() => null);
+    const readOnly = ctx?.role === 'viewer';
 
     // Determine the active view
     let view = params.view ? String(params.view) : undefined;
@@ -61,14 +66,18 @@ export default async function InboxPage({ searchParams }: PageProps) {
                     </p>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" className="gap-2">
-                        <Download className="h-4 w-4" />
-                        {t.export.de}
-                    </Button>
-                    <Button className="gap-2">
-                        <Upload className="h-4 w-4" />
-                        {t.upload.de}
-                    </Button>
+                    {!readOnly && (
+                        <>
+                            <Button variant="outline" className="gap-2">
+                                <Download className="h-4 w-4" />
+                                {t.export.de}
+                            </Button>
+                            <Button className="gap-2">
+                                <Upload className="h-4 w-4" />
+                                {t.upload.de}
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -105,6 +114,7 @@ export default async function InboxPage({ searchParams }: PageProps) {
                 total={total}
                 page={page}
                 pageSize={PAGE_SIZE}
+                readOnly={readOnly}
             />
         </div>
     );

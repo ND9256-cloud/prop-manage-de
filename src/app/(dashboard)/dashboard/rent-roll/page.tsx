@@ -6,26 +6,20 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, Users, Euro, Home, ArrowLeft } from 'lucide-react';
 import ImportButton from '@/components/rent-roll/import-button';
+import { getOrgContext } from '@/lib/org';
 
 export default async function RentRollPage() {
     const session = await auth();
-    if (!session?.user?.email) {
-        notFound();
-    }
+    if (!session?.user?.email) notFound();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) {
-        notFound();
-    }
+    const ctx = await getOrgContext().catch(() => null);
+    if (!ctx) notFound();
+    const orgId = ctx.orgId;
 
     const leases = await prisma.lease.findMany({
         where: {
             status: 'ACTIVE',
-            unit: { property: { organizationId: user.organizationId } },
+            unit: { property: { organizationId: orgId } },
         },
         include: {
             mainTenant: true,

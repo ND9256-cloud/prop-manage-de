@@ -7,39 +7,33 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Building2, Users, Home, Euro, TrendingUp, AlertCircle, ArrowRight, Calendar } from 'lucide-react';
+import { getOrgContext } from '@/lib/org';
 
 export default async function DashboardPage() {
     const session = await auth();
-    if (!session?.user?.email) {
-        notFound();
-    }
+    if (!session?.user?.email) notFound();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: { organization: true },
-    });
-
-    if (!user?.organizationId) {
-        notFound();
-    }
+    const ctx = await getOrgContext().catch(() => null);
+    if (!ctx) notFound();
+    const orgId = ctx.orgId;
 
     // Fetch all stats
     const [properties, units, persons, leases] = await Promise.all([
         prisma.property.findMany({
-            where: { organizationId: user.organizationId },
+            where: { organizationId: orgId },
             include: { _count: { select: { units: true } } },
         }),
         prisma.unit.findMany({
-            where: { property: { organizationId: user.organizationId } },
+            where: { property: { organizationId: orgId } },
             include: {
                 leases: { where: { status: 'ACTIVE' }, select: { id: true, coldRent: true, utilityAdvance: true } },
             },
         }),
-        prisma.person.count({ where: { organizationId: user.organizationId } }),
+        prisma.person.count({ where: { organizationId: orgId } }),
         prisma.lease.findMany({
             where: {
                 status: 'ACTIVE',
-                unit: { property: { organizationId: user.organizationId } },
+                unit: { property: { organizationId: orgId } },
             },
             include: {
                 mainTenant: true,
@@ -69,7 +63,7 @@ export default async function DashboardPage() {
         <main className="p-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground">Willkommen zurück, {user.name || user.email}</p>
+                <p className="text-muted-foreground">Willkommen zurück, {session.user.name || session.user.email}</p>
             </div>
 
             {/* KPI Cards */}

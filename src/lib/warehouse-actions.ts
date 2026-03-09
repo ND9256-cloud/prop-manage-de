@@ -4,6 +4,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { warehouseDb } from '@/lib/warehouse/db';
 import { CATEGORIES } from '@/lib/warehouse-categories';
+import { getOrgId, getOrgContext, getOrgIdWritable } from '@/lib/org';
 
 export interface InboxDocument {
     id: string;
@@ -26,15 +27,6 @@ export interface InboxDocument {
     applied_at: string | null;
 }
 
-async function getOrgId(): Promise<string | null> {
-    const session = await auth();
-    if (!session?.user?.email) return null;
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        include: { organization: true },
-    });
-    return user?.organizationId || null;
-}
 
 // ─── Audit logging (silent — never throws) ────────────────────
 export async function logAuditEvent({
@@ -611,7 +603,7 @@ export async function updatePropertyField(
         return { error: 'Field not allowed' };
     }
 
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const property = await prisma.property.findFirst({
@@ -652,7 +644,7 @@ export async function updatePropertyField(
 }
 
 export async function uploadWarehouseDocument(formData: FormData) {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -774,7 +766,7 @@ export async function applyReviewTask(
     triggerType: 'user_confirmed' | 'user_corrected' = 'user_confirmed',
 ) {
     // SECURITY: orgId always from session, never from client
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Unauthorized' };
 
     const db = warehouseDb(orgId);
@@ -860,7 +852,7 @@ export async function updateDocumentMetadata(
     displayName: string,
     category: string,
 ) {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -916,7 +908,7 @@ export async function updateDocumentMetadata(
 
 export async function dismissReviewTask(taskId: string) {
     // SECURITY: orgId always from session, never from client
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Unauthorized' };
 
     const db = warehouseDb(orgId);
@@ -987,7 +979,7 @@ export async function getCategoryDocuments(propertyId: string, category: string)
 }
 
 export async function renameDocument(documentId: string, newDisplayName: string) {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -1002,7 +994,7 @@ export async function renameDocument(documentId: string, newDisplayName: string)
 }
 
 export async function softDeleteDocument(documentId: string) {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -1264,7 +1256,7 @@ export async function quarantineDocument(
     reason: string,
     notes: string | null,
 ): Promise<{ error: string | null }> {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -1323,7 +1315,7 @@ export async function quarantineDocument(
 export async function unquarantineDocument(
     documentId: string,
 ): Promise<{ error: string | null }> {
-    const orgId = await getOrgId();
+    const orgId = await getOrgIdWritable();
     if (!orgId) return { error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
@@ -1561,17 +1553,7 @@ export async function getAuditEvents({
     pageSize?: number;
     propertyId?: string;
 }): Promise<{ events: AuditEvent[]; total: number }> {
-    const orgId = await getOrgId();
-    if (!orgId) return { events: [], total: 0 };
-
-    // Owner-only enforcement: verify user belongs to this org
-    const session = await auth();
-    if (!session?.user?.email) return { events: [], total: 0 };
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user || user.organizationId !== orgId) return { events: [], total: 0 };
+    const { orgId } = await getOrgContext();
 
     const db = warehouseDb(orgId);
     const shared = db.admin.schema('shared');
@@ -1628,17 +1610,7 @@ export async function getAuditEvents({
 }
 
 export async function getAuditActors(): Promise<{ id: string; email: string }[]> {
-    const orgId = await getOrgId();
-    if (!orgId) return [];
-
-    // Owner-only enforcement: verify user belongs to this org
-    const session = await auth();
-    if (!session?.user?.email) return [];
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user || user.organizationId !== orgId) return [];
+    const { orgId } = await getOrgContext();
 
     const db = warehouseDb(orgId);
     const shared = db.admin.schema('shared');

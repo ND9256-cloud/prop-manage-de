@@ -35,6 +35,7 @@ interface PropertyDetailsProps {
     property: PropertyData;
     units: UnitData[];
     meta: MetaData;
+    readOnly?: boolean;
 }
 
 // ─── Inline edit field ────────────────────────────────────────
@@ -48,6 +49,7 @@ function InlineField({
     propertyId,
     multiline,
     transform,
+    readOnly,
 }: {
     label: string;
     hint?: string;
@@ -56,6 +58,7 @@ function InlineField({
     propertyId: string;
     multiline?: boolean;
     transform?: (v: string) => string;
+    readOnly?: boolean;
 }) {
     const [current, setCurrent] = useState(value);
     const [saveState, setSaveState] = useState<SaveState>('idle');
@@ -110,7 +113,9 @@ function InlineField({
         <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">{label}</label>
             <div className="relative">
-                {multiline ? (
+                {readOnly ? (
+                    <p className="px-3 py-2 text-sm text-foreground">{current || '—'}</p>
+                ) : multiline ? (
                     <textarea
                         className="w-full px-3 py-2 text-sm bg-transparent border border-transparent rounded-md hover:bg-muted focus:bg-background focus:border-border focus:outline-none transition-colors resize-none"
                         rows={3}
@@ -130,23 +135,25 @@ function InlineField({
                         aria-label={label}
                     />
                 )}
-                <span className="absolute right-2 top-2 text-xs">
-                    {saveState === 'saving' && (
-                        <span className="text-muted-foreground flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Saving...
-                        </span>
-                    )}
-                    {saveState === 'saved' && (
-                        <span className="text-green-600 flex items-center gap-1">
-                            <Check className="h-3 w-3" /> Saved
-                        </span>
-                    )}
-                    {saveState === 'error' && (
-                        <span className="text-red-600 flex items-center gap-1">
-                            <X className="h-3 w-3" /> Error
-                        </span>
-                    )}
-                </span>
+                {!readOnly && (
+                    <span className="absolute right-2 top-2 text-xs">
+                        {saveState === 'saving' && (
+                            <span className="text-muted-foreground flex items-center gap-1">
+                                <Loader2 className="h-3 w-3 animate-spin" /> Saving...
+                            </span>
+                        )}
+                        {saveState === 'saved' && (
+                            <span className="text-green-600 flex items-center gap-1">
+                                <Check className="h-3 w-3" /> Saved
+                            </span>
+                        )}
+                        {saveState === 'error' && (
+                            <span className="text-red-600 flex items-center gap-1">
+                                <X className="h-3 w-3" /> Error
+                            </span>
+                        )}
+                    </span>
+                )}
             </div>
             {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         </div>
@@ -154,7 +161,7 @@ function InlineField({
 }
 
 // ─── Main component ──────────────────────────────────────────
-export function PropertyDetails({ property, units, meta }: PropertyDetailsProps) {
+export function PropertyDetails({ property, units, meta, readOnly }: PropertyDetailsProps) {
     const router = useRouter();
 
     return (
@@ -172,6 +179,7 @@ export function PropertyDetails({ property, units, meta }: PropertyDetailsProps)
                     field="short_code"
                     propertyId={property.id}
                     transform={(v) => v.toUpperCase().slice(0, 5)}
+                    readOnly={readOnly}
                 />
 
                 <InlineField
@@ -179,6 +187,7 @@ export function PropertyDetails({ property, units, meta }: PropertyDetailsProps)
                     value={property.address}
                     field="address"
                     propertyId={property.id}
+                    readOnly={readOnly}
                 />
 
                 <InlineField
@@ -187,6 +196,7 @@ export function PropertyDetails({ property, units, meta }: PropertyDetailsProps)
                     field="notes"
                     propertyId={property.id}
                     multiline
+                    readOnly={readOnly}
                 />
             </div>
 
@@ -275,14 +285,16 @@ export function PropertyDetails({ property, units, meta }: PropertyDetailsProps)
                         Verwalterzuweisungen werden in Org & Nutzer konfiguriert /
                         Manager assignments configured in Org & Users
                     </p>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="mt-2 text-xs"
-                        onClick={() => router.push('/dashboard/settings/users')}
-                    >
-                        Zu Org & Nutzer →
-                    </Button>
+                    {!readOnly && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 text-xs"
+                            onClick={() => router.push('/dashboard/settings/users')}
+                        >
+                            Zu Org & Nutzer →
+                        </Button>
+                    )}
                 </div>
             </div>
 

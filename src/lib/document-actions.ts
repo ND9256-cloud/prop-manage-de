@@ -1,9 +1,9 @@
 'use server';
 
-import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
+import { getOrgContext, getOrgContextWritable } from '@/lib/org';
 
 const BUCKET = 'documents';
 
@@ -20,14 +20,7 @@ async function ensureBucket() {
 
 // Upload a document for a property
 export async function uploadDocument(formData: FormData) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user?.organizationId) throw new Error('No organization');
+    const { orgId } = await getOrgContextWritable();
 
     const propertyId = formData.get('propertyId') as string;
     const docType = (formData.get('type') as string) || 'other';
@@ -37,7 +30,7 @@ export async function uploadDocument(formData: FormData) {
 
     // Verify property belongs to user's org
     const property = await prisma.property.findFirst({
-        where: { id: propertyId, organizationId: user.organizationId },
+        where: { id: propertyId, organizationId: orgId },
     });
     if (!property) throw new Error('Property not found');
 
@@ -45,7 +38,7 @@ export async function uploadDocument(formData: FormData) {
 
     // Build a unique storage path
     const ext = file.name.split('.').pop() || 'bin';
-    const storagePath = `${user.organizationId}/${propertyId}/${Date.now()}.${ext}`;
+    const storagePath = `${orgId}/${propertyId}/${Date.now()}.${ext}`;
 
     // Upload to Supabase Storage
     const arrayBuffer = await file.arrayBuffer();
@@ -79,21 +72,14 @@ export async function uploadDocument(formData: FormData) {
 
 // Delete a document
 export async function deleteDocument(documentId: string) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user?.organizationId) throw new Error('No organization');
+    const { orgId } = await getOrgContextWritable();
 
     const doc = await prisma.document.findUnique({
         where: { id: documentId },
         include: { property: { select: { organizationId: true } } },
     });
 
-    if (!doc || !doc.property || doc.property.organizationId !== user.organizationId) {
+    if (!doc || !doc.property || doc.property.organizationId !== orgId) {
         throw new Error('Document not found');
     }
 
@@ -112,21 +98,14 @@ export async function deleteDocument(documentId: string) {
 
 // Get a signed download URL for a document
 export async function getDocumentUrl(documentId: string): Promise<string> {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user?.organizationId) throw new Error('No organization');
+    const { orgId } = await getOrgContext();
 
     const doc = await prisma.document.findUnique({
         where: { id: documentId },
         include: { property: { select: { organizationId: true } } },
     });
 
-    if (!doc || !doc.property || doc.property.organizationId !== user.organizationId) {
+    if (!doc || !doc.property || doc.property.organizationId !== orgId) {
         throw new Error('Document not found');
     }
 

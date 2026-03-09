@@ -12,14 +12,7 @@ import {
 } from './enable-banking';
 import { revalidatePath } from 'next/cache';
 import { autoAssignNewTransactions } from './bank-assignment';
-
-// ── Helpers ────────────────────────────────────────────────
-
-async function getOrgId(): Promise<string> {
-    const org = await prisma.organization.findFirst();
-    if (!org) throw new Error('No organization found');
-    return org.id;
-}
+import { getOrgContext, getOrgContextWritable } from '@/lib/org';
 
 // ── Connection management ──────────────────────────────────
 
@@ -37,13 +30,14 @@ export async function startBankConnection(
     aspspCountry: string = 'DE'
 ): Promise<{ url: string; error?: string }> {
     try {
+        const { orgId } = await getOrgContextWritable();
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
         const redirectUrl = `${appUrl}/api/banking/callback`;
 
         const connection = await prisma.bankConnection.create({
             data: {
                 aspspName, aspspCountry, status: 'PENDING',
-                organizationId: await getOrgId(),
+                organizationId: orgId,
             },
         });
 
@@ -68,6 +62,14 @@ export async function completeBankConnection(
     connectionId: string
 ): Promise<{ success: boolean; error?: string }> {
     try {
+        const { orgId } = await getOrgContextWritable();
+
+        // Verify connection belongs to this org
+        const connection = await prisma.bankConnection.findFirst({
+            where: { id: connectionId, organizationId: orgId },
+        });
+        if (!connection) throw new Error('Not found');
+
         const session = await createSession(code);
         const validUntil = new Date();
         validUntil.setDate(validUntil.getDate() + 90);
@@ -94,7 +96,7 @@ export async function completeBankConnection(
                 data: {
                     externalId: accountId, iban, ownerName,
                     bankConnectionId: connectionId,
-                    organizationId: await getOrgId(),
+                    organizationId: orgId,
                 },
             });
         }
@@ -103,17 +105,23 @@ export async function completeBankConnection(
         return { success: true };
     } catch (error) {
         console.error('Failed to complete bank connection:', error);
-        await prisma.bankConnection.update({
-            where: { id: connectionId },
-            data: { status: 'ERROR' },
-        });
+        if (error instanceof Error && error.message !== 'Not found') {
+            await prisma.bankConnection.update({
+                where: { id: connectionId },
+                data: { status: 'ERROR' },
+            }).catch(() => { }); // Swallow if connection doesn't exist
+        }
         return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
 }
 
 export async function deleteBankConnection(connectionId: string): Promise<{ success: boolean }> {
     try {
-        await prisma.bankConnection.delete({ where: { id: connectionId } });
+        const { orgId } = await getOrgContextWritable();
+        const { count } = await prisma.bankConnection.deleteMany({
+            where: { id: connectionId, organizationId: orgId },
+        });
+        if (count === 0) throw new Error('Not found');
         revalidatePath('/dashboard/banking');
         return { success: true };
     } catch (error) {
@@ -124,10 +132,25 @@ export async function deleteBankConnection(connectionId: string): Promise<{ succ
 
 // ── Sync ───────────────────────────────────────────────────
 
+/**
+ * Sync transactions for a single bank account.
+ * When called from user context (server action), verifies org ownership.
+ * When called internally (cron via syncAllBankAccounts), pass skipOrgCheck=true.
+ */
 export async function syncBankTransactions(
-    bankAccountId: string
+    bankAccountId: string,
+    { skipOrgCheck = false }: { skipOrgCheck?: boolean } = {}
 ): Promise<{ count: number; error?: string }> {
     try {
+        // Org ownership check (skipped only for internal cron calls)
+        if (!skipOrgCheck) {
+            const { orgId } = await getOrgContextWritable();
+            const account = await prisma.bankAccount.findFirst({
+                where: { id: bankAccountId, organizationId: orgId },
+            });
+            if (!account) return { count: 0, error: 'Not found' };
+        }
+
         const account = await prisma.bankAccount.findUnique({ where: { id: bankAccountId } });
         if (!account) return { count: 0, error: 'Account not found' };
 
@@ -197,6 +220,11 @@ export async function syncBankTransactions(
     }
 }
 
+/**
+ * Sync all bank accounts. Used by cron job (no user session).
+ * Iterates ALL active accounts across ALL orgs.
+ * Auth is handled by CRON_SECRET in the route handler.
+ */
 export async function syncAllBankAccounts(): Promise<{ synced: number; errors: string[] }> {
     const accounts = await prisma.bankAccount.findMany({
         where: { bankConnection: { status: 'ACTIVE' } },
@@ -204,7 +232,7 @@ export async function syncAllBankAccounts(): Promise<{ synced: number; errors: s
     let synced = 0;
     const errors: string[] = [];
     for (const account of accounts) {
-        const result = await syncBankTransactions(account.id);
+        const result = await syncBankTransactions(account.id, { skipOrgCheck: true });
         if (result.error) errors.push(`${account.iban || account.id}: ${result.error}`);
         else synced++;
     }
@@ -214,24 +242,37 @@ export async function syncAllBankAccounts(): Promise<{ synced: number; errors: s
 // ── Queries ────────────────────────────────────────────────
 
 export async function getBankConnections() {
+    const { orgId } = await getOrgContext();
     return prisma.bankConnection.findMany({
-        where: { organizationId: await getOrgId() },
+        where: { organizationId: orgId },
         include: { accounts: { include: { _count: { select: { transactions: true } } } } },
         orderBy: { createdAt: 'desc' },
     });
 }
 
 export async function getBankAccount(accountId: string) {
-    return prisma.bankAccount.findUnique({
-        where: { id: accountId },
+    const { orgId } = await getOrgContext();
+    const account = await prisma.bankAccount.findFirst({
+        where: { id: accountId, organizationId: orgId },
         include: { bankConnection: true },
     });
+    if (!account) throw new Error('Not found');
+    return account;
 }
 
 export async function getBankTransactions(
     bankAccountId: string,
     options?: { search?: string; dateFrom?: string; dateTo?: string; page?: number; pageSize?: number }
 ) {
+    const { orgId } = await getOrgContext();
+
+    // Verify account belongs to this org
+    const account = await prisma.bankAccount.findFirst({
+        where: { id: bankAccountId, organizationId: orgId },
+        select: { id: true },
+    });
+    if (!account) return { transactions: [], total: 0, page: 1, pageSize: 50, totalPages: 0 };
+
     const page = options?.page || 1;
     const pageSize = options?.pageSize || 50;
     const where: Record<string, unknown> = { bankAccountId };
@@ -261,8 +302,12 @@ export async function getBankTransactions(
 }
 
 export async function getTenantPayments(personId: string, page: number = 1, pageSize: number = 10) {
+    const { orgId } = await getOrgContext();
     const skip = (page - 1) * pageSize;
-    const where = { tenantId: personId };
+    const where = {
+        tenantId: personId,
+        tenant: { organizationId: orgId },
+    };
     const [transactions, total] = await Promise.all([
         prisma.bankTransaction.findMany({
             where, orderBy: { bookingDate: 'desc' }, skip, take: pageSize,
@@ -274,7 +319,7 @@ export async function getTenantPayments(personId: string, page: number = 1, page
 }
 
 export async function getAssignmentOptions() {
-    const orgId = await getOrgId();
+    const { orgId } = await getOrgContext();
     const properties = await prisma.property.findMany({
         where: { organizationId: orgId },
         select: {

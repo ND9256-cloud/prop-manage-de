@@ -43,6 +43,7 @@ interface InboxTableProps {
     page: number;
     pageSize: number;
     isLoading?: boolean;
+    readOnly?: boolean;
 }
 
 function formatDate(dateStr: string): string {
@@ -66,6 +67,7 @@ export function InboxTable({
     page,
     pageSize,
     isLoading,
+    readOnly,
 }: InboxTableProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -417,6 +419,7 @@ export function InboxTable({
                         setTriageDocId(null);
                         router.refresh();
                     }}
+                    readOnly={readOnly}
                 />
             )}
         </div>

@@ -1,24 +1,16 @@
 
 'use server';
 
-import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
 import { LeaseStatus } from '@prisma/client';
+import { getOrgContext, getOrgContextWritable } from '@/lib/org';
 
 /**
  * Create a new person (tenant/contact)
  */
 export async function createPerson(formData: FormData) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) throw new Error('User not in organization');
+    const ctx = await getOrgContextWritable();
 
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
@@ -31,7 +23,7 @@ export async function createPerson(formData: FormData) {
             lastName,
             email: email || undefined,
             phone: phone || undefined,
-            organizationId: user.organizationId,
+            organizationId: ctx.orgId,
         },
     });
 
@@ -43,18 +35,10 @@ export async function createPerson(formData: FormData) {
  * Get all persons in the organization
  */
 export async function getPersons() {
-    const session = await auth();
-    if (!session?.user?.email) return [];
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) return [];
+    const ctx = await getOrgContext();
 
     return prisma.person.findMany({
-        where: { organizationId: user.organizationId },
+        where: { organizationId: ctx.orgId },
         include: {
             leases: {
                 where: { status: 'ACTIVE' },
@@ -73,8 +57,7 @@ export async function getPersons() {
  * Create a new lease
  */
 export async function createLease(formData: FormData) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
+    const ctx = await getOrgContextWritable();
 
     const unitId = formData.get('unitId') as string;
     const mainTenantId = formData.get('mainTenantId') as string;
@@ -85,13 +68,12 @@ export async function createLease(formData: FormData) {
     const deposit = parseFloat(formData.get('deposit') as string);
     const parkingRent = formData.get('parkingRent') as string | null;
 
-    // Get unit to find property
-    const unit = await prisma.unit.findUnique({
-        where: { id: unitId },
+    // Verify unit belongs to this org
+    const unit = await prisma.unit.findFirst({
+        where: { id: unitId, property: { organizationId: ctx.orgId } },
         include: { property: true },
     });
-
-    if (!unit) throw new Error('Unit not found');
+    if (!unit) throw new Error('Not found');
 
     const lease = await prisma.lease.create({
         data: {
@@ -104,7 +86,6 @@ export async function createLease(formData: FormData) {
             deposit,
             parkingRent: parkingRent ? parseFloat(parkingRent) : undefined,
             status: 'ACTIVE',
-            // Set as current unit occupant
             currentUnitId: unitId,
         },
     });
@@ -118,8 +99,14 @@ export async function createLease(formData: FormData) {
  * Update a lease
  */
 export async function updateLease(leaseId: string, formData: FormData) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
+    const ctx = await getOrgContextWritable();
+
+    // Verify ownership and get propertyId for revalidation
+    const existing = await prisma.lease.findFirst({
+        where: { id: leaseId, unit: { property: { organizationId: ctx.orgId } } },
+        select: { id: true, unit: { select: { propertyId: true } } },
+    });
+    if (!existing) throw new Error('Not found');
 
     const endDateStr = formData.get('endDate') as string | null;
     const coldRent = parseFloat(formData.get('coldRent') as string);
@@ -127,66 +114,74 @@ export async function updateLease(leaseId: string, formData: FormData) {
     const status = formData.get('status') as LeaseStatus;
     const parkingRent = formData.get('parkingRent') as string | null;
 
-    const lease = await prisma.lease.update({
-        where: { id: leaseId },
+    const { count } = await prisma.lease.updateMany({
+        where: {
+            id: leaseId,
+            unit: { property: { organizationId: ctx.orgId } },
+        },
         data: {
             endDate: endDateStr ? new Date(endDateStr) : null,
             coldRent,
             utilityAdvance,
             parkingRent: parkingRent ? parseFloat(parkingRent) : null,
             status,
-            // If ended, remove current unit association
             currentUnitId: status === 'ACTIVE' ? undefined : null,
         },
-        include: { unit: true },
     });
+    if (count === 0) throw new Error('Not found');
 
-    revalidatePath(`/dashboard/properties/${lease.unit.propertyId}`);
+    revalidatePath(`/dashboard/properties/${existing.unit.propertyId}`);
     revalidatePath('/dashboard/rent-roll');
-    return lease;
 }
 
 /**
  * End a lease
  */
 export async function endLease(leaseId: string) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
+    const ctx = await getOrgContextWritable();
 
-    const lease = await prisma.lease.update({
-        where: { id: leaseId },
+    // Verify ownership and get propertyId for revalidation
+    const existing = await prisma.lease.findFirst({
+        where: { id: leaseId, unit: { property: { organizationId: ctx.orgId } } },
+        select: { id: true, unit: { select: { propertyId: true } } },
+    });
+    if (!existing) throw new Error('Not found');
+
+    const { count } = await prisma.lease.updateMany({
+        where: {
+            id: leaseId,
+            unit: { property: { organizationId: ctx.orgId } },
+        },
         data: {
             status: 'ENDED',
             endDate: new Date(),
             currentUnitId: null,
         },
-        include: { unit: true },
     });
+    if (count === 0) throw new Error('Not found');
 
-    revalidatePath(`/dashboard/properties/${lease.unit.propertyId}`);
+    revalidatePath(`/dashboard/properties/${existing.unit.propertyId}`);
     revalidatePath('/dashboard/rent-roll');
-    return lease;
 }
 
 /**
  * Get all leases for a property
  */
 export async function getPropertyLeases(propertyId: string) {
-    const session = await auth();
-    if (!session?.user?.email) return [];
+    const ctx = await getOrgContext();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
+    // Verify property belongs to this org
+    const property = await prisma.property.findFirst({
+        where: { id: propertyId, organizationId: ctx.orgId },
+        select: { id: true },
     });
-
-    if (!user?.organizationId) return [];
+    if (!property) return [];
 
     return prisma.lease.findMany({
         where: {
             unit: {
                 propertyId,
-                property: { organizationId: user.organizationId },
+                property: { organizationId: ctx.orgId },
             },
         },
         include: {
@@ -201,21 +196,13 @@ export async function getPropertyLeases(propertyId: string) {
  * Get active leases count and total rent
  */
 export async function getLeaseStats() {
-    const session = await auth();
-    if (!session?.user?.email) return null;
-
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) return null;
+    const ctx = await getOrgContext();
 
     const activeLeases = await prisma.lease.findMany({
         where: {
             status: 'ACTIVE',
             unit: {
-                property: { organizationId: user.organizationId },
+                property: { organizationId: ctx.orgId },
             },
         },
         select: {

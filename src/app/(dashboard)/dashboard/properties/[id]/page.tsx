@@ -15,6 +15,7 @@ import ServiceProviderList from '@/components/properties/service-provider-list';
 import PropertyCashFlow from '@/components/properties/property-cash-flow';
 import { deleteProperty } from '@/lib/property-actions';
 import { getPropertyCashFlow, getServiceProviderCosts } from '@/lib/bank-actions';
+import { getOrgContext } from '@/lib/org';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -24,23 +25,16 @@ export default async function PropertyDetailPage({ params }: PageProps) {
     const { id: propertyId } = await params;
 
     const session = await auth();
-    if (!session?.user?.email) {
-        notFound();
-    }
+    if (!session?.user?.email) notFound();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) {
-        notFound();
-    }
+    const ctx = await getOrgContext().catch(() => null);
+    if (!ctx) notFound();
+    const orgId = ctx.orgId;
 
     const property = await prisma.property.findFirst({
         where: {
             id: propertyId,
-            organizationId: user.organizationId,
+            organizationId: orgId,
         },
         include: {
             units: {
@@ -75,7 +69,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
     // Get all persons for lease creation
     const persons = await prisma.person.findMany({
-        where: { organizationId: user.organizationId },
+        where: { organizationId: orgId },
         orderBy: { lastName: 'asc' },
     });
 

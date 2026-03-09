@@ -38,6 +38,7 @@ interface DokumenteTabProps {
         status: string;
         sort: string;
     };
+    readOnly?: boolean;
 }
 
 export function DokumenteTab({
@@ -47,6 +48,7 @@ export function DokumenteTab({
     docsTotal,
     docsPage,
     currentFilters,
+    readOnly,
 }: DokumenteTabProps) {
     const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
@@ -79,6 +81,7 @@ export function DokumenteTab({
                         setSelectedDocId(null);
                         window.location.reload();
                     }}
+                    readOnly={readOnly}
                 />
             )}
         </>

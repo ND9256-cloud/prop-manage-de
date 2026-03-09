@@ -32,6 +32,7 @@ interface TriageOverlayProps {
     documentId: string;
     onClose: () => void;
     onApplied?: () => void;
+    readOnly?: boolean;
 }
 
 // ─── Inline editable field ─────────────────────────────────────
@@ -41,12 +42,14 @@ function EditableField({
     value,
     isDirty,
     onEdit,
+    readOnly,
 }: {
     label: string;
     fieldName: string;
     value: string | null | undefined;
     isDirty: boolean;
     onEdit: (fieldName: string, value: string) => void;
+    readOnly?: boolean;
 }) {
     const [local, setLocal] = useState(value ?? '');
 
@@ -54,20 +57,24 @@ function EditableField({
         <div className="space-y-1">
             <p className="text-xs text-muted-foreground">
                 {label}
-                {isDirty && <span className="ml-1 text-amber-500">•</span>}
+                {!readOnly && isDirty && <span className="ml-1 text-amber-500">•</span>}
             </p>
-            <input
-                className={`w-full text-sm text-foreground bg-transparent rounded px-2 py-1 hover:bg-muted focus:bg-background focus:border focus:border-border focus:outline-none focus:ring-1 focus:ring-ring transition-colors ${isDirty ? 'border-l-2 border-amber-400 pl-2' : ''}`}
-                value={local}
-                onChange={(e) => setLocal(e.target.value)}
-                onBlur={() => onEdit(fieldName, local)}
-            />
+            {readOnly ? (
+                <p className="text-sm text-foreground px-2 py-1">{local || '—'}</p>
+            ) : (
+                <input
+                    className={`w-full text-sm text-foreground bg-transparent rounded px-2 py-1 hover:bg-muted focus:bg-background focus:border focus:border-border focus:outline-none focus:ring-1 focus:ring-ring transition-colors ${isDirty ? 'border-l-2 border-amber-400 pl-2' : ''}`}
+                    value={local}
+                    onChange={(e) => setLocal(e.target.value)}
+                    onBlur={() => onEdit(fieldName, local)}
+                />
+            )}
         </div>
     );
 }
 
 // ─── Main overlay component ───────────────────────────────────
-export function TriageOverlay({ documentId, onClose, onApplied }: TriageOverlayProps) {
+export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: TriageOverlayProps) {
     const [data, setData] = useState<TriageData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -352,19 +359,19 @@ export function TriageOverlay({ documentId, onClose, onApplied }: TriageOverlayP
 
                                     {docType === 'invoice' ? (
                                         <div className="space-y-2">
-                                            <EditableField label="Anbieter / Vendor" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Betrag / Amount" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Datum / Date" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Kategorie" fieldName="category_hint" value={fields.category_hint as string} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} />
+                                            <EditableField label="Anbieter / Vendor" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Betrag / Amount" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Datum / Date" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Kategorie" fieldName="category_hint" value={fields.category_hint as string} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
                                     ) : docType === 'lease' ? (
                                         <div className="space-y-2">
-                                            <EditableField label="Mieter / Tenant" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Einheit / Unit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Kaltmiete" fieldName="rent_cold" value={fields.rent_cold as string} isDirty={editedFields.has('rent_cold')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Beginn / Start" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} />
-                                            <EditableField label="Ende / End" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} />
+                                            <EditableField label="Mieter / Tenant" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Einheit / Unit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Kaltmiete" fieldName="rent_cold" value={fields.rent_cold as string} isDirty={editedFields.has('rent_cold')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Beginn / Start" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Ende / End" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">
@@ -505,81 +512,83 @@ export function TriageOverlay({ documentId, onClose, onApplied }: TriageOverlayP
                     </div>
 
                     {/* Sticky actions */}
-                    <div className="border-t border-border bg-card p-4 space-y-2">
-                        <Button
-                            className="w-full"
-                            onClick={handleApply}
-                            disabled={applying || saveState === 'saving' || !data?.data}
-                        >
-                            {applying
-                                ? 'Wird verbucht...'
-                                : saveState === 'saving'
-                                    ? 'Speichert... / Saving...'
-                                    : failedFields.size > 0
-                                        ? '✓ Trotzdem verbuchen / Apply anyway'
-                                        : '✓ Verbuchen / Apply'}
-                        </Button>
-                        {failedFields.size > 0 && (
-                            <p className="text-xs text-amber-600 text-center">
-                                ⚠ {failedFields.size} Feld(er) nicht gespeichert / field(s) not saved
-                            </p>
-                        )}
-                        <Button
-                            variant="outline"
-                            className="w-full text-destructive border-destructive hover:bg-destructive/10"
-                            onClick={() => setQuarantineOpen(true)}
-                            disabled={!data?.data}
-                        >
-                            🚫 Quarantäne / Quarantine
-                        </Button>
+                    {!readOnly && (
+                        <div className="border-t border-border bg-card p-4 space-y-2">
+                            <Button
+                                className="w-full"
+                                onClick={handleApply}
+                                disabled={applying || saveState === 'saving' || !data?.data}
+                            >
+                                {applying
+                                    ? 'Wird verbucht...'
+                                    : saveState === 'saving'
+                                        ? 'Speichert... / Saving...'
+                                        : failedFields.size > 0
+                                            ? '✓ Trotzdem verbuchen / Apply anyway'
+                                            : '✓ Verbuchen / Apply'}
+                            </Button>
+                            {failedFields.size > 0 && (
+                                <p className="text-xs text-amber-600 text-center">
+                                    ⚠ {failedFields.size} Feld(er) nicht gespeichert / field(s) not saved
+                                </p>
+                            )}
+                            <Button
+                                variant="outline"
+                                className="w-full text-destructive border-destructive hover:bg-destructive/10"
+                                onClick={() => setQuarantineOpen(true)}
+                                disabled={!data?.data}
+                            >
+                                🚫 Quarantäne / Quarantine
+                            </Button>
 
-                        {/* Quarantine dialog */}
-                        <Dialog open={quarantineOpen} onOpenChange={setQuarantineOpen}>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Quarantäne / Quarantine</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 py-2">
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-muted-foreground">Grund / Reason *</p>
-                                        <Select value={quarantineReason} onValueChange={setQuarantineReason}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Grund auswählen..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="suspicious">Verdächtige Datei / Suspicious file</SelectItem>
-                                                <SelectItem value="cannot_classify">Kann nicht klassifiziert / Cannot classify</SelectItem>
-                                                <SelectItem value="duplicate">Duplikat / Duplicate</SelectItem>
-                                                <SelectItem value="wrong_format">Falsches Format / Wrong format</SelectItem>
-                                                <SelectItem value="other">Sonstiges / Other</SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                            {/* Quarantine dialog */}
+                            <Dialog open={quarantineOpen} onOpenChange={setQuarantineOpen}>
+                                <DialogContent>
+                                    <DialogHeader>
+                                        <DialogTitle>Quarantäne / Quarantine</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-4 py-2">
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-muted-foreground">Grund / Reason *</p>
+                                            <Select value={quarantineReason} onValueChange={setQuarantineReason}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Grund auswählen..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="suspicious">Verdächtige Datei / Suspicious file</SelectItem>
+                                                    <SelectItem value="cannot_classify">Kann nicht klassifiziert / Cannot classify</SelectItem>
+                                                    <SelectItem value="duplicate">Duplikat / Duplicate</SelectItem>
+                                                    <SelectItem value="wrong_format">Falsches Format / Wrong format</SelectItem>
+                                                    <SelectItem value="other">Sonstiges / Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-muted-foreground">Notizen / Notes (optional)</p>
+                                            <Textarea
+                                                placeholder="Weitere Details..."
+                                                value={quarantineNotes}
+                                                onChange={(e) => setQuarantineNotes(e.target.value)}
+                                                rows={3}
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-muted-foreground">Notizen / Notes (optional)</p>
-                                        <Textarea
-                                            placeholder="Weitere Details..."
-                                            value={quarantineNotes}
-                                            onChange={(e) => setQuarantineNotes(e.target.value)}
-                                            rows={3}
-                                        />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button variant="outline" onClick={() => setQuarantineOpen(false)}>
-                                        Abbrechen / Cancel
-                                    </Button>
-                                    <Button
-                                        variant="destructive"
-                                        onClick={handleQuarantine}
-                                        disabled={!quarantineReason || quarantining}
-                                    >
-                                        {quarantining ? 'Wird gespeichert...' : 'Bestätigen / Confirm'}
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
+                                    <DialogFooter>
+                                        <Button variant="outline" onClick={() => setQuarantineOpen(false)}>
+                                            Abbrechen / Cancel
+                                        </Button>
+                                        <Button
+                                            variant="destructive"
+                                            onClick={handleQuarantine}
+                                            disabled={!quarantineReason || quarantining}
+                                        >
+                                            {quarantining ? 'Wird gespeichert...' : 'Bestätigen / Confirm'}
+                                        </Button>
+                                    </DialogFooter>
+                                </DialogContent>
+                            </Dialog>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

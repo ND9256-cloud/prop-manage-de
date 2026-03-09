@@ -1,8 +1,8 @@
 'use server';
 
-import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { getOrgContextWritable } from '@/lib/org';
 
 export interface ImportRow {
     address: string;
@@ -26,17 +26,8 @@ export interface ImportRow {
 }
 
 export async function importRentRoll(rows: ImportRow[]) {
-    const session = await auth();
-    if (!session?.user?.email) throw new Error('Not authenticated');
+    const { orgId } = await getOrgContextWritable();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) throw new Error('User not in organization');
-
-    const orgId = user.organizationId;
     let created = 0;
 
     // Cache to avoid re-creating same property/person

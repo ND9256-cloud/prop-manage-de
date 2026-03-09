@@ -36,11 +36,18 @@ enum LeaseStatus {
   CANCELLED
 }
 
+// Membership roles
+enum MembershipRole {
+  service_operator
+  owner
+  manager
+  viewer
+}
 
 
 // Organization (Tenant) - The Property Management Company
 model Organization {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   name      String
   slug      String   @unique // For diverse subdomains if needed
   createdAt DateTime @default(now())
@@ -52,29 +59,31 @@ model Organization {
   tenants         Person[]
   bankConnections BankConnection[]
   bankAccounts    BankAccount[]
+  memberships     Membership[]
+  invitations     Invitation[]
 }
 
 // User - System users (Admins, Managers, Accountants)
 // Tenants have their own profile linked here purely for auth if they log in
 model User {
-  id             String   @id @default(uuid())
+  id             String   @id @default(uuid()) @db.Uuid
   email          String   @unique
   name           String?
   hashedPassword String?  // If using credential auth; optional if using Clerk/Auth.js with social
   role           UserRole @default(PROPERTY_MANAGER)
   
-  organizationId String?
+  organizationId String?  @db.Uuid
   organization   Organization? @relation(fields: [organizationId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-
+  memberships Membership[]
 }
 
 // Property - A physical building or complex
 model Property {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   name      String   // E.g. "Sunset Apartments" or "Musterstraße 123"
   address   String
   city      String
@@ -83,7 +92,7 @@ model Property {
   yearBuilt Int?
   type      PropertyType
 
-  organizationId String
+  organizationId String   @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   units            Unit[]
@@ -97,7 +106,7 @@ model Property {
 
 // Unit - A rentable space within a property
 model Unit {
-  id           String  @id @default(uuid())
+  id           String  @id @default(uuid()) @db.Uuid
   unitNumber   String  // E.g. "Top 12", "Apt 4B"
   floor        Int?
   sizeSqm      Float   // Square meters (German standard)
@@ -106,7 +115,7 @@ model Unit {
   // Base rent configuration
   targetColdRent Float? // Kaltmiete prediction
   
-  propertyId   String
+  propertyId   String   @db.Uuid
   property     Property @relation(fields: [propertyId], references: [id])
 
   leases       Lease[]
@@ -119,13 +128,13 @@ model Unit {
 // Person - A repository of people (Tenants, Vendors contacts, etc.)
 // Separated from User because they might not have login access initially
 model Person {
-  id        String   @id @default(uuid())
+  id        String   @id @default(uuid()) @db.Uuid
   firstName String
   lastName  String
   email     String?
   phone     String?
   
-  organizationId String
+  organizationId String   @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   leases           Lease[]
@@ -137,7 +146,7 @@ model Person {
 
 // Lease (Tenancy) - The contract
 model Lease {
-  id        String      @id @default(uuid())
+  id        String      @id @default(uuid()) @db.Uuid
   startDate DateTime
   endDate   DateTime?   // Null means indefinite (unbefristet)
   status    LeaseStatus @default(ACTIVE)
@@ -158,17 +167,17 @@ model Lease {
   cpiAtIncrease       Float?     // VPI Stand bei Erhöhung
   cpiCurrent          Float?     // VPI Stand heute
 
-  unitId    String
+  unitId    String   @db.Uuid
   unit      Unit   @relation(fields: [unitId], references: [id])
   
   // For simplicity, one main tenant per lease for now, or use relation table for many-to-many
-  mainTenantId String
+  mainTenantId String   @db.Uuid
   mainTenant   Person @relation(fields: [mainTenantId], references: [id])
 
   // Optimization: Relation back to Unit for "current lease" if active?
   // Prisma doesn't support conditional relations easily, handled in logic.
   currentUnit Unit? @relation("CurrentLease", fields: [currentUnitId], references: [id])
-  currentUnitId String? @unique 
+  currentUnitId String? @unique @db.Uuid
 
 
 
@@ -180,7 +189,7 @@ model Lease {
 
 // VPI (Verbraucherpreisindex) – Consumer Price Index from Destatis
 model VpiIndex {
-  id    String @id @default(uuid())
+  id    String @id @default(uuid()) @db.Uuid
   year  Int
   month Int    // 1-12
   value Float  // VPI value (basis 2020 = 100)
@@ -194,14 +203,14 @@ model VpiIndex {
 
 // Document - Files stored in Supabase Storage, linked to a property
 model Document {
-  id          String   @id @default(uuid())
+  id          String   @id @default(uuid()) @db.Uuid
   name        String   // Original filename or user-given name
   type        String   // "contract", "invoice", "notice", "other"
   storagePath String   // Path in Supabase storage bucket
   fileSize    Int      // Bytes
   mimeType    String   // "application/pdf", "image/jpeg", etc.
 
-  propertyId  String
+  propertyId  String   @db.Uuid
   property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   createdAt   DateTime @default(now())
@@ -210,7 +219,7 @@ model Document {
 
 // ServiceProvider - Utilities, insurance, taxes linked to a property
 model ServiceProvider {
-  id             String   @id @default(uuid())
+  id             String   @id @default(uuid()) @db.Uuid
   name           String   // e.g. "Stadtwerke München"
   category       String   // Strom, Gas, Wasser, etc.
   contractNumber String   // Referenznummer (required for matching)
@@ -222,7 +231,7 @@ model ServiceProvider {
   contactEmail   String?
   notes          String?
 
-  propertyId     String
+  propertyId     String   @db.Uuid
   property       Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   createdAt      DateTime @default(now())
@@ -231,14 +240,14 @@ model ServiceProvider {
 
 // Bank Connection - A link to a bank via Enable Banking
 model BankConnection {
-  id              String   @id @default(uuid())
+  id              String   @id @default(uuid()) @db.Uuid
   aspspName       String   // e.g. "Deutsche Kreditbank (DKB)"
   aspspCountry    String   @default("DE")
   sessionId       String?  @unique // Enable Banking session ID
   authorizationId String?  // Enable Banking authorization ID
   status          String   @default("PENDING") // PENDING, ACTIVE, EXPIRED, ERROR
 
-  organizationId  String
+  organizationId  String   @db.Uuid
   organization    Organization @relation(fields: [organizationId], references: [id])
 
   accounts        BankAccount[]
@@ -250,14 +259,14 @@ model BankConnection {
 
 // Bank Account - An individual bank account within a connection
 model BankAccount {
-  id               String   @id @default(uuid())
+  id               String   @id @default(uuid()) @db.Uuid
   externalId       String   @unique // Enable Banking account ID
   iban             String?
   ownerName        String?
 
   bankConnectionId String
   bankConnection   BankConnection @relation(fields: [bankConnectionId], references: [id], onDelete: Cascade)
-  organizationId   String
+  organizationId   String   @db.Uuid
   organization     Organization @relation(fields: [organizationId], references: [id])
 
   transactions     BankTransaction[]
@@ -269,7 +278,7 @@ model BankAccount {
 
 // Bank Transaction - Individual booking entries (Buchungsjournal)
 model BankTransaction {
-  id                   String   @id @default(uuid())
+  id                   String   @id @default(uuid()) @db.Uuid
   entryReference       String?  // Bank's transaction ID (for dedup)
   bookingDate          DateTime
   valueDate            DateTime?
@@ -283,13 +292,13 @@ model BankTransaction {
   purpose              String?  // remittance_information
   transactionCode      String?
 
-  bankAccountId        String
+  bankAccountId        String   @db.Uuid
   bankAccount          BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
 
   // Manual assignment (auto-propagated by IBAN)
-  propertyId           String?
+  propertyId           String?  @db.Uuid
   property             Property? @relation(fields: [propertyId], references: [id])
-  tenantId             String?
+  tenantId             String?  @db.Uuid
   tenant               Person?   @relation(fields: [tenantId], references: [id])
   category             String?   // e.g. "Bruttomieteinnahmen", "Kaution", etc.
 
@@ -299,4 +308,38 @@ model BankTransaction {
   @@index([bankAccountId, bookingDate])
   @@index([tenantId])
   @@index([propertyId])
+}
+
+// Membership — links User to Organization with a role
+model Membership {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  orgId     String         @db.Uuid
+  role      MembershipRole @default(manager)
+  createdAt DateTime       @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([userId, orgId])
+  @@map("memberships")
+}
+
+// Invitation — pending invite to join an organization
+model Invitation {
+  id          String         @id @default(uuid()) @db.Uuid
+  orgId       String         @db.Uuid
+  email       String
+  emailNorm   String
+  role        MembershipRole @default(manager)
+  tokenHash   String         @unique
+  invitedBy   String         @db.Uuid
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  createdAt   DateTime       @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([emailNorm, orgId])
+  @@map("invitations")
 }

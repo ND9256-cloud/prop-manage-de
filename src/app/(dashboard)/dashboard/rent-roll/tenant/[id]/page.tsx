@@ -7,6 +7,7 @@ import { ArrowLeft, Mail, Phone, User, Home, Euro, Calendar } from 'lucide-react
 import Link from 'next/link';
 import { getTenantPayments } from '@/lib/bank-actions';
 import TenantPaymentHistory from '@/components/tenants/tenant-payment-history';
+import { getOrgContext } from '@/lib/org';
 
 export default async function TenantDetailPage({
     params,
@@ -17,14 +18,12 @@ export default async function TenantDetailPage({
     const session = await auth();
     if (!session?.user?.email) notFound();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-    if (!user?.organizationId) notFound();
+    const ctx = await getOrgContext().catch(() => null);
+    if (!ctx) notFound();
+    const orgId = ctx.orgId;
 
     const person = await prisma.person.findFirst({
-        where: { id, organizationId: user.organizationId },
+        where: { id, organizationId: orgId },
         include: {
             leases: {
                 include: {

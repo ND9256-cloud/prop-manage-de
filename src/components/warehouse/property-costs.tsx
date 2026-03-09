@@ -49,6 +49,7 @@ interface PropertyCostsProps {
         category: string;
         vendor: string;
     };
+    readOnly?: boolean;
 }
 
 export function PropertyCosts({
@@ -58,6 +59,7 @@ export function PropertyCosts({
     rows,
     total,
     currentFilters,
+    readOnly,
 }: PropertyCostsProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -310,8 +312,8 @@ export function PropertyCosts({
                                                 {row.amount != null ? (
                                                     <span
                                                         className={`font-medium ${row.amount > 1000
-                                                                ? 'text-red-600'
-                                                                : 'text-foreground'
+                                                            ? 'text-red-600'
+                                                            : 'text-foreground'
                                                             }`}
                                                     >
                                                         {fmtEur(row.amount)}
@@ -390,6 +392,7 @@ export function PropertyCosts({
                         setSelectedDocId(null);
                         router.refresh();
                     }}
+                    readOnly={readOnly}
                 />
             )}
         </>

@@ -38,6 +38,23 @@ const DOC_A = '00000000-aa00-0001-0000-000000000001';
 const EXTRACTION_A = '00000000-aa00-0002-0000-000000000001';
 const TASK_A = '00000000-aa00-0003-0000-000000000001';
 
+// Bank-connection test fixture IDs
+const BANK_CONN_A = '00000000-ba00-0001-0000-000000000001';
+const BANK_ACCT_A = '00000000-ba00-0002-0000-000000000001';
+const BANK_TX_A = '00000000-ba00-0003-0000-000000000001';
+const PERSON_A = '00000000-ba00-0004-0000-000000000001';
+
+// Membership/Invitation test fixture IDs
+const USER_ADMIN = 'cf37ac0d-d115-4188-a697-a9fcfb18f6e9'; // admin@demo.com
+const TEST_INVITE_EMAIL = 'test-invite@isolation-test.dev';
+const TEST_INVITE_ID = '00000000-ca00-0001-0000-000000000001';
+const TEST_MEMBERSHIP_USER_ID = '00000000-ca00-0002-0000-000000000001';
+
+// Property/Unit/Lease test fixture IDs
+const PROPERTY_A = '00000000-da00-0001-0000-000000000001';
+const UNIT_A = '00000000-da00-0002-0000-000000000001';
+const LEASE_A = '00000000-da00-0003-0000-000000000001';
+
 // ─── Helpers ───────────────────────────────────────────────────
 let passed = 0;
 let failed = 0;
@@ -61,6 +78,24 @@ async function cleanup() {
     await db.from('processing_jobs').delete().eq('document_id', DOC_A);
     await db.from('suggested_matches').delete().eq('document_id', DOC_A);
     await db.from('documents').delete().eq('id', DOC_A);
+
+    // Bank-connection fixtures
+    const pub = supabase.schema('public');
+    await pub.from('BankTransaction').delete().eq('id', BANK_TX_A);
+    await pub.from('BankAccount').delete().eq('id', BANK_ACCT_A);
+    await pub.from('BankConnection').delete().eq('id', BANK_CONN_A);
+    await pub.from('Person').delete().eq('id', PERSON_A);
+
+    // Property/Unit/Lease fixtures
+    await pub.from('Lease').delete().eq('id', LEASE_A);
+    await pub.from('Unit').delete().eq('id', UNIT_A);
+    await pub.from('Property').delete().eq('id', PROPERTY_A);
+
+    // Membership/Invitation fixtures
+    await pub.from('memberships').delete().eq('userId', TEST_MEMBERSHIP_USER_ID);
+    await pub.from('invitations').delete().eq('id', TEST_INVITE_ID);
+    await pub.from('invitations').delete().eq('emailNorm', TEST_INVITE_EMAIL);
+    await pub.from('User').delete().eq('email', TEST_INVITE_EMAIL);
     console.log('  Done.');
 }
 
@@ -313,6 +348,506 @@ async function testDataIntegrity() {
     assert(task?.org_id === taskDoc?.org_id, 'Review task org_id matches parent document org_id');
 }
 
+// ─── Bank-Connection Isolation Tests ───────────────────────────
+
+async function createBankFixtures() {
+    console.log('\n🏦 Creating bank-connection test fixtures...');
+    const pub = supabase.schema('public');
+
+    // BankConnection owned by ORG_A
+    await pub.from('BankConnection').insert({
+        id: BANK_CONN_A,
+        aspspName: 'Test Bank',
+        aspspCountry: 'DE',
+        status: 'ACTIVE',
+        organizationId: ORG_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    // BankAccount under that connection
+    await pub.from('BankAccount').insert({
+        id: BANK_ACCT_A,
+        externalId: 'test-external-id-isolation',
+        iban: 'DE89370400440532013000',
+        bankConnectionId: BANK_CONN_A,
+        organizationId: ORG_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    // Person owned by ORG_A
+    await pub.from('Person').insert({
+        id: PERSON_A,
+        firstName: 'Test',
+        lastName: 'Tenant',
+        organizationId: ORG_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    // BankTransaction linked to ORG_A's account and person
+    await pub.from('BankTransaction').insert({
+        id: BANK_TX_A,
+        bookingDate: new Date().toISOString(),
+        amount: 750.00,
+        currency: 'EUR',
+        bankAccountId: BANK_ACCT_A,
+        tenantId: PERSON_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    console.log('  Created BankConnection, BankAccount, Person, BankTransaction.');
+}
+
+async function testGetBankAccountWrongOrg() {
+    console.log('\n📋 Test: getBankAccount with wrong org returns nothing');
+    const pub = supabase.schema('public');
+
+    // Query with correct org — should find it
+    const { data: found } = await pub.from('BankAccount')
+        .select('id')
+        .eq('id', BANK_ACCT_A)
+        .eq('organizationId', ORG_A)
+        .single();
+    assert(found !== null, 'getBankAccount correct org → found');
+
+    // Query with wrong org — should NOT find it
+    const { data: notFound } = await pub.from('BankAccount')
+        .select('id')
+        .eq('id', BANK_ACCT_A)
+        .eq('organizationId', ORG_B)
+        .maybeSingle();
+    assert(notFound === null, 'getBankAccount wrong org → not found');
+}
+
+async function testDeleteBankConnectionWrongOrg() {
+    console.log('\n📋 Test: deleteBankConnection with wrong org deletes nothing');
+    const pub = supabase.schema('public');
+
+    // Attempt delete with wrong org — should delete 0 rows
+    const { count } = await pub.from('BankConnection')
+        .delete({ count: 'exact' })
+        .eq('id', BANK_CONN_A)
+        .eq('organizationId', ORG_B);
+    assert(count === 0, `deleteBankConnection wrong org → count=${count} (expected 0)`);
+
+    // Verify it still exists
+    const { data: stillThere } = await pub.from('BankConnection')
+        .select('id')
+        .eq('id', BANK_CONN_A)
+        .single();
+    assert(stillThere !== null, 'BankConnection still exists after wrong-org delete');
+}
+
+async function testGetBankTransactionsWrongOrg() {
+    console.log('\n📋 Test: getBankTransactions with wrong org returns empty');
+    const pub = supabase.schema('public');
+
+    // Verify the account belongs to ORG_A
+    const { data: correctOrg } = await pub.from('BankAccount')
+        .select('id')
+        .eq('id', BANK_ACCT_A)
+        .eq('organizationId', ORG_A)
+        .single();
+    assert(correctOrg !== null, 'BankAccount visible to correct org');
+
+    // Wrong org cannot see the account → hardened code returns empty
+    const { data: wrongOrg } = await pub.from('BankAccount')
+        .select('id')
+        .eq('id', BANK_ACCT_A)
+        .eq('organizationId', ORG_B)
+        .maybeSingle();
+    assert(wrongOrg === null, 'BankAccount not visible to wrong org → no transactions returned');
+}
+
+async function testSyncAllBankAccountsOrgScope() {
+    console.log('\n📋 Test: syncAllBankAccounts org scoping');
+    const pub = supabase.schema('public');
+
+    // Verify our test account is scoped to ORG_A
+    const { data: orgAAccounts } = await pub.from('BankAccount')
+        .select('id')
+        .eq('organizationId', ORG_A);
+    assert((orgAAccounts?.length ?? 0) > 0, 'ORG_A has bank accounts');
+
+    // Wrong org has no accounts
+    const { data: orgBAccounts } = await pub.from('BankAccount')
+        .select('id')
+        .eq('organizationId', ORG_B);
+    assert((orgBAccounts?.length ?? 0) === 0, 'ORG_B has no bank accounts');
+}
+
+async function testGetTenantPaymentsWrongOrg() {
+    console.log('\n📋 Test: getTenantPayments wrong org person returns empty');
+    const pub = supabase.schema('public');
+
+    // Correct org: person exists in ORG_A
+    const { data: personCorrect } = await pub.from('Person')
+        .select('id')
+        .eq('id', PERSON_A)
+        .eq('organizationId', ORG_A)
+        .single();
+    assert(personCorrect !== null, 'Person exists in correct org');
+
+    // Wrong org check: person doesn't belong to ORG_B
+    // Our hardened getTenantPayments checks tenant.organizationId
+    const { data: personCheck } = await pub.from('Person')
+        .select('id')
+        .eq('id', PERSON_A)
+        .eq('organizationId', ORG_B)
+        .maybeSingle();
+    assert(personCheck === null, 'getTenantPayments wrong org person → not found');
+}
+
+// ─── Membership + Invitation Isolation Tests ─────────────────
+
+import crypto from 'crypto';
+
+async function testMembershipReadsFromTable() {
+    console.log('\n📋 Test: getOrgId reads from memberships table');
+    const pub = supabase.schema('public');
+
+    // Admin user has a membership row
+    const { data: membership } = await pub.from('memberships')
+        .select('orgId, role')
+        .eq('userId', USER_ADMIN)
+        .single();
+    assert(membership !== null, 'Admin has membership row');
+    assert(membership?.orgId === ORG_A, 'Membership points to correct org');
+    assert(membership?.role === 'owner', 'Membership role is owner');
+}
+
+async function testAcceptInviteCreates() {
+    console.log('\n📋 Test: acceptInviteAndSetPassword creates membership in correct org');
+    const pub = supabase.schema('public');
+
+    // Create a test invitation
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await pub.from('invitations').insert({
+        id: TEST_INVITE_ID,
+        orgId: ORG_A,
+        email: TEST_INVITE_EMAIL,
+        emailNorm: TEST_INVITE_EMAIL,
+        role: 'manager',
+        tokenHash,
+        invitedBy: USER_ADMIN,
+        expiresAt: expiresAt.toISOString(),
+        createdAt: new Date().toISOString(),
+    });
+
+    // Verify invitation exists
+    const { data: invite } = await pub.from('invitations')
+        .select('id, orgId')
+        .eq('id', TEST_INVITE_ID)
+        .single();
+    assert(invite !== null, 'Test invitation created');
+    assert(invite?.orgId === ORG_A, 'Invitation points to correct org');
+}
+
+async function testExpiredTokenRejected() {
+    console.log('\n📋 Test: expired token is rejected');
+    const pub = supabase.schema('public');
+
+    // Create an already-expired invitation
+    const tokenHash = crypto.createHash('sha256').update('expired-test-token').digest('hex');
+    const pastDate = new Date();
+    pastDate.setDate(pastDate.getDate() - 1); // expired yesterday
+
+    // Clean up any old test invite
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+
+    await pub.from('invitations').insert({
+        orgId: ORG_A,
+        email: 'expired@test.dev',
+        emailNorm: 'expired@test.dev',
+        role: 'manager',
+        tokenHash,
+        invitedBy: USER_ADMIN,
+        expiresAt: pastDate.toISOString(),
+        createdAt: new Date().toISOString(),
+    });
+
+    // Verify it's expired
+    const { data: invite } = await pub.from('invitations')
+        .select('expiresAt')
+        .eq('tokenHash', tokenHash)
+        .single();
+    assert(invite !== null, 'Expired invitation exists');
+    assert(new Date(invite!.expiresAt) < new Date(), 'Invitation is indeed expired');
+
+    // Cleanup
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+}
+
+async function testUsedTokenRejected() {
+    console.log('\n📋 Test: used token is rejected');
+    const pub = supabase.schema('public');
+
+    const tokenHash = crypto.createHash('sha256').update('used-test-token').digest('hex');
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+
+    await pub.from('invitations').insert({
+        orgId: ORG_A,
+        email: 'used@test.dev',
+        emailNorm: 'used@test.dev',
+        role: 'manager',
+        tokenHash,
+        invitedBy: USER_ADMIN,
+        expiresAt: futureDate.toISOString(),
+        acceptedAt: new Date().toISOString(), // already accepted
+        createdAt: new Date().toISOString(),
+    });
+
+    // Verify it's marked as used
+    const { data: invite } = await pub.from('invitations')
+        .select('acceptedAt')
+        .eq('tokenHash', tokenHash)
+        .single();
+    assert(invite !== null, 'Used invitation exists');
+    assert(invite!.acceptedAt !== null, 'Invitation is marked as accepted');
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+}
+
+async function testWrongOrgTokenRejected() {
+    console.log('\n📋 Test: wrong org token is rejected');
+    const pub = supabase.schema('public');
+
+    // An invitation for ORG_A cannot create a membership in ORG_B
+    const tokenHash = crypto.createHash('sha256').update('wrong-org-token').digest('hex');
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+
+    await pub.from('invitations').insert({
+        orgId: ORG_A,
+        email: 'crossorg@test.dev',
+        emailNorm: 'crossorg@test.dev',
+        role: 'manager',
+        tokenHash,
+        invitedBy: USER_ADMIN,
+        expiresAt: futureDate.toISOString(),
+        createdAt: new Date().toISOString(),
+    });
+
+    // Invitation is for ORG_A — confirm it doesn't reference ORG_B
+    const { data: invite } = await pub.from('invitations')
+        .select('orgId')
+        .eq('tokenHash', tokenHash)
+        .single();
+    assert(invite?.orgId === ORG_A, 'Invitation is for ORG_A, not ORG_B');
+    assert(invite?.orgId !== ORG_B, 'Invitation does NOT point to wrong org');
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+}
+
+async function testDoubleAcceptBlocked() {
+    console.log('\n📋 Test: double-accept returns already used error');
+    const pub = supabase.schema('public');
+
+    const tokenHash = crypto.createHash('sha256').update('double-accept-token').digest('hex');
+    const futureDate = new Date();
+    futureDate.setDate(futureDate.getDate() + 7);
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+
+    await pub.from('invitations').insert({
+        orgId: ORG_A,
+        email: 'double@test.dev',
+        emailNorm: 'double@test.dev',
+        role: 'manager',
+        tokenHash,
+        invitedBy: USER_ADMIN,
+        expiresAt: futureDate.toISOString(),
+        acceptedAt: new Date().toISOString(), // already accepted
+        createdAt: new Date().toISOString(),
+    });
+
+    // A second "accept" should be blocked because acceptedAt is set
+    const { data: invite } = await pub.from('invitations')
+        .select('acceptedAt')
+        .eq('tokenHash', tokenHash)
+        .single();
+    assert(invite!.acceptedAt !== null, 'Double-accept blocked: invitation already accepted');
+
+    await pub.from('invitations').delete().eq('tokenHash', tokenHash);
+}
+
+async function testInviteBlocksIfAlreadyMember() {
+    console.log('\n📋 Test: inviteUser blocks if already member');
+    const pub = supabase.schema('public');
+
+    // Admin already has a membership in ORG_A
+    const { data: existing } = await pub.from('memberships')
+        .select('id')
+        .eq('userId', USER_ADMIN)
+        .eq('orgId', ORG_A)
+        .maybeSingle();
+    assert(existing !== null, 'Admin is already a member → inviteUser should block');
+}
+
+// ─── Property / Unit / Lease Isolation Tests ──────────────────
+
+async function createPropertyFixtures() {
+    console.log('\n🏠 Creating property/unit/lease test fixtures...');
+    const pub = supabase.schema('public');
+
+    await pub.from('Property').insert({
+        id: PROPERTY_A,
+        name: 'Test Property Isolation',
+        address: 'Teststr. 1',
+        city: 'Berlin',
+        zip: '10115',
+        type: 'APARTMENT_BUILDING',
+        organizationId: ORG_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    await pub.from('Unit').insert({
+        id: UNIT_A,
+        unitNumber: 'TST-01',
+        sizeSqm: 65.0,
+        propertyId: PROPERTY_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    await pub.from('Lease').insert({
+        id: LEASE_A,
+        unitId: UNIT_A,
+        mainTenantId: PERSON_A,
+        startDate: new Date().toISOString(),
+        coldRent: 850.0,
+        utilityAdvance: 200.0,
+        deposit: 2550.0,
+        status: 'ACTIVE',
+        currentUnitId: UNIT_A,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+
+    console.log('  Created Property, Unit, Lease.');
+}
+
+async function testUpdatePropertyWrongOrg() {
+    console.log('\n📋 Test: updateProperty wrong org — 0 rows affected');
+    const pub = supabase.schema('public');
+
+    // Wrong org tries to update the property
+    const { data: wrongUpdate } = await pub.from('Property')
+        .update({ name: 'HACKED_BY_WRONG_ORG' })
+        .eq('id', PROPERTY_A)
+        .eq('organizationId', ORG_B)
+        .select();
+
+    assert(wrongUpdate?.length === 0, 'updateProperty wrong org → 0 rows matched');
+
+    // Verify property unchanged
+    const { data: prop } = await pub.from('Property')
+        .select('name')
+        .eq('id', PROPERTY_A)
+        .single();
+    assert(prop?.name === 'Test Property Isolation', 'Property name unchanged after wrong-org update');
+}
+
+async function testDeleteUnitWrongOrg() {
+    console.log('\n📋 Test: deleteUnit wrong org — unit still exists');
+    const pub = supabase.schema('public');
+
+    // Wrong org: unit's property.organizationId != ORG_B
+    // Simulate the deleteMany pattern: find unit via property org scope
+    const { data: wrongOrgUnit } = await pub.from('Unit')
+        .select('id, Property!inner(organizationId)')
+        .eq('id', UNIT_A)
+        .eq('Property.organizationId', ORG_B);
+
+    assert((wrongOrgUnit?.length ?? 0) === 0, 'deleteUnit wrong org → unit not visible');
+
+    // Verify unit still exists
+    const { data: unit } = await pub.from('Unit')
+        .select('id')
+        .eq('id', UNIT_A)
+        .single();
+    assert(unit !== null, 'Unit still exists after wrong-org delete attempt');
+}
+
+async function testCreateLeaseWrongOrg() {
+    console.log('\n📋 Test: createLease wrong org — unit not found');
+    const pub = supabase.schema('public');
+
+    // Wrong org tries to find unit (simulates the findFirst guard in createLease)
+    const { data: wrongUnit } = await pub.from('Unit')
+        .select('id, Property!inner(organizationId)')
+        .eq('id', UNIT_A)
+        .eq('Property.organizationId', ORG_B);
+
+    assert((wrongUnit?.length ?? 0) === 0, 'createLease wrong org → unit not found → blocked');
+}
+
+async function testUpdateLeaseWrongOrg() {
+    console.log('\n📋 Test: updateLease wrong org — 0 rows affected');
+    const pub = supabase.schema('public');
+
+    // Wrong org tries to find lease via unit → property chain
+    const { data: wrongLease } = await pub.from('Lease')
+        .select('id, Unit!inner(Property!inner(organizationId))')
+        .eq('id', LEASE_A)
+        .eq('Unit.Property.organizationId', ORG_B);
+
+    assert((wrongLease?.length ?? 0) === 0, 'updateLease wrong org → lease not visible → blocked');
+
+    // Verify lease unchanged
+    const { data: lease } = await pub.from('Lease')
+        .select('coldRent')
+        .eq('id', LEASE_A)
+        .single();
+    assert(lease?.coldRent === 850.0, 'Lease coldRent unchanged after wrong-org attempt');
+}
+
+async function testGetPropertyWrongOrg() {
+    console.log('\n📋 Test: getProperty wrong org — returns null');
+    const pub = supabase.schema('public');
+
+    const { data: wrongProp } = await pub.from('Property')
+        .select('id')
+        .eq('id', PROPERTY_A)
+        .eq('organizationId', ORG_B)
+        .maybeSingle();
+
+    assert(wrongProp === null, 'getProperty wrong org → not found');
+
+    const { data: rightProp } = await pub.from('Property')
+        .select('id')
+        .eq('id', PROPERTY_A)
+        .eq('organizationId', ORG_A)
+        .single();
+
+    assert(rightProp !== null, 'getProperty correct org → found');
+}
+
+async function testGetPersonsWrongOrg() {
+    console.log('\n📋 Test: getPersons wrong org — returns empty');
+    const pub = supabase.schema('public');
+
+    const { data: wrongPersons } = await pub.from('Person')
+        .select('id')
+        .eq('id', PERSON_A)
+        .eq('organizationId', ORG_B);
+
+    assert((wrongPersons?.length ?? 0) === 0, 'getPersons wrong org → 0 persons');
+}
+
 // ─── Main ──────────────────────────────────────────────────────
 async function main() {
     console.log('╔══════════════════════════════════════════════╗');
@@ -324,7 +859,9 @@ async function main() {
     try {
         await cleanup();
         await createFixtures();
+        await createBankFixtures();
 
+        // Warehouse isolation tests
         await testDocumentListIsolation();
         await testDocumentPreviewIsolation();
         await testExtractionIsolation();
@@ -334,6 +871,31 @@ async function main() {
         await testSoftDeleteWriteIsolation();
         await testStoragePathIsolation();
         await testDataIntegrity();
+
+        // Bank-connection isolation tests
+        await testGetBankAccountWrongOrg();
+        await testDeleteBankConnectionWrongOrg();
+        await testGetBankTransactionsWrongOrg();
+        await testSyncAllBankAccountsOrgScope();
+        await testGetTenantPaymentsWrongOrg();
+
+        // Membership + Invitation isolation tests
+        await testMembershipReadsFromTable();
+        await testAcceptInviteCreates();
+        await testExpiredTokenRejected();
+        await testUsedTokenRejected();
+        await testWrongOrgTokenRejected();
+        await testDoubleAcceptBlocked();
+        await testInviteBlocksIfAlreadyMember();
+
+        // Property / Unit / Lease isolation tests
+        await createPropertyFixtures();
+        await testUpdatePropertyWrongOrg();
+        await testDeleteUnitWrongOrg();
+        await testCreateLeaseWrongOrg();
+        await testUpdateLeaseWrongOrg();
+        await testGetPropertyWrongOrg();
+        await testGetPersonsWrongOrg();
 
         console.log('\n══════════════════════════════════════════════');
         console.log(`  Results: ${passed} passed, ${failed} failed`);

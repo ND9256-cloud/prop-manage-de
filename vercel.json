@@ -5,7 +5,7 @@
             "schedule": "0 10 15 * *"
         },
         {
-            "path": "/api/banking/sync",
+            "path": "/api/cron/banking/sync-all",
             "schedule": "0 6 * * *"
         }
     ]

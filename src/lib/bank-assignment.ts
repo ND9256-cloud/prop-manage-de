@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/db';
 import { revalidatePath } from 'next/cache';
+import { getOrgContext, getOrgContextWritable } from '@/lib/org';
 
 // ── Constants ──────────────────────────────────────────────
 
@@ -122,7 +123,15 @@ export async function assignTransaction(
     transactionId: string,
     assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
 ): Promise<{ updated: number }> {
+    const { orgId } = await getOrgContextWritable();
     const category = assignment.category ?? null;
+
+    // Verify transaction belongs to this org
+    const existing = await prisma.bankTransaction.findFirst({
+        where: { id: transactionId, bankAccount: { organizationId: orgId } },
+        select: { id: true },
+    });
+    if (!existing) throw new Error('Not found');
 
     const tx = await prisma.bankTransaction.update({
         where: { id: transactionId },
@@ -131,6 +140,13 @@ export async function assignTransaction(
 
     // OUTGOING: Auto-fill SP IBAN if "nicht bekannt"
     if (tx.amount < 0 && tx.creditorIban && category && assignment.propertyId) {
+        // Verify property belongs to this org
+        const property = await prisma.property.findFirst({
+            where: { id: assignment.propertyId, organizationId: orgId },
+            select: { id: true },
+        });
+        if (!property) throw new Error('Property not found');
+
         const unknownIbanSPs = await prisma.serviceProvider.findMany({
             where: { propertyId: assignment.propertyId, category, iban: 'nicht bekannt' },
             select: { id: true, contractNumber: true },
@@ -157,10 +173,14 @@ export async function assignTransaction(
 export async function countSimilarTransactions(
     transactionId: string
 ): Promise<{ count: number; name: string | null }> {
-    const tx = await prisma.bankTransaction.findUniqueOrThrow({
-        where: { id: transactionId },
+    const { orgId } = await getOrgContext();
+
+    // Verify transaction belongs to this org
+    const tx = await prisma.bankTransaction.findFirst({
+        where: { id: transactionId, bankAccount: { organizationId: orgId } },
         select: { amount: true, debtorIban: true, debtorName: true, creditorIban: true, creditorName: true },
     });
+    if (!tx) throw new Error('Not found');
 
     const isIncoming = tx.amount >= 0;
     const iban = isIncoming ? tx.debtorIban : tx.creditorIban;
@@ -168,9 +188,11 @@ export async function countSimilarTransactions(
 
     if (!iban) return { count: 0, name };
 
+    // Scope count to this org's bank accounts only
     const count = await prisma.bankTransaction.count({
         where: {
             id: { not: transactionId },
+            bankAccount: { organizationId: orgId },
             ...(isIncoming ? { debtorIban: iban } : { creditorIban: iban }),
         },
     });
@@ -186,10 +208,14 @@ export async function bulkReassignByIban(
     transactionId: string,
     assignment: { propertyId?: string | null; tenantId?: string | null; category?: string | null }
 ): Promise<{ updated: number }> {
-    const tx = await prisma.bankTransaction.findUniqueOrThrow({
-        where: { id: transactionId },
+    const { orgId } = await getOrgContextWritable();
+
+    // Verify transaction belongs to this org
+    const tx = await prisma.bankTransaction.findFirst({
+        where: { id: transactionId, bankAccount: { organizationId: orgId } },
         select: { amount: true, debtorIban: true, creditorIban: true, purpose: true },
     });
+    if (!tx) throw new Error('Not found');
 
     const isIncoming = tx.amount >= 0;
     const iban = isIncoming ? tx.debtorIban : tx.creditorIban;
@@ -200,7 +226,8 @@ export async function bulkReassignByIban(
     if (isIncoming) {
         const allSimilar = await prisma.bankTransaction.findMany({
             where: {
-                ...(isIncoming ? { debtorIban: iban } : { creditorIban: iban }),
+                bankAccount: { organizationId: orgId },
+                debtorIban: iban,
             },
             select: { id: true, purpose: true },
         });
@@ -221,9 +248,18 @@ export async function bulkReassignByIban(
         return { updated: allSimilar.length };
     }
 
-    // For outgoing, apply the exact same category to all
+    // For outgoing, apply the exact same category to all — scoped to this org
+    const orgAccounts = await prisma.bankAccount.findMany({
+        where: { organizationId: orgId },
+        select: { id: true },
+    });
+    const accountIds = orgAccounts.map(a => a.id);
+
     const result = await prisma.bankTransaction.updateMany({
-        where: { creditorIban: iban },
+        where: {
+            creditorIban: iban,
+            bankAccountId: { in: accountIds },
+        },
         data: {
             propertyId: assignment.propertyId,
             tenantId: assignment.tenantId,
@@ -236,11 +272,21 @@ export async function bulkReassignByIban(
 }
 
 /** Auto-assign newly synced transactions. Called after sync and SP create/update. */
-export async function autoAssignNewTransactions(bankAccountId: string) {
+export async function autoAssignNewTransactions(bankAccountId: string, orgId?: string) {
+    const resolvedOrgId = orgId ?? (await getOrgContextWritable()).orgId;
+
+    // Pre-fetch org's account IDs for updateMany scoping
+    const orgAccounts = await prisma.bankAccount.findMany({
+        where: { organizationId: resolvedOrgId },
+        select: { id: true },
+    });
+    const accountIds = orgAccounts.map(a => a.id);
+
     // INCOMING: propagate by debtor IBAN
     const assignedTxs = await prisma.bankTransaction.findMany({
         where: {
             bankAccountId,
+            bankAccount: { organizationId: resolvedOrgId },
             amount: { gte: 0 },
             OR: [{ propertyId: { not: null } }, { tenantId: { not: null } }],
         },
@@ -256,29 +302,41 @@ export async function autoAssignNewTransactions(bankAccountId: string) {
 
     for (const [iban, a] of ibanMap) {
         await prisma.bankTransaction.updateMany({
-            where: { bankAccountId, debtorIban: iban, propertyId: null, tenantId: null },
+            where: {
+                bankAccountId: { in: accountIds },
+                debtorIban: iban,
+                propertyId: null,
+                tenantId: null,
+            },
             data: { propertyId: a.propertyId, tenantId: a.tenantId },
         });
     }
 
     // OUTGOING: Score-based matching (name + IBAN + reference number)
     const allProviders = await prisma.serviceProvider.findMany({
+        where: { property: { organizationId: resolvedOrgId } },
         select: { id: true, name: true, category: true, contractNumber: true, iban: true, propertyId: true, monthlyCost: true },
     });
 
     if (allProviders.length > 0) {
         const unassigned = await prisma.bankTransaction.findMany({
-            where: { bankAccountId, amount: { lt: 0 }, propertyId: null },
+            where: {
+                bankAccountId,
+                bankAccount: { organizationId: resolvedOrgId },
+                amount: { lt: 0 },
+                propertyId: null,
+            },
             select: { id: true, creditorName: true, creditorIban: true, purpose: true, amount: true },
         });
 
         for (const tx of unassigned) {
             const match = matchByScore(tx.creditorName, tx.creditorIban, tx.purpose, allProviders);
             if (match) {
-                await prisma.bankTransaction.update({
-                    where: { id: tx.id },
+                const { count } = await prisma.bankTransaction.updateMany({
+                    where: { id: tx.id, bankAccountId: { in: accountIds } },
                     data: { propertyId: match.propertyId, category: match.category },
                 });
+                if (count !== 1) continue; // skip SP auto-fill if update didn't match
 
                 // Auto-fill SP IBAN if it was "nicht bekannt" and we now know it from the transaction
                 if (tx.creditorIban) {
@@ -303,8 +361,9 @@ export async function autoAssignNewTransactions(bankAccountId: string) {
 
 /** Get available NK categories for a property based on registered SPs. */
 export async function getPropertySPCategories(propertyId: string): Promise<string[]> {
+    const { orgId } = await getOrgContext();
     const sps = await prisma.serviceProvider.findMany({
-        where: { propertyId },
+        where: { propertyId, property: { organizationId: orgId } },
         select: { category: true },
     });
     return [...new Set(sps.map((sp) => sp.category))];
@@ -313,8 +372,9 @@ export async function getPropertySPCategories(propertyId: string): Promise<strin
 // ── Analytics ──────────────────────────────────────────────
 
 export async function getPropertyCashFlow(propertyId: string) {
+    const { orgId } = await getOrgContext();
     const transactions = await prisma.bankTransaction.findMany({
-        where: { propertyId },
+        where: { propertyId, bankAccount: { organizationId: orgId } },
         select: { id: true, bookingDate: true, amount: true, category: true },
         orderBy: { bookingDate: 'asc' },
     });
@@ -339,10 +399,11 @@ function detectFrequency(dates: Date[]): string {
 }
 
 export async function getServiceProviderCosts(propertyId: string, providers: { id: string; category: string; contractNumber: string }[]) {
+    const { orgId } = await getOrgContext();
     const currentYear = new Date().getFullYear();
 
     const transactions = await prisma.bankTransaction.findMany({
-        where: { propertyId },
+        where: { propertyId, bankAccount: { organizationId: orgId } },
         select: { bookingDate: true, amount: true, category: true, purpose: true },
         orderBy: { bookingDate: 'asc' },
     });

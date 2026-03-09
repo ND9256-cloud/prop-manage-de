@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight, FileText, AlertCircle, Building, Euro } from 'lucide-react';
+import { getOrgContext } from '@/lib/org';
 
 interface PageProps {
     params: Promise<{ propertyId: string }>;
@@ -24,6 +25,10 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
     if (statsError || !statsData) notFound();
 
     const { property, totalDocs, needsReview, unitCount, totalCostsThisYear } = statsData;
+
+    // Role for viewer enforcement
+    const ctx = await getOrgContext().catch(() => null);
+    const readOnly = ctx?.role === 'viewer';
 
     // Tab-specific data
     let foldersData = null;
@@ -191,6 +196,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     docsTotal={propertyDocs.total}
                     docsPage={sp.docPage ? Number(sp.docPage) : 1}
                     currentFilters={docFilters}
+                    readOnly={readOnly}
                 />
             )}
 
@@ -202,6 +208,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     rows={costsData.rows}
                     total={costsData.total}
                     currentFilters={costFilters}
+                    readOnly={readOnly}
                 />
             )}
 
@@ -225,6 +232,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     }}
                     units={detailsData.units}
                     meta={detailsData.meta}
+                    readOnly={readOnly}
                 />
             )}
         </div>

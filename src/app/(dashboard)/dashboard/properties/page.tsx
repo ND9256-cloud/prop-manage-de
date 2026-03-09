@@ -8,24 +8,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Building2, Plus, MapPin, Home, Users, ArrowLeft } from 'lucide-react';
 import PropertyForm from '@/components/properties/property-form';
+import { getOrgContext } from '@/lib/org';
 
 export default async function PropertiesPage() {
     const session = await auth();
-    if (!session?.user?.email) {
-        notFound();
-    }
+    if (!session?.user?.email) notFound();
 
-    const user = await prisma.user.findUnique({
-        where: { email: session.user.email },
-        select: { organizationId: true },
-    });
-
-    if (!user?.organizationId) {
-        notFound();
-    }
+    const ctx = await getOrgContext().catch(() => null);
+    if (!ctx) notFound();
+    const orgId = ctx.orgId;
 
     const properties = await prisma.property.findMany({
-        where: { organizationId: user.organizationId },
+        where: { organizationId: orgId },
         include: {
             _count: { select: { units: true } },
             units: {
