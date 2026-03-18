@@ -1,6 +1,32 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// ─── Open taxonomy: doc_type → category / subcategory / extraction prompt / retention ───
+const DOC_TYPE_MAP: Record<string, {
+    category: string;
+    subcategory: string | null;
+    extraction_prompt_key: string;
+    retention_years: number;
+}> = {
+    mietvertrag:                { category: "vertraege",          subcategory: "mietvertrag",      extraction_prompt_key: "lease",             retention_years: 30 },
+    nebenkostenabrechnung:      { category: "kosten_rechnungen",  subcategory: "betriebskosten",   extraction_prompt_key: "invoice",           retention_years: 10 },
+    betriebskostenabrechnung:   { category: "kosten_rechnungen",  subcategory: "betriebskosten",   extraction_prompt_key: "invoice",           retention_years: 10 },
+    heizkostenabrechnung:       { category: "kosten_rechnungen",  subcategory: "heizkosten",       extraction_prompt_key: "invoice",           retention_years: 10 },
+    rechnung:                   { category: "kosten_rechnungen",  subcategory: "sonstiges",        extraction_prompt_key: "invoice",           retention_years: 10 },
+    handwerkerrechnung:         { category: "kosten_rechnungen",  subcategory: "instandhaltung",   extraction_prompt_key: "invoice",           retention_years: 10 },
+    "mieterhöhung":             { category: "vertraege",          subcategory: "mietanpassung",    extraction_prompt_key: "lease",             retention_years: 30 },
+    "kündigung":                { category: "vertraege",          subcategory: "kuendigung",       extraction_prompt_key: "lease",             retention_years: 30 },
+    grundsteuerbescheid:        { category: "behoerden",          subcategory: "steuerbescheid",   extraction_prompt_key: "default",           retention_years: 10 },
+    energieausweis:             { category: "medien",             subcategory: "energieausweis",   extraction_prompt_key: "default",           retention_years: 10 },
+    "wohnungsübergabeprotokoll": { category: "instandhaltung",   subcategory: "uebergabe",        extraction_prompt_key: "inspection_report", retention_years: 10 },
+    versicherungspolice:        { category: "kosten_rechnungen",  subcategory: "versicherung",     extraction_prompt_key: "default",           retention_years: 10 },
+    hausgeldabrechnung:         { category: "kosten_rechnungen",  subcategory: "hausgeld",         extraction_prompt_key: "invoice",           retention_years: 10 },
+    mahnung:                    { category: "kosten_rechnungen",  subcategory: "mahnung",          extraction_prompt_key: "invoice",           retention_years: 10 },
+    mietbescheinigung:          { category: "vertraege",          subcategory: "bescheinigung",    extraction_prompt_key: "default",           retention_years: 10 },
+};
+
+const DOC_TYPE_DEFAULT = { category: "rechtliches", subcategory: null as string | null, extraction_prompt_key: "default", retention_years: 10 };
+
 // ─── classifyAndName helper ─────────────────────────────────────
 async function classifyAndName(
     supabase: SupabaseClient,
@@ -16,38 +42,10 @@ async function classifyAndName(
     retention_until: string;
     property_id: string | null;
 }> {
-    // 1. CATEGORISE
-    let category = "rechtliches";
-    let subcategory: string | null = null;
-
-    if (
-        extractedFields.amount !== undefined ||
-        docType === "invoice" ||
-        docType === "utility_bill"
-    ) {
-        category = "kosten_rechnungen";
-        subcategory = extractedFields.category_hint ?? null;
-    } else if (docType === "lease" || docType === "contract") {
-        category = "vertraege";
-    } else if (docType === "photo" || docType === "floor_plan") {
-        category = "medien";
-    } else if (docType === "inspection_report") {
-        category = "instandhaltung";
-    } else if (docType === "financial_report") {
-        category = "finanzen";
-    } else {
-        // Check description for authority keywords
-        const desc = String(
-            extractedFields.description ?? extractedFields.summary ?? ""
-        ).toLowerCase();
-        if (
-            desc.includes("bescheid") ||
-            desc.includes("genehmigung") ||
-            desc.includes("hausordnung")
-        ) {
-            category = "behoerden";
-        }
-    }
+    // 1. CATEGORISE via DOC_TYPE_MAP lookup
+    const mapping = DOC_TYPE_MAP[docType] ?? DOC_TYPE_DEFAULT;
+    const category = mapping.category;
+    const subcategory = mapping.subcategory;
 
     // 2. GET PROPERTY SHORT CODE via fuzzy address match
     let shortCode = "XXXXX";
@@ -137,7 +135,7 @@ async function classifyAndName(
     const baseDate = extractedFields.invoice_date
         ? new Date(extractedFields.invoice_date)
         : new Date();
-    const retentionYears = category === "rechtliches" ? 30 : 10;
+    const retentionYears = mapping.retention_years;
     const retentionDate = new Date(baseDate);
     retentionDate.setFullYear(retentionDate.getFullYear() + retentionYears);
     const retentionUntil = retentionDate.toISOString().split("T")[0];
@@ -391,9 +389,9 @@ serve(async (req: Request) => {
 
         console.log("Step 3 complete: ocr_text and ocr_confidence saved");
 
-        // Step 4: Classify document type via Claude Haiku
+        // Step 4: Classify document type via Claude Haiku (open taxonomy)
         // deno-lint-ignore no-explicit-any
-        let classification: any = { doc_type: "other", language: "de", confidence: 0 };
+        let classification: any = { doc_type: "unknown", doc_type_en: "unknown", language: "de", confidence: 0 };
 
         try {
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
@@ -409,7 +407,7 @@ serve(async (req: Request) => {
                     max_tokens: 200,
                     messages: [{
                         role: "user",
-                        content: `Classify this document. Return ONLY valid JSON, no markdown, no explanation:\n{"doc_type":"lease|invoice|inspection_report|other","language":"de|en","confidence":0-100}\n\nDocument text:\n${extractedText.slice(0, 3000)}`,
+                        content: `You are classifying a document from a German Hausverwaltung (property management company).\nReturn the most specific German document type term.\nExamples: mietvertrag, nebenkostenabrechnung, mieterhöhung, kündigung, rechnung, grundsteuerbescheid, energieausweis, handwerkerrechnung, betriebskostenabrechnung, heizkostenabrechnung, wohnungsübergabeprotokoll, versicherungspolice, hausgeldabrechnung, mahnung, mietbescheinigung.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"doc_type":"<german_term>","doc_type_en":"<english_translation>","language":"de|en|mixed|unknown","confidence":0}\n\nDocument text:\n${extractedText.slice(0, 3000)}`,
                     }],
                 }),
             });
@@ -480,7 +478,8 @@ serve(async (req: Request) => {
 
         try {
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
-            const extractPrompt = prompts[classification.doc_type] || defaultPrompt;
+            const promptKey = (DOC_TYPE_MAP[classification.doc_type] ?? DOC_TYPE_DEFAULT).extraction_prompt_key;
+            const extractPrompt = prompts[promptKey] || defaultPrompt;
 
             const extractResponse = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
@@ -656,8 +655,10 @@ serve(async (req: Request) => {
             }
         }
 
+        const resolveKey = (DOC_TYPE_MAP[classification.doc_type] ?? DOC_TYPE_DEFAULT).extraction_prompt_key;
+
         try {
-            if (classification.doc_type === "invoice") {
+            if (resolveKey === "invoice") {
                 if (extractedFields.address_hint) {
                     const m = await resolveAndStore("property", {
                         address_street: extractedFields.address_hint,
@@ -665,7 +666,7 @@ serve(async (req: Request) => {
                     if (m) allMatches.push(m);
                 }
 
-            } else if (classification.doc_type === "lease") {
+            } else if (resolveKey === "lease") {
                 const propertyMatch = await resolveAndStore("property", {
                     address_street: extractedFields.address_street,
                     address_number: extractedFields.address_number,
@@ -684,7 +685,7 @@ serve(async (req: Request) => {
                 });
                 if (tenantMatch) allMatches.push(tenantMatch);
 
-            } else if (classification.doc_type === "inspection_report") {
+            } else if (resolveKey === "inspection_report") {
                 const propMatch = await resolveAndStore("property", {
                     address_street: extractedFields.address_hint,
                 });
@@ -697,7 +698,7 @@ serve(async (req: Request) => {
                     if (unitMatch) allMatches.push(unitMatch);
                 }
             }
-            // For 'other' doc_type: skip resolve calls
+            // For 'default' prompt key: skip resolve calls
 
             console.log(`Step 7 complete: ${allMatches.length} entity matches`);
         } catch (matchErr) {
@@ -733,7 +734,7 @@ serve(async (req: Request) => {
 
         if (overallConfidence >= 85 && allExisting && !hasNew) {
             // Auto-apply: high confidence, all entities exist
-            const applyAction = classification.doc_type === "lease"
+            const applyAction = resolveKey === "lease"
                 ? "lease.create"
                 : "ledger.append";
 
