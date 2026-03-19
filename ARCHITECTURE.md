@@ -1,4 +1,4 @@
-# Architecture
+≈# Architecture
 
 Read this before writing any code. No exceptions.
 
@@ -25,9 +25,13 @@ Read this before writing any code. No exceptions.
 ## Pipeline
 
 - `process-document` is a **Supabase Edge Function** (`supabase/functions/process-document/index.ts`), not a Next.js API route.
+- The function is structured as **10 sequential functions**: claimJob → fetchDocument → extractText → classifyDocument → extractFields → categorize → storeExtraction → matchEntities → routeByConfidence → completeJob.
+- **Classification uses open taxonomy** — the AI returns the most specific German Hausverwaltung term (e.g. `mietvertrag`, `nebenkostenabrechnung`, `rechnung`). A `DOC_TYPE_MAP` constant maps these to categories, subcategories, extraction prompts, and retention periods.
+- **Pipeline is self-operating** — pg_cron triggers `process-document` every minute. Any document with a `processing_jobs` row in `queued` status gets processed automatically.
 - Edge Function secrets (including `ANTHROPIC_API_KEY`) are in the **Supabase dashboard** under Edge Functions → Secrets. They are NOT in `.env` files.
 - The pipeline writes to `warehouse.*` tables only. Writes to `pm.*` go through `connector.apply()`.
-- The pipeline uses `warehouse.processing_jobs` for job management with `claim_next_job` RPC and `schedule_retry()` for exponential backoff (1 min / 5 min / 25 min).
+- Job management: `claim_next_job` RPC with `SKIP LOCKED`, `schedule_retry()` for exponential backoff (1 min / 5 min / 25 min). Stuck jobs recovered automatically via pg_cron every 5 minutes.
+- The legacy `Document` model in Prisma has been deleted. All document operations use `warehouse.documents` via the Supabase client.
 
 ## Code conventions
 
