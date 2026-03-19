@@ -16,6 +16,7 @@ import PropertyCashFlow from '@/components/properties/property-cash-flow';
 import { deleteProperty } from '@/lib/property-actions';
 import { getPropertyCashFlow, getServiceProviderCosts } from '@/lib/bank-actions';
 import { getOrgContext } from '@/lib/org';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -46,17 +47,6 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                 },
                 orderBy: { unitNumber: 'asc' },
             },
-            documents: {
-                orderBy: { createdAt: 'desc' },
-                select: {
-                    id: true,
-                    name: true,
-                    type: true,
-                    fileSize: true,
-                    mimeType: true,
-                    createdAt: true,
-                },
-            },
             serviceProviders: {
                 orderBy: { category: 'asc' },
             },
@@ -85,11 +75,28 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         await deleteProperty(propertyId);
     }
 
-    // Fetch cash flow and service provider cost data
-    const [cashFlowData, spCosts] = await Promise.all([
+    // Fetch cash flow, service provider costs, and warehouse documents
+    const sb = getSupabaseAdmin();
+    const [cashFlowData, spCosts, warehouseDocs] = await Promise.all([
         getPropertyCashFlow(propertyId),
         getServiceProviderCosts(propertyId, property.serviceProviders),
+        sb
+            ? sb
+                  .schema('warehouse')
+                  .from('documents')
+                  .select('id, file_name, doc_type, file_size_bytes, mime_type, created_at')
+                  .eq('org_id', orgId)
+                  .order('created_at', { ascending: false })
+            : Promise.resolve({ data: [] }),
     ]);
+    const documents = (warehouseDocs.data ?? []).map((d: { id: string; file_name: string; doc_type: string | null; file_size_bytes: number; mime_type: string; created_at: string }) => ({
+        id: d.id,
+        name: d.file_name,
+        type: d.doc_type ?? 'other',
+        fileSize: d.file_size_bytes,
+        mimeType: d.mime_type,
+        createdAt: d.created_at,
+    }));
 
     return (
         <main className="p-6">
@@ -291,10 +298,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
             <div className="mt-6">
                 <DocumentList
                     propertyId={propertyId}
-                    documents={property.documents.map((d) => ({
-                        ...d,
-                        createdAt: d.createdAt.toISOString(),
-                    }))}
+                    documents={documents}
                 />
             </div>
         </main >

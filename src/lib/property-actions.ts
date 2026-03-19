@@ -90,7 +90,7 @@ export async function getProperties() {
     return prisma.property.findMany({
         where: { organizationId: ctx.orgId },
         include: {
-            _count: { select: { units: true, documents: true } },
+            _count: { select: { units: true } },
             units: {
                 include: {
                     leases: {
@@ -125,7 +125,6 @@ export async function getProperty(propertyId: string) {
                 },
                 orderBy: { unitNumber: 'asc' },
             },
-            _count: { select: { documents: true } },
         },
     });
 }

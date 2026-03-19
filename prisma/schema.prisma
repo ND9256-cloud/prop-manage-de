@@ -96,7 +96,6 @@ model Property {
   organization   Organization @relation(fields: [organizationId], references: [id])
 
   units            Unit[]
-  documents        Document[]
   serviceProviders ServiceProvider[]
   bankTransactions BankTransaction[]
 
@@ -199,22 +198,6 @@ model VpiIndex {
 
   @@unique([year, month])
   @@index([year, month])
-}
-
-// Document - Files stored in Supabase Storage, linked to a property
-model Document {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String   // Original filename or user-given name
-  type        String   // "contract", "invoice", "notice", "other"
-  storagePath String   // Path in Supabase storage bucket
-  fileSize    Int      // Bytes
-  mimeType    String   // "application/pdf", "image/jpeg", etc.
-
-  propertyId  String   @db.Uuid
-  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }
 
 // ServiceProvider - Utilities, insurance, taxes linked to a property

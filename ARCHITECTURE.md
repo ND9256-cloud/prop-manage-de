@@ -22,12 +22,6 @@ Read this before writing any code. No exceptions.
 
 **Key rule:** Warehouse code never reads or writes `pm.*` directly. Everything goes through `connector.resolve()` and `connector.apply()`.
 
-## Legacy — do not use
-
-- `public.Document` (the Prisma Document model) is **DEPRECATED**. Use `warehouse.documents` instead.
-- Do not import, reference, or extend the Document model from Prisma.
-- This model is scheduled for deletion.
-
 ## Pipeline
 
 - `process-document` is a **Supabase Edge Function** (`supabase/functions/process-document/index.ts`), not a Next.js API route.
