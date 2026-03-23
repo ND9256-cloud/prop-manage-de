@@ -92,6 +92,9 @@ model Property {
   yearBuilt Int?
   type      PropertyType
 
+  unit_count Int?
+  total_sqm  Decimal?
+
   organizationId String   @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
 
@@ -298,8 +301,9 @@ model Membership {
   id        String         @id @default(uuid()) @db.Uuid
   userId    String         @db.Uuid
   orgId     String         @db.Uuid
-  role      MembershipRole @default(manager)
-  createdAt DateTime       @default(now())
+  role       MembershipRole @default(manager)
+  createdAt  DateTime       @default(now())
+  lastSeenAt DateTime?      @map("last_seen_at")
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [orgId], references: [id])
