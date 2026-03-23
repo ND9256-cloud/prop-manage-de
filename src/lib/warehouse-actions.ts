@@ -72,30 +72,52 @@ export async function logAuditEvent({
 
 export async function getWarehouseOverview() {
     const orgId = await getOrgId();
-    if (!orgId) return { error: 'Not authenticated', stats: null, propertyCards: [] };
+    if (!orgId) return { error: 'Not authenticated', stats: null, propertyCards: [], role: 'viewer' as const };
 
     const db = warehouseDb(orgId);
 
+    // Fetch role
+    const ctx = await getOrgContext();
+    const role = ctx.role;
+
     // Fetch all documents for this org
     const { data: docs } = await db.from('documents')
-        .select('id, status, property_id, category, created_at')
+        .select('id, status, property_id, category, doc_type, created_at')
         .eq('org_id', orgId)
         .neq('status', 'deleted');
 
     const allDocs = docs || [];
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+    // Helper: classify a doc into a bucket
+    const isPhoto = (d: { doc_type: string | null }) => d.doc_type === 'foto';
+    const isUnknown = (d: { doc_type: string | null }) => d.doc_type === 'unknown';
+    const isFailed = (d: { status: string }) => d.status === 'failed';
+
+    // Bucket classification (excludes fotos and unknowns)
+    const classifyBucket = (d: { category: string | null; doc_type: string | null }) => {
+        if (isPhoto(d) || isUnknown(d)) return null;
+        if (d.category === 'kosten_rechnungen' && !d.doc_type?.startsWith('versicherung')) return 'kosten';
+        if (d.category === 'vertraege' || d.doc_type?.startsWith('versicherung')) return 'versicherungen_vertraege';
+        if (d.category === 'behoerden') return 'behoerden';
+        return 'sonstiges';
+    };
+
+    // Docs excluding fotos and unknowns for total count
+    const countableDocs = allDocs.filter(d => !isPhoto(d) && !isUnknown(d));
 
     // Global stats
     const stats = {
-        total: allDocs.length,
-        needs_review: allDocs.filter(d => d.status === 'needs_review').length,
-        applied_this_month: allDocs.filter(
-            d => d.status === 'applied' && d.created_at >= monthStart
+        total: countableDocs.length,
+        needs_review: countableDocs.filter(d => d.status === 'needs_review').length,
+        applied_this_month: countableDocs.filter(
+            d => d.status === 'applied' && d.created_at >= new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
         ).length,
         properties_with_docs: new Set(
-            allDocs.filter(d => d.property_id).map(d => d.property_id)
+            countableDocs.filter(d => d.property_id).map(d => d.property_id)
         ).size,
+        photos: allDocs.filter(isPhoto).length,
+        failed: allDocs.filter(isFailed).length,
+        unknown: allDocs.filter(isUnknown).length,
     };
 
     // Fetch all properties
@@ -107,14 +129,19 @@ export async function getWarehouseOverview() {
     // Build per-property card data
     const propertyCards = properties.map(p => {
         const propDocs = allDocs.filter(d => d.property_id === p.id);
-        const needsReview = propDocs.filter(d => d.status === 'needs_review').length;
-        const appliedThisMonth = propDocs.filter(
-            d => d.status === 'applied' && d.created_at >= monthStart
-        ).length;
-        const categories = new Set(propDocs.filter(d => d.category).map(d => d.category));
+        const propCountable = propDocs.filter(d => !isPhoto(d) && !isUnknown(d));
+        const needsReview = propCountable.filter(d => d.status === 'needs_review').length;
+        const failed = propDocs.filter(isFailed).length;
+        const photos = propDocs.filter(isPhoto).length;
+
+        const buckets = { kosten: 0, versicherungen_vertraege: 0, behoerden: 0, sonstiges: 0 };
+        for (const d of propCountable) {
+            const bucket = classifyBucket(d);
+            if (bucket) buckets[bucket]++;
+        }
 
         let statusDot: 'red' | 'green' | 'gray' = 'gray';
-        if (propDocs.length === 0) statusDot = 'gray';
+        if (propCountable.length === 0) statusDot = 'gray';
         else if (needsReview > 0) statusDot = 'red';
         else statusDot = 'green';
 
@@ -123,15 +150,16 @@ export async function getWarehouseOverview() {
             name: p.name,
             address: p.address,
             shortCode: (p as Record<string, unknown>).short_code as string | null,
-            totalDocs: propDocs.length,
+            totalDocs: propCountable.length,
             needsReview,
-            appliedThisMonth,
-            categoriesUsed: categories.size,
+            failed,
+            photos,
+            buckets,
             statusDot,
         };
     });
 
-    return { error: null, stats, propertyCards };
+    return { error: null, stats, propertyCards, role };
 }
 
 export async function getOpenReviewCount() {

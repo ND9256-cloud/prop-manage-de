@@ -16,12 +16,13 @@ import { uploadWarehouseDocument } from '@/lib/warehouse-actions';
 import {
     FileText,
     AlertTriangle,
-    CheckCircle2,
-    FolderOpen,
     Building2,
     Upload,
     ClipboardList,
     X,
+    Camera,
+    AlertCircle,
+    XCircle,
 } from 'lucide-react';
 
 type PropertyCard = {
@@ -31,8 +32,14 @@ type PropertyCard = {
     shortCode: string | null;
     totalDocs: number;
     needsReview: number;
-    appliedThisMonth: number;
-    categoriesUsed: number;
+    failed: number;
+    photos: number;
+    buckets: {
+        kosten: number;
+        versicherungen_vertraege: number;
+        behoerden: number;
+        sonstiges: number;
+    };
     statusDot: 'red' | 'green' | 'gray';
 };
 
@@ -41,15 +48,19 @@ type Stats = {
     needs_review: number;
     applied_this_month: number;
     properties_with_docs: number;
+    photos: number;
+    failed: number;
+    unknown: number;
 };
 
 type Props = {
     stats: Stats;
     propertyCards: PropertyCard[];
     reviewCount: number;
+    role: string;
 };
 
-export default function PropertySelection({ stats, propertyCards, reviewCount }: Props) {
+export default function PropertySelection({ stats, propertyCards, reviewCount, role }: Props) {
     const router = useRouter();
     const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [dragging, setDragging] = useState(false);
@@ -57,6 +68,8 @@ export default function PropertySelection({ stats, propertyCards, reviewCount }:
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [selectedPropertyId, setSelectedPropertyId] = useState('');
     const [uploading, setUploading] = useState(false);
+
+    const isOperator = role === 'service_operator' || role === 'owner';
 
     const onDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -132,59 +145,45 @@ export default function PropertySelection({ stats, propertyCards, reviewCount }:
                     <h1 className="text-2xl font-bold">Warehouse</h1>
                     <p className="text-sm text-muted-foreground">Dokumentenverwaltung</p>
                 </div>
-                <Button
-                    variant="outline"
-                    onClick={() => router.push('/dashboard/warehouse/review')}
-                    className="relative"
-                >
-                    <ClipboardList className="mr-2 h-4 w-4" />
-                    Review Queue
-                    {reviewCount > 0 && (
-                        <Badge className="ml-2 bg-amber-500 text-white hover:bg-amber-600">
-                            {reviewCount}
-                        </Badge>
-                    )}
-                </Button>
+                {role !== 'viewer' && (
+                    <Button
+                        variant="outline"
+                        onClick={() => router.push('/dashboard/warehouse/review')}
+                        className="relative"
+                    >
+                        <ClipboardList className="mr-2 h-4 w-4" />
+                        Review Queue
+                        {reviewCount > 0 && (
+                            <Badge className="ml-2 bg-amber-500 text-white hover:bg-amber-600">
+                                {reviewCount}
+                            </Badge>
+                        )}
+                    </Button>
+                )}
             </div>
 
-            {/* Global stats bar */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-blue-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.total}</p>
-                            <p className="text-xs text-muted-foreground">Dokumente gesamt</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.needs_review}</p>
-                            <p className="text-xs text-muted-foreground">Prüfung nötig</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.applied_this_month}</p>
-                            <p className="text-xs text-muted-foreground">Angewendet (Monat)</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <Building2 className="h-5 w-5 text-indigo-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.properties_with_docs}</p>
-                            <p className="text-xs text-muted-foreground">Immobilien mit Dokumenten</p>
-                        </div>
-                    </CardContent>
-                </Card>
+            {/* Portfolio bar */}
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <Building2 className="h-4 w-4" />
+                <span className="font-medium text-foreground">{propertyCards.length}</span> Objekte
+                <span className="mx-1">&middot;</span>
+                <FileText className="h-4 w-4" />
+                <span className="font-medium text-foreground">{stats.total}</span> Dokumente
+                <span className="mx-1">&middot;</span>
+                <Camera className="h-4 w-4" />
+                <span className="font-medium text-foreground">{stats.photos}</span> Fotos
+                {isOperator && stats.needs_review > 0 && (
+                    <>
+                        <span className="mx-1">&middot;</span>
+                        <span className="font-medium text-amber-600">{stats.needs_review} zur Prüfung</span>
+                    </>
+                )}
+                {isOperator && stats.failed > 0 && (
+                    <>
+                        <span className="mx-1">&middot;</span>
+                        <span className="font-medium text-red-600">{stats.failed} fehlgeschlagen</span>
+                    </>
+                )}
             </div>
 
             {/* Property cards grid */}
@@ -221,27 +220,47 @@ export default function PropertySelection({ stats, propertyCards, reviewCount }:
                                         </Badge>
                                     )}
                                 </CardHeader>
-                                <CardContent className="pt-0">
-                                    <div className="grid grid-cols-2 gap-2 text-sm">
-                                        <div className="flex items-center gap-1.5">
-                                            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span>{p.totalDocs} Dokumente</span>
+                                <CardContent className="pt-0 space-y-2">
+                                    {/* Category rows */}
+                                    <div className="space-y-1 text-sm">
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Kosten</span>
+                                            <span className="font-medium">{p.buckets.kosten}</span>
                                         </div>
-                                        <div
-                                            className={`flex items-center gap-1.5 ${p.needsReview > 0 ? 'text-amber-600 font-medium' : ''
-                                                }`}
-                                        >
-                                            <AlertTriangle className="h-3.5 w-3.5" />
-                                            <span>{p.needsReview} Prüfung</span>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Versicherungen & Verträge</span>
+                                            <span className="font-medium">{p.buckets.versicherungen_vertraege}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                                            <span>{p.appliedThisMonth} Angewendet</span>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Behörden</span>
+                                            <span className="font-medium">{p.buckets.behoerden}</span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                                            <span>{p.categoriesUsed} Kategorien</span>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Sonstiges</span>
+                                            <span className="font-medium">{p.buckets.sonstiges}</span>
                                         </div>
+                                    </div>
+
+                                    {/* Operator badges */}
+                                    {role !== 'viewer' && (p.needsReview > 0 || p.failed > 0) && (
+                                        <div className="flex gap-2 pt-1">
+                                            {p.needsReview > 0 && (
+                                                <Badge variant="outline" className="text-amber-600 border-amber-300">
+                                                    {p.needsReview} zur Prüfung
+                                                </Badge>
+                                            )}
+                                            {p.failed > 0 && (
+                                                <Badge variant="outline" className="text-red-600 border-red-300">
+                                                    {p.failed} fehlgeschlagen
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Footer: total doc count */}
+                                    <div className="pt-2 border-t text-xs text-muted-foreground flex items-center gap-1.5">
+                                        <FileText className="h-3.5 w-3.5" />
+                                        {p.totalDocs} Dokumente
                                     </div>
                                 </CardContent>
                             </Card>
@@ -250,30 +269,78 @@ export default function PropertySelection({ stats, propertyCards, reviewCount }:
                 )}
             </div>
 
-            {/* Global upload zone */}
-            <div
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${dragging
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                    : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-                    }`}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                onClick={() => document.getElementById('file-upload')?.click()}
-            >
-                <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-                <p className="font-medium">Dokument hochladen / Upload document</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                    Datei hierher ziehen oder klicken
-                </p>
-                <input
-                    id="file-upload"
-                    type="file"
-                    className="hidden"
-                    onChange={onFileSelect}
-                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                />
-            </div>
+            {/* Photo bar */}
+            {stats.photos > 0 && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
+                    <Camera className="h-4 w-4" />
+                    <span>{stats.photos} Fotos im Archiv</span>
+                </div>
+            )}
+
+            {/* Attention section (operator only) */}
+            {isOperator && (stats.unknown > 0 || stats.failed > 0 || stats.needs_review > 0) && (
+                <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
+                    <CardContent className="p-4 space-y-2">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                            Handlungsbedarf
+                        </h3>
+                        <div className="flex flex-wrap gap-3 text-sm">
+                            {stats.unknown > 0 && (
+                                <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    {stats.unknown} nicht klassifiziert
+                                </span>
+                            )}
+                            {stats.failed > 0 && (
+                                <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                                    <XCircle className="h-3.5 w-3.5" />
+                                    {stats.failed} fehlgeschlagen
+                                </span>
+                            )}
+                            {stats.needs_review > 0 && (
+                                <Button
+                                    variant="link"
+                                    className="h-auto p-0 text-sm text-amber-700 dark:text-amber-400"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push('/dashboard/warehouse/inbox');
+                                    }}
+                                >
+                                    {stats.needs_review} zur Prüfung
+                                </Button>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Global upload zone (hidden for viewers) */}
+            {role !== 'viewer' && (
+                <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer ${dragging
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
+                        : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                        }`}
+                    onDragOver={onDragOver}
+                    onDragLeave={onDragLeave}
+                    onDrop={onDrop}
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                    <Upload className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
+                    <p className="font-medium">Dokument hochladen / Upload document</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                        Datei hierher ziehen oder klicken
+                    </p>
+                    <input
+                        id="file-upload"
+                        type="file"
+                        className="hidden"
+                        onChange={onFileSelect}
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                    />
+                </div>
+            )}
 
             {/* Upload modal */}
             {showModal && (
