@@ -94,6 +94,7 @@ model Property {
 
   unit_count Int?
   total_sqm  Decimal?
+  short_code String?
 
   organizationId String   @db.Uuid
   organization   Organization @relation(fields: [organizationId], references: [id])
