@@ -168,12 +168,12 @@ export async function getOpenReviewCount() {
 
     const db = warehouseDb(orgId);
 
-    const { data } = await db.from('review_tasks')
-        .select('id')
+    const { count } = await db.from('documents')
+        .select('*', { count: 'exact', head: true })
         .eq('org_id', orgId)
-        .eq('status', 'open');
+        .eq('status', 'needs_review');
 
-    return data?.length || 0;
+    return count ?? 0;
 }
 
 

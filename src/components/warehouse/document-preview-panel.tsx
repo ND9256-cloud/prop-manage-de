@@ -263,7 +263,7 @@ export default function DocumentPreviewPanel({ documentId, onClose }: Props) {
                             {ext && (
                                 <Card>
                                     <CardContent className="p-4">
-                                        <ConfidenceBar score={ext.confidence_score} />
+                                        <ConfidenceBar score={ext.confidence_score * 100} />
                                     </CardContent>
                                 </Card>
                             )}

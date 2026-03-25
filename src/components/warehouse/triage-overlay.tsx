@@ -476,7 +476,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                                         : '—'}
                                                 </span>
                                             </div>
-                                            <ConfidenceBar score={confidence?.score ?? 0} />
+                                            <ConfidenceBar score={(confidence?.score ?? 0) * 100} />
                                             {confidence?.reason && (
                                                 <div className="flex gap-2">
                                                     <span className="text-muted-foreground text-xs">Grund:</span>

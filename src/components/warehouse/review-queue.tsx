@@ -230,7 +230,7 @@ function ReviewTaskCard({
                 {task.extraction && (
                     <div>
                         <p className="text-xs text-muted-foreground mb-1">Confidence</p>
-                        <ConfidenceBar score={task.extraction.confidence_score} />
+                        <ConfidenceBar score={task.extraction.confidence_score * 100} />
                     </div>
                 )}
 
