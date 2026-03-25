@@ -55,9 +55,13 @@ export async function getOrgId(): Promise<string | null> {
 
         if (!firstMembership) return null;
 
-        // Auto-set cookie on fallback
-        cookieStore.set('x-active-org', firstMembership.orgId, COOKIE_OPTIONS);
-        cookieStore.set('x-active-role', firstMembership.role, COOKIE_OPTIONS);
+        // Auto-set cookie on fallback — only works in Server Actions / Route Handlers
+        try {
+            cookieStore.set('x-active-org', firstMembership.orgId, COOKIE_OPTIONS);
+            cookieStore.set('x-active-role', firstMembership.role, COOKIE_OPTIONS);
+        } catch {
+            // Setting cookies not allowed in Server Components — still return the orgId
+        }
 
         return firstMembership.orgId;
     } catch {
@@ -117,9 +121,13 @@ export async function getOrgContext(): Promise<OrgContext> {
         });
 
         if (membership) {
-            // Auto-set cookies on fallback
-            cookieStore.set('x-active-org', membership.orgId, COOKIE_OPTIONS);
-            cookieStore.set('x-active-role', membership.role, COOKIE_OPTIONS);
+            // Auto-set cookies on fallback — only works in Server Actions / Route Handlers
+            try {
+                cookieStore.set('x-active-org', membership.orgId, COOKIE_OPTIONS);
+                cookieStore.set('x-active-role', membership.role, COOKIE_OPTIONS);
+            } catch {
+                // Setting cookies not allowed in Server Components
+            }
         }
     }
 
