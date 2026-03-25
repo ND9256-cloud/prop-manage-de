@@ -19,8 +19,8 @@ test.describe('Property Detail', () => {
   });
 
   test('tabs are visible: Dokumente Kosten Protokoll Stammdaten', async ({ page }) => {
-    for (const tab of ['Dokumente', 'Kosten', 'Protokoll', 'Stammdaten']) {
-      await expect(page.getByRole('tab', { name: tab }).or(page.getByText(tab, { exact: true }))).toBeVisible();
+    for (const tab of ['dokumente', 'kosten', 'protokoll', 'stammdaten']) {
+      await expect(page.locator(`a[href*="tab=${tab}"]`)).toBeVisible();
     }
   });
 

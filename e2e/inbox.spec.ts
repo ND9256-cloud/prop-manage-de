@@ -10,7 +10,7 @@ test.describe('Inbox', () => {
     await expect(page.getByRole('heading', { name: 'Posteingang' })).toBeVisible();
 
     // Stats cards are rendered
-    await expect(page.getByText('Dokumente gesamt')).toBeVisible();
+    await expect(page.getByText('Gesamt / Total')).toBeVisible();
 
     // Table has at least one document row
     const rows = page.locator('table tbody tr');
