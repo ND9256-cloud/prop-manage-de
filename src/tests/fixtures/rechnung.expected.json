@@ -1,0 +1,16 @@
+{
+  "doc_type": "rechnung",
+  "category": "kosten_rechnungen",
+  "confidence_score": 88.5,
+  "extracted_fields": {
+    "vendor_name": "Müller Sanitär GmbH",
+    "amount": 1234.56,
+    "currency": "EUR",
+    "invoice_date": "2025-06-15",
+    "invoice_number": "RE-2025-0847",
+    "description": "Rohrreparatur Badezimmer",
+    "category_hint": "instandhaltung",
+    "address_hint": "Berliner Straße 42",
+    "confidence_score": 88.5
+  }
+}

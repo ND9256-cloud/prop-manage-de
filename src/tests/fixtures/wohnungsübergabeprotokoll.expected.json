@@ -1,0 +1,18 @@
+{
+  "doc_type": "wohnungsübergabeprotokoll",
+  "category": "instandhaltung",
+  "confidence_score": 78.0,
+  "extracted_fields": {
+    "unit_ref": "WE-03",
+    "address_hint": "Berliner Straße 42",
+    "condition": "gut",
+    "meter_readings": {
+      "strom": 12345,
+      "gas": 6789,
+      "wasser": 234
+    },
+    "damages": [],
+    "inspection_date": "2025-01-15",
+    "confidence_score": 78.0
+  }
+}

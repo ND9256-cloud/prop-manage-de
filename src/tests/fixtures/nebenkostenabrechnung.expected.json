@@ -1,0 +1,16 @@
+{
+  "doc_type": "nebenkostenabrechnung",
+  "category": "kosten_rechnungen",
+  "confidence_score": 85.0,
+  "extracted_fields": {
+    "vendor_name": "Hausverwaltung Schmidt",
+    "amount": 2456.78,
+    "currency": "EUR",
+    "invoice_date": "2025-03-01",
+    "invoice_number": "NK-2024-FINAL",
+    "description": "Nebenkostenabrechnung 2024",
+    "category_hint": "betriebskosten",
+    "address_hint": "Berliner Straße 42",
+    "confidence_score": 85.0
+  }
+}

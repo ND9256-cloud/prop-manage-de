@@ -1,0 +1,22 @@
+[
+  {
+    "doc_type": "mietvertrag",
+    "document_id": "00000000-a01d-0001-0000-000000000001",
+    "description": "Standard residential lease agreement"
+  },
+  {
+    "doc_type": "rechnung",
+    "document_id": "00000000-a01d-0001-0000-000000000002",
+    "description": "Vendor invoice for maintenance work"
+  },
+  {
+    "doc_type": "nebenkostenabrechnung",
+    "document_id": "00000000-a01d-0001-0000-000000000003",
+    "description": "Annual utility cost settlement"
+  },
+  {
+    "doc_type": "wohnungsübergabeprotokoll",
+    "document_id": "00000000-a01d-0001-0000-000000000004",
+    "description": "Unit handover inspection report"
+  }
+]
