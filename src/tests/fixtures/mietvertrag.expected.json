@@ -1,19 +1,29 @@
 {
   "doc_type": "mietvertrag",
   "category": "vertraege",
-  "confidence_score": 92.0,
+  "subcategory": "mietvertrag",
   "extracted_fields": {
-    "tenant_first_name": "Max",
-    "tenant_last_name": "Mustermann",
-    "unit_ref": "WE-03",
-    "address_street": "Berliner Straße",
-    "address_number": "42",
-    "address_zip": "10115",
-    "rent_cold": 850.0,
-    "rent_warm": 1050.0,
-    "lease_start": "2025-01-01",
-    "lease_end": "2027-12-31",
-    "deposit": 2550.0,
-    "confidence_score": 92.0
-  }
+    "deposit": null,
+    "unit_ref": "",
+    "lease_end": null,
+    "rent_cold": 0,
+    "rent_warm": null,
+    "address_zip": "34121",
+    "lease_start": "2015-05-08",
+    "address_city": "Kassel",
+    "tenant_email": null,
+    "address_number": "55A",
+    "address_street": "Heinrich-Heine-Str.",
+    "missing_fields": [
+      "rent_cold",
+      "rent_warm",
+      "deposit",
+      "lease_end",
+      "unit_ref"
+    ],
+    "confidence_score": 0.4,
+    "tenant_last_name": "Weber",
+    "tenant_first_name": "Lydia"
+  },
+  "confidence_score": 0.4
 }

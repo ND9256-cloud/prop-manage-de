@@ -1,0 +1,30 @@
+{
+  "doc_type": "grundbuchauszug",
+  "category": "rechtliches",
+  "subcategory": null,
+  "extracted_fields": {
+    "summary": "Property ownership transfer registration notice from notary office Horn & Blum regarding conditional ownership transfer to Denn Immobilienverwaltung eGbR. Land registry registration for residential property in Kassel.",
+    "key_dates": [
+      "01.09.2025",
+      "19.09.2025",
+      "01.10.2025"
+    ],
+    "key_amounts": [],
+    "address_hint": "Heinrich-Heine-Straße 55 A, 34121 Kassel; Cappusstraße 24, 72172 Sulz am Neckar; Brüder-Grimm-Platz 4, 34117 Kassel",
+    "missing_fields": [
+      "purchase_price",
+      "property_value",
+      "lease_terms",
+      "tenant_information"
+    ],
+    "confidence_score": 0.85,
+    "parties_mentioned": [
+      "Denn Immobilienverwaltung eGbR",
+      "Bernhardt, Cornelia (geb. Zorzendek)",
+      "Horn & Blum (law firm and notary)",
+      "Udo Horn (notary)",
+      "Jörg Blum"
+    ]
+  },
+  "confidence_score": 0.85
+}

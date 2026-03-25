@@ -1,0 +1,26 @@
+{
+  "doc_type": "unknown",
+  "category": "rechtliches",
+  "subcategory": null,
+  "extracted_fields": {
+    "summary": "Document appears to be a reference or case number document with minimal property management content",
+    "key_dates": [],
+    "key_amounts": [],
+    "address_hint": null,
+    "missing_fields": [
+      "property_address",
+      "tenant_information",
+      "landlord_information",
+      "lease_terms",
+      "rent_amount",
+      "payment_dates",
+      "maintenance_requests",
+      "inspection_dates",
+      "violation_details",
+      "document_type"
+    ],
+    "confidence_score": 0.1,
+    "parties_mentioned": []
+  },
+  "confidence_score": 0.1
+}

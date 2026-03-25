@@ -1,16 +1,19 @@
 {
   "doc_type": "rechnung",
   "category": "kosten_rechnungen",
-  "confidence_score": 88.5,
+  "subcategory": "sonstiges",
   "extracted_fields": {
-    "vendor_name": "Müller Sanitär GmbH",
-    "amount": 1234.56,
+    "amount": 118,
     "currency": "EUR",
-    "invoice_date": "2025-06-15",
-    "invoice_number": "RE-2025-0847",
-    "description": "Rohrreparatur Badezimmer",
-    "category_hint": "instandhaltung",
-    "address_hint": "Berliner Straße 42",
-    "confidence_score": 88.5
-  }
+    "unit_hint": "days",
+    "description": "Car rental - MAZDA MX-5 CAB BE MAN, 2 rental days, 902 km inclusive",
+    "vendor_name": "Sixt GmbH & Co. Autovermietung KG",
+    "address_hint": "Zugspitzstrasse 1, 82049 Pullach",
+    "invoice_date": "2023-07-15",
+    "category_hint": "other",
+    "invoice_number": "9496343365/00/M/00/N",
+    "missing_fields": [],
+    "confidence_score": 0.95
+  },
+  "confidence_score": 0.95
 }

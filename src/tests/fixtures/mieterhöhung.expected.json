@@ -1,0 +1,30 @@
+{
+  "doc_type": "mieterhöhung",
+  "category": "vertraege",
+  "subcategory": "mietanpassung",
+  "extracted_fields": {
+    "deposit": null,
+    "unit_ref": "",
+    "lease_end": null,
+    "rent_cold": 470,
+    "rent_warm": null,
+    "address_zip": "34270",
+    "lease_start": "",
+    "address_city": "Schauenburg",
+    "tenant_email": null,
+    "address_number": "132",
+    "address_street": "Korbacher Straße",
+    "missing_fields": [
+      "tenant_email",
+      "unit_ref",
+      "lease_start",
+      "lease_end",
+      "deposit",
+      "rent_warm"
+    ],
+    "confidence_score": 0.65,
+    "tenant_last_name": "Kuru",
+    "tenant_first_name": "Saniye"
+  },
+  "confidence_score": 0.65
+}

@@ -1,0 +1,28 @@
+{
+  "doc_type": "energieausweis",
+  "category": "medien",
+  "subcategory": "energieausweis",
+  "extracted_fields": {
+    "summary": "Building volume calculation (Umbauter Raum) for property at Korbacher Straße 132, Elgershausen. Breakdown by floor level with dimensions and calculated volumes.",
+    "key_dates": [],
+    "key_amounts": [
+      "1345.59 (total cubic meters)",
+      "301.79 (basement subtotal)",
+      "380.52 (ground floor subtotal)",
+      "367.40 (first floor subtotal)",
+      "295.89 (attic floor subtotal)"
+    ],
+    "address_hint": "Elgershausen, Korbacher Straße 132",
+    "missing_fields": [
+      "property_owner",
+      "tenant_information",
+      "rent_amount",
+      "lease_dates",
+      "management_company",
+      "contact_information"
+    ],
+    "confidence_score": 0.85,
+    "parties_mentioned": []
+  },
+  "confidence_score": 0.85
+}

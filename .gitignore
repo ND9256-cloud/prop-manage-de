@@ -44,3 +44,5 @@ next-env.d.ts
 .env*.local
 scripts/debug-sp.ts
 supabase/.temp/
+supabase/.temp/
+.claude/

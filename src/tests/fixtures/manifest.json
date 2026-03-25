@@ -1,22 +1,82 @@
 [
   {
-    "doc_type": "mietvertrag",
-    "document_id": "00000000-a01d-0001-0000-000000000001",
-    "description": "Standard residential lease agreement"
-  },
-  {
+    "document_id": "d54d0d56-a285-410d-b367-88d6b6316a88",
     "doc_type": "rechnung",
-    "document_id": "00000000-a01d-0001-0000-000000000002",
-    "description": "Vendor invoice for maintenance work"
+    "file_name": "rechnung.expected.json"
   },
   {
+    "document_id": "5dc5a989-5e99-4fa1-a7ba-ad5761c514d2",
+    "doc_type": "handwerkerrechnung",
+    "file_name": "handwerkerrechnung.expected.json"
+  },
+  {
+    "document_id": "922ca50b-c5e2-4f0c-b491-c4ee54b08ad9",
+    "doc_type": "mietvertrag",
+    "file_name": "mietvertrag.expected.json"
+  },
+  {
+    "document_id": "8c8029cd-6be4-4333-a4b8-50d14f1c5376",
     "doc_type": "nebenkostenabrechnung",
-    "document_id": "00000000-a01d-0001-0000-000000000003",
-    "description": "Annual utility cost settlement"
+    "file_name": "nebenkostenabrechnung.expected.json"
   },
   {
+    "document_id": "972c0fab-f643-40e3-a8b2-41de4cacceaa",
+    "doc_type": "heizkostenabrechnung",
+    "file_name": "heizkostenabrechnung.expected.json"
+  },
+  {
+    "document_id": "d6795bfa-ad96-4cce-9b52-7419dd700337",
+    "doc_type": "grundsteuerbescheid",
+    "file_name": "grundsteuerbescheid.expected.json"
+  },
+  {
+    "document_id": "fe00f45b-0d62-4dee-bd03-2748e0012ab0",
+    "doc_type": "versicherungspolice",
+    "file_name": "versicherungspolice.expected.json"
+  },
+  {
+    "document_id": "4cd48895-996f-4769-baed-1c1c8738eda2",
+    "doc_type": "kündigung",
+    "file_name": "kündigung.expected.json"
+  },
+  {
+    "document_id": "9ede7354-9e64-400b-b7aa-c2520bd0e4a5",
+    "doc_type": "mieterhöhung",
+    "file_name": "mieterhöhung.expected.json"
+  },
+  {
+    "document_id": "12a1ae93-e6e4-47e8-af6a-2f0a50ccf5ae",
+    "doc_type": "grundbuchauszug",
+    "file_name": "grundbuchauszug.expected.json"
+  },
+  {
+    "document_id": "93692e39-779c-4488-96a0-46c5bcfd7108",
+    "doc_type": "energieausweis",
+    "file_name": "energieausweis.expected.json"
+  },
+  {
+    "document_id": "f737e64b-ab8a-4275-b2e8-131f492d8a37",
+    "doc_type": "gesellschaftsvertrag",
+    "file_name": "gesellschaftsvertrag.expected.json"
+  },
+  {
+    "document_id": "667f02c6-639a-4751-afd3-2314ebaf07ff",
     "doc_type": "wohnungsübergabeprotokoll",
-    "document_id": "00000000-a01d-0001-0000-000000000004",
-    "description": "Unit handover inspection report"
+    "file_name": "wohnungsübergabeprotokoll.expected.json"
+  },
+  {
+    "document_id": "47757fe7-e3c8-4fc9-bfc2-3fcf774c7141",
+    "doc_type": "darlehensvertrag",
+    "file_name": "darlehensvertrag.expected.json"
+  },
+  {
+    "document_id": "17cbb225-208e-470b-8380-ae4aff642cc5",
+    "doc_type": "foto",
+    "file_name": "foto.expected.json"
+  },
+  {
+    "document_id": "334c3d81-9fbb-4b81-abcc-4383a341f966",
+    "doc_type": "unknown",
+    "file_name": "unknown.expected.json"
   }
 ]

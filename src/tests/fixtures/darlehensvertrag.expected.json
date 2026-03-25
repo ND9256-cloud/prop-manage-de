@@ -1,0 +1,33 @@
+{
+  "doc_type": "darlehensvertrag",
+  "category": "rechtliches",
+  "subcategory": null,
+  "extracted_fields": {
+    "summary": "Financing approval letter from Kasseler Sparkasse for property investment. Loan approval conditional on security arrangements and required documentation submission. Property is a three-family house requiring valuation.",
+    "key_dates": [
+      "19.08.2025",
+      "09.09.2025"
+    ],
+    "key_amounts": [],
+    "address_hint": "Schauenburg, Korbacher Str. 132",
+    "missing_fields": [
+      "loan_amount",
+      "interest_rate",
+      "loan_term",
+      "monthly_payment",
+      "property_type_details",
+      "loan_purpose_specific"
+    ],
+    "confidence_score": 0.85,
+    "parties_mentioned": [
+      "Kasseler Sparkasse",
+      "Nils Denn",
+      "Thomas Denn",
+      "Denn & Denn Verwaltungs GbR",
+      "Daniela Ernst",
+      "Katja Kausch",
+      "Angelika Carl"
+    ]
+  },
+  "confidence_score": 0.85
+}

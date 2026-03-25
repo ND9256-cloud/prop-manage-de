@@ -1,0 +1,35 @@
+{
+  "doc_type": "grundsteuerbescheid",
+  "category": "behoerden",
+  "subcategory": "steuerbescheid",
+  "extracted_fields": {
+    "summary": "Tax-favored housing recognition notice (Anerkennungsbescheid) for 3 rental apartments in Schauenburg. Property is classified as extension (Erweiterung) with garages included. All units reached occupancy readiness on 01.02.1986 and became tax-favored from 01.01.1987.",
+    "key_dates": [
+      "12.01.1987",
+      "09.02.1987",
+      "01.02.1986",
+      "01.01.1987"
+    ],
+    "key_amounts": [
+      "35.68",
+      "100.61",
+      "35.61",
+      "99.79",
+      "30.24",
+      "80.79"
+    ],
+    "address_hint": "Korbacher Straße 132, 3501 Schauenburg, Elgershausen Fl. 1 Flst. 355/65, Grundbuch Band 52 Blatt 1579",
+    "missing_fields": [
+      "property_owner_confirmation",
+      "total_acquisition_cost",
+      "financing_details",
+      "lease_terms"
+    ],
+    "confidence_score": 0.85,
+    "parties_mentioned": [
+      "Kurt Denn",
+      "Herr Höhle"
+    ]
+  },
+  "confidence_score": 0.85
+}

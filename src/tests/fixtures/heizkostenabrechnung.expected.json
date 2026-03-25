@@ -1,0 +1,19 @@
+{
+  "doc_type": "heizkostenabrechnung",
+  "category": "kosten_rechnungen",
+  "subcategory": "heizkosten",
+  "extracted_fields": {
+    "amount": 4856.57,
+    "currency": "EUR",
+    "unit_hint": "280.0 m²",
+    "description": "Heating and hot water cost settlement for property Korbacher Str. 132, period 01.01.2023 - 31.12.2023",
+    "vendor_name": "BRUNATA-METRONA GmbH",
+    "address_hint": "Korbacher Str. 132, 34270 Schauenburg-Elgershausen",
+    "invoice_date": "2024-03-30",
+    "category_hint": "utilities",
+    "invoice_number": "5093307",
+    "missing_fields": [],
+    "confidence_score": 0.95
+  },
+  "confidence_score": 0.95
+}

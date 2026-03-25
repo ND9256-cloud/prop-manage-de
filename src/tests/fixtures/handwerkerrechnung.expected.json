@@ -1,0 +1,19 @@
+{
+  "doc_type": "handwerkerrechnung",
+  "category": "kosten_rechnungen",
+  "subcategory": "instandhaltung",
+  "extracted_fields": {
+    "amount": 150.65,
+    "currency": "EUR",
+    "unit_hint": null,
+    "description": "Jahresrechnung - Schornsteinfeger Inspektionen und Überprüfungen: Grundwert Zusammenlegung, Abgasleitung Überprüfung, Abgaswegeüberprüfung Gashz, Feuerstättenschau, Wärmedämmung Überprüfung, regelungstechnische Ausstattung Überprüfung Heizungsanlagen",
+    "vendor_name": "Florian Reitze - Schornsteinfegermeister",
+    "address_hint": "Korbacherstr. 132, 34270 Schauenburg-Elgersh.",
+    "invoice_date": "2024-03-04",
+    "category_hint": "maintenance",
+    "invoice_number": "J-24-00797",
+    "missing_fields": [],
+    "confidence_score": 0.95
+  },
+  "confidence_score": 0.95
+}

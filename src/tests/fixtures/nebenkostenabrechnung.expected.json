@@ -1,16 +1,21 @@
 {
   "doc_type": "nebenkostenabrechnung",
   "category": "kosten_rechnungen",
-  "confidence_score": 85.0,
+  "subcategory": "betriebskosten",
   "extracted_fields": {
-    "vendor_name": "Hausverwaltung Schmidt",
-    "amount": 2456.78,
+    "amount": 2229.89,
     "currency": "EUR",
-    "invoice_date": "2025-03-01",
-    "invoice_number": "NK-2024-FINAL",
-    "description": "Nebenkostenabrechnung 2024",
-    "category_hint": "betriebskosten",
-    "address_hint": "Berliner Straße 42",
-    "confidence_score": 85.0
-  }
+    "unit_hint": null,
+    "description": "Nebenkostenabrechnung 2024 - Familie Kuru (Wasser, Abwasser, Niederschlagswasser, Müllabfuhr, Strom, Grundsteuer, Versicherungen, Heiz- und Warmwasserkosten)",
+    "vendor_name": "Denn & Denn Verwaltungs GbR",
+    "address_hint": "Cappusstr. 24, 72172 Sulz",
+    "invoice_date": "2025-07-20",
+    "category_hint": "utilities",
+    "invoice_number": null,
+    "missing_fields": [
+      "invoice_number"
+    ],
+    "confidence_score": 0.95
+  },
+  "confidence_score": 0.95
 }

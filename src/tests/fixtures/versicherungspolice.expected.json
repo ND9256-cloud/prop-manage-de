@@ -1,0 +1,40 @@
+{
+  "doc_type": "versicherungspolice",
+  "category": "kosten_rechnungen",
+  "subcategory": "versicherung",
+  "extracted_fields": {
+    "summary": "Comparison document of residential building insurance (Wohngebäudeversicherung) between VGB 2023 Classic (new offer) and VGB 2018 Classic (previous offer), highlighting coverage differences for garages, carports, outbuildings, wind turbines, natural hazards, and various service inclusions.",
+    "key_dates": [
+      "10.2023"
+    ],
+    "key_amounts": [
+      "20 m2",
+      "3 km",
+      "10 m",
+      "15 kWp",
+      "5000 €",
+      "500 €",
+      "100000 €",
+      "10000 €",
+      "1000 €",
+      "150 €",
+      "2 years",
+      "1 year",
+      "7 days"
+    ],
+    "address_hint": null,
+    "missing_fields": [
+      "property_address",
+      "policyholder_name",
+      "insurance_policy_number",
+      "effective_dates",
+      "premium_amounts",
+      "property_owner_details",
+      "coverage_limits",
+      "claim_contact_information"
+    ],
+    "confidence_score": 0.4,
+    "parties_mentioned": []
+  },
+  "confidence_score": 0.4
+}

@@ -1,18 +1,32 @@
 {
   "doc_type": "wohnungsübergabeprotokoll",
   "category": "instandhaltung",
-  "confidence_score": 78.0,
+  "subcategory": "uebergabe",
   "extracted_fields": {
-    "unit_ref": "WE-03",
-    "address_hint": "Berliner Straße 42",
-    "condition": "gut",
+    "damages": [
+      "Kitchen exhaust system not functioning properly",
+      "Main door seal defective and not airtight",
+      "Window frames extremely damaged with severe discoloration",
+      "Window sills extremely worn",
+      "Window hinges require permanent replacement",
+      "Heating system meter assignment errors"
+    ],
+    "unit_ref": null,
+    "address_hint": "Ulm",
     "meter_readings": {
-      "strom": 12345,
-      "gas": 6789,
-      "wasser": 234
+      "gas": null,
+      "water": null,
+      "electricity": null
     },
-    "damages": [],
-    "inspection_date": "2025-01-15",
-    "confidence_score": 78.0
-  }
+    "missing_fields": [
+      "meter_readings",
+      "unit_reference",
+      "specific_address",
+      "photographic_evidence"
+    ],
+    "inspection_date": "2014-01-07",
+    "confidence_score": 0.45,
+    "condition_summary": "Multiple issues identified: Kitchen exhaust problems, door sealing issues, window frame damage and deterioration, window hinges requiring replacement, heating system meter allocation errors, basement storage concerns, and shared cost allocation disputes regarding total floor area of 59.94 m²."
+  },
+  "confidence_score": 0.45
 }

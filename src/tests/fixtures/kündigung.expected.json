@@ -1,0 +1,30 @@
+{
+  "doc_type": "kündigung",
+  "category": "vertraege",
+  "subcategory": "kuendigung",
+  "extracted_fields": {
+    "deposit": null,
+    "unit_ref": null,
+    "lease_end": "2025-03-31",
+    "rent_cold": 0,
+    "rent_warm": null,
+    "address_zip": "34270",
+    "lease_start": null,
+    "address_city": "Schauenburg",
+    "tenant_email": null,
+    "address_number": "132",
+    "address_street": "Korbacherstr.",
+    "missing_fields": [
+      "tenant_email",
+      "unit_ref",
+      "rent_cold",
+      "rent_warm",
+      "deposit",
+      "lease_start"
+    ],
+    "confidence_score": 0.75,
+    "tenant_last_name": "Dajs",
+    "tenant_first_name": "Irina"
+  },
+  "confidence_score": 0.75
+}

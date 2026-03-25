@@ -1,0 +1,29 @@
+{
+  "doc_type": "gesellschaftsvertrag",
+  "category": "rechtliches",
+  "subcategory": null,
+  "extracted_fields": {
+    "summary": "Initial registration of Denn Immobilienverwaltung GbR, a civil law partnership for acquisition, ownership, rental, management and potential sale of multi-family houses and apartments. Two individual partners with individual representation authority.",
+    "key_dates": [
+      "07/08/2025 14:35",
+      "05.12.1994",
+      "06.05.1992"
+    ],
+    "key_amounts": [],
+    "address_hint": "Cappusstraße 24, Sulz am Neckar 72172, Germany",
+    "missing_fields": [
+      "registration_number",
+      "property_details",
+      "financial_amounts",
+      "lease_terms"
+    ],
+    "confidence_score": 0.95,
+    "parties_mentioned": [
+      "Thomas Denn",
+      "Nils Denn",
+      "Franziska Ruppert",
+      "Notare Lorenz & Schmid"
+    ]
+  },
+  "confidence_score": 0.95
+}
