@@ -12,6 +12,9 @@
 
 # testing
 /coverage
+/e2e/.auth/
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -38,7 +41,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 /src/generated/prisma
 .env*.local
