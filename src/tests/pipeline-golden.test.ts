@@ -1,3 +1,5 @@
+require('dotenv').config({ path: '.env.local' });
+
 /**
  * Pipeline Golden File Tests
  *
@@ -5,7 +7,7 @@
  * document_extractions rows in the warehouse. Each fixture in manifest.json
  * defines a document_id whose extraction is compared field-by-field.
  *
- * Run: DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config src/tests/run-golden.ts
+ * Run: npx tsx src/tests/run-golden.ts
  */
 
 import assert from 'node:assert';
@@ -27,12 +29,13 @@ const FIXTURES_DIR = join(__dirname, 'fixtures');
 interface ManifestEntry {
     doc_type: string;
     document_id: string;
-    description: string;
+    file_name: string;
 }
 
 interface ExpectedOutput {
     doc_type: string;
     category: string;
+    subcategory: string | null;
     confidence_score: number;
     extracted_fields: Record<string, unknown>;
 }

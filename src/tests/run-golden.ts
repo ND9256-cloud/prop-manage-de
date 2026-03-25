@@ -1,7 +1,9 @@
+require('dotenv').config({ path: '.env.local' });
+
 /**
  * Golden file test runner
  *
- * Run: DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config src/tests/run-golden.ts
+ * Run: npx tsx src/tests/run-golden.ts
  */
 
 import { runGoldenTests } from './pipeline-golden.test';
