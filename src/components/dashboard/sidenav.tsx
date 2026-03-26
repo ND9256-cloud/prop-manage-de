@@ -2,8 +2,6 @@ import Link from 'next/link';
 import {
     Home,
     Building,
-    Users,
-    Landmark,
     Inbox,
     ShieldCheck,
     UserCog,
@@ -70,8 +68,9 @@ const links = [
         icon: Building,
         roles: WRITE_ROLES,
     },
-    { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users, roles: WRITE_ROLES },
-    { name: 'Konten', href: '/dashboard/banking', icon: Landmark, roles: WRITE_ROLES },
+    // Phase 2 – hidden until ready
+    // { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users, roles: WRITE_ROLES },
+    // { name: 'Konten', href: '/dashboard/banking', icon: Landmark, roles: WRITE_ROLES },
     { name: 'Inbox', href: '/dashboard/warehouse/inbox', icon: Inbox, showBadge: true, roles: WRITE_ROLES },
     { name: 'Properties', href: '/dashboard/warehouse', icon: Building },
     { name: 'Protokoll', href: '/dashboard/warehouse/audit', icon: ShieldCheck, roles: WRITE_ROLES },
@@ -93,7 +92,7 @@ function NavLinks({ reviewCount, role }: { reviewCount: number; role: string }) 
                         >
                             <LinkIcon className="w-6" />
                             <p className="hidden md:block">{link.name}</p>
-                            {link.showBadge && reviewCount > 0 && (
+                            {link.showBadge && reviewCount > 0 && role !== 'viewer' && (
                                 <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 md:relative md:right-auto md:top-auto md:translate-y-0 md:ml-auto">
                                     <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                                     <span className="hidden md:inline text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
