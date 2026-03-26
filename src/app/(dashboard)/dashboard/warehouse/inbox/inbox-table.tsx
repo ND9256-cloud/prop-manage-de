@@ -271,7 +271,7 @@ export function InboxTable({
                                         {/* Confidence */}
                                         <TableCell className="py-3 px-4">
                                             {doc.confidence_score !== null ? (
-                                                <ConfidenceBar score={doc.confidence_score} />
+                                                <ConfidenceBar score={doc.confidence_score * 100} />
                                             ) : (
                                                 <span className="text-sm text-muted-foreground">—</span>
                                             )}
