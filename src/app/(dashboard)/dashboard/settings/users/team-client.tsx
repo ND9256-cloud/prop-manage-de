@@ -121,7 +121,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
         startTransition(async () => {
             const result = await updateMemberRole(userId, newRole);
             if (result.success) {
-                showFeedback('success', 'Rolle geändert / Role updated');
+                showFeedback('success', 'Rolle geändert');
                 router.refresh();
             } else {
                 showFeedback('error', result.error ?? 'Fehler');
@@ -136,7 +136,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
         startTransition(async () => {
             const result = await revokeMembership(userId);
             if (result.success) {
-                showFeedback('success', 'Mitglied entfernt / Member removed');
+                showFeedback('success', 'Mitglied entfernt');
                 router.refresh();
             } else {
                 showFeedback('error', result.error ?? 'Fehler');
@@ -148,7 +148,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
         startTransition(async () => {
             const result = await cancelInvitation(id);
             if (result.success) {
-                showFeedback('success', 'Einladung storniert / Invitation cancelled');
+                showFeedback('success', 'Einladung storniert');
                 router.refresh();
             } else {
                 showFeedback('error', result.error ?? 'Fehler');
@@ -160,7 +160,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
         startTransition(async () => {
             const result = await resendInvitation(id);
             if (result.success) {
-                showFeedback('success', 'Einladung erneut gesendet / Invitation resent');
+                showFeedback('success', 'Einladung erneut gesendet');
                 router.refresh();
             } else {
                 showFeedback('error', result.error ?? 'Fehler');
@@ -205,7 +205,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
             {/* Section 1 — Members */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Mitglieder / Members</CardTitle>
+                    <CardTitle className="text-base">Mitglieder</CardTitle>
                     <CardDescription>
                         {members.length} {members.length === 1 ? 'Mitglied' : 'Mitglieder'}
                     </CardDescription>
@@ -215,7 +215,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b bg-muted/50">
-                                    <th className="text-left p-3 font-medium">Name / E-Mail</th>
+                                    <th className="text-left p-3 font-medium">Name</th>
                                     <th className="text-left p-3 font-medium">Rolle</th>
                                     <th className="text-left p-3 font-medium">Seit</th>
                                     <th className="text-right p-3 font-medium">Aktionen</th>
@@ -306,12 +306,12 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
             {/* Section 2 — Pending Invitations */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Ausstehende Einladungen / Pending Invitations</CardTitle>
+                    <CardTitle className="text-base">Ausstehende Einladungen</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {invitations.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                            Keine ausstehenden Einladungen / No pending invitations
+                            Keine ausstehenden Einladungen
                         </p>
                     ) : (
                         <div className="overflow-x-auto">
@@ -375,7 +375,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
             {/* Section 3 — Invite Form */}
             <Card>
                 <CardHeader>
-                    <CardTitle className="text-base">Neues Mitglied einladen / Invite New Member</CardTitle>
+                    <CardTitle className="text-base">Neues Mitglied einladen</CardTitle>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleInvite} className="flex flex-col sm:flex-row gap-3">
@@ -398,10 +398,10 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="viewer">
-                                    {getRoleLabel('viewer')} / Client
+                                    {getRoleLabel('viewer')}
                                 </SelectItem>
                                 <SelectItem value="manager">
-                                    {getRoleLabel('manager')} / Manager
+                                    {getRoleLabel('manager')}
                                 </SelectItem>
                             </SelectContent>
                         </Select>
@@ -421,7 +421,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
             <Dialog open={!!revokeTarget} onOpenChange={(open) => !open && setRevokeTarget(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Mitglied entfernen / Remove Member</DialogTitle>
+                        <DialogTitle>Mitglied entfernen</DialogTitle>
                         <DialogDescription>
                             Möchten Sie <strong>{revokeTarget?.name || revokeTarget?.email}</strong> wirklich
                             aus der Organisation entfernen? Diese Aktion kann nicht rückgängig gemacht werden.
@@ -433,7 +433,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
                         </Button>
                         <Button variant="destructive" onClick={handleRevoke} disabled={isPending}>
                             {isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                            Entfernen / Remove
+                            Entfernen
                         </Button>
                     </DialogFooter>
                 </DialogContent>
