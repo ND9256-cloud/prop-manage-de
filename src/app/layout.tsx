@@ -38,7 +38,7 @@ export default async function RootLayout({
           <div>
             {session?.user ? (
               <div className="flex gap-4 items-center">
-                <span className="text-sm">Welcome, {session.user.name || session.user.email}</span>
+                <span className="text-sm">Willkommen, {session.user.name || session.user.email}</span>
                 <SignOut />
               </div>
             ) : (
