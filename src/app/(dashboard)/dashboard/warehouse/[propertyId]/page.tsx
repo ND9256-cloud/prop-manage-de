@@ -130,11 +130,11 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
             {/* ── Breadcrumb ── */}
             <nav className="flex items-center text-sm text-muted-foreground" aria-label="Breadcrumb">
                 <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
-                    Warehouse
+                    Dokumentenarchiv
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
                 <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
-                    Properties
+                    Immobilien
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
                 <span className="text-foreground font-medium">
