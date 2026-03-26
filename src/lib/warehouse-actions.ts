@@ -1186,10 +1186,10 @@ export async function getInboxDocuments({
     if (propertyIds.length > 0) {
         const properties = await prisma.property.findMany({
             where: { id: { in: propertyIds } },
-            select: { id: true, address: true },
+            select: { id: true, address: true, short_code: true },
         });
         propertiesMap = Object.fromEntries(
-            properties.map(p => [p.id, { address: p.address, short_code: (p as Record<string, unknown>).short_code as string | null }])
+            properties.map(p => [p.id, { address: p.address, short_code: p.short_code ?? null }])
         );
     }
 
