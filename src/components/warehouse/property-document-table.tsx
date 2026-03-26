@@ -119,9 +119,9 @@ export function PropertyDocumentTable({
             {/* Section header */}
             <div className="flex items-center justify-between">
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Alle Dokumente / All Documents
+                    Alle Dokumente
                 </h3>
-                <span className="text-xs text-muted-foreground">{total} Einträge</span>
+                <span className="text-xs text-muted-foreground">{total} Dokumente</span>
             </div>
 
             {/* Filter bar */}
@@ -130,7 +130,7 @@ export function PropertyDocumentTable({
                     <Input
                         className="w-[200px] text-sm"
                         placeholder="Dokument suchen..."
-                        aria-label="Dokument suchen / Search documents"
+                        aria-label="Dokument suchen"
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -144,7 +144,7 @@ export function PropertyDocumentTable({
                     value={currentFilters.category || 'all'}
                     onValueChange={(v) => updateFilter('cat', v)}
                 >
-                    <SelectTrigger className="w-[180px] text-sm" aria-label="Kategorie filtern / Filter by category">
+                    <SelectTrigger className="w-[180px] text-sm" aria-label="Kategorie filtern">
                         <SelectValue placeholder="Alle Kategorien..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -159,7 +159,7 @@ export function PropertyDocumentTable({
                     value={currentFilters.status || 'all'}
                     onValueChange={(v) => updateFilter('docStatus', v)}
                 >
-                    <SelectTrigger className="w-[160px] text-sm" aria-label="Status filtern / Filter by status">
+                    <SelectTrigger className="w-[160px] text-sm" aria-label="Status filtern">
                         <SelectValue placeholder="Alle Status..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -174,7 +174,7 @@ export function PropertyDocumentTable({
                     value={currentFilters.sort || 'newest'}
                     onValueChange={(v) => updateFilter('sort', v)}
                 >
-                    <SelectTrigger className="w-[160px] text-sm" aria-label="Sortierung / Sort order">
+                    <SelectTrigger className="w-[160px] text-sm" aria-label="Sortierung">
                         <SelectValue placeholder="Sortierung..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -190,22 +190,22 @@ export function PropertyDocumentTable({
                     <thead>
                         <tr className="border-b border-border bg-muted/50">
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Dokument / Document
+                                Dokument
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Kategorie / Category
+                                Kategorie
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                 Status
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Betrag / Amount
+                                Betrag
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Datum / Date
+                                Datum
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide w-8">
-                                <span className="sr-only">Quelle / Source</span>
+                                <span className="sr-only">Quelle</span>
                             </th>
                         </tr>
                     </thead>
@@ -215,7 +215,7 @@ export function PropertyDocumentTable({
                                 <td colSpan={6} className="text-center py-16">
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                         <FileText className="h-8 w-8" />
-                                        <p className="text-sm">Keine Dokumente / No documents</p>
+                                        <p className="text-sm">Keine Dokumente</p>
                                     </div>
                                 </td>
                             </tr>

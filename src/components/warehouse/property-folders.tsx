@@ -228,7 +228,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                             <AlertTriangle className="h-5 w-5 text-amber-600" />
                             <div>
                                 <p className="font-medium text-amber-800 dark:text-amber-200">
-                                    ⚠️ Nicht kategorisiert / Uncategorised
+                                    ⚠️ Nicht kategorisiert
                                 </p>
                                 <p className="text-sm text-amber-700 dark:text-amber-300">
                                     {unassignedCount} Dokument{unassignedCount !== 1 ? 'e' : ''} ohne Kategorie
@@ -259,7 +259,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 onClick={() => document.getElementById('prop-file-upload')?.click()}
             >
                 <Upload className="mx-auto h-6 w-6 text-muted-foreground mb-1" />
-                <p className="text-sm font-medium">Dokument zu {property.shortCode || property.address} hochladen</p>
+                <p className="text-sm font-medium">Dokument hochladen</p>
             </div>
 
             {/* Upload confirmation modal */}
