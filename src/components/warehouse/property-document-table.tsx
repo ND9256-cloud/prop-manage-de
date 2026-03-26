@@ -13,6 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { FileText, Search, Mail, Upload as UploadIcon, Globe } from 'lucide-react';
+import { CATEGORIES } from '@/lib/warehouse-categories';
 
 // ─── Types ────────────────────────────────────────────────────
 export interface PropertyDoc {
@@ -27,15 +28,10 @@ export interface PropertyDoc {
     vendorName: string | null;
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-    kosten_rechnungen: 'Rechnungen',
-    vertraege: 'Verträge',
-    finanzen: 'Finanzen',
-    versicherungen: 'Versicherungen',
-    steuern: 'Steuern',
-    kommunikation: 'Kommunikation',
-    sonstiges: 'Sonstiges',
-};
+function getCategoryLabel(key: string): string {
+    const cat = CATEGORIES.find((c) => c.key === key);
+    return cat?.de ?? key;
+}
 
 const STATUS_COLORS: Record<string, string> = {
     needs_review: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -155,8 +151,8 @@ export function PropertyDocumentTable({
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">Alle Kategorien</SelectItem>
-                        {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                        {CATEGORIES.map((c) => (
+                            <SelectItem key={c.key} value={c.key}>{c.de}</SelectItem>
                         ))}
                     </SelectContent>
                 </Select>
@@ -245,7 +241,7 @@ export function PropertyDocumentTable({
                                     <td className="px-4 py-3">
                                         {doc.category ? (
                                             <Badge variant="outline" className="text-xs">
-                                                {CATEGORY_LABELS[doc.category] ?? doc.category}
+                                                {getCategoryLabel(doc.category)}
                                             </Badge>
                                         ) : (
                                             <span className="text-muted-foreground text-xs">—</span>
