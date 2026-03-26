@@ -44,10 +44,10 @@ export default async function AuditPage({ searchParams }: PageProps) {
                     <ShieldCheck className="h-7 w-7 text-muted-foreground" />
                     <div>
                         <h1 className="text-2xl font-semibold text-foreground">
-                            Aktivitätsprotokoll / Audit Log
+                            Aktivitätsprotokoll
                         </h1>
                         <p className="text-sm text-muted-foreground">
-                            Alle Aktionen in Ihrer Organisation / All organisation activity
+                            Alle Aktionen in Ihrer Organisation
                         </p>
                     </div>
                 </div>

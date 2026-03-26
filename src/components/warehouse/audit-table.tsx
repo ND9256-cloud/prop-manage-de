@@ -83,7 +83,7 @@ function detailSummary(evt: AuditEvent): string {
             return `${m.old_role ?? '?'} → ${m.new_role ?? '?'}`;
         case 'apply_failed':
         case 'processing_failed':
-            return 'Fehler / Error';
+            return 'Fehler';
         default:
             return '—';
     }
@@ -131,13 +131,13 @@ async function exportCsv(filters: {
 
 // ─── Type filter options ──────────────────────────────────────
 const TYPE_GROUPS = [
-    { value: 'uploaded', label: 'Hochgeladen / Uploaded' },
-    { value: 'applied', label: 'Verbucht / Applied' },
-    { value: 'quarantined', label: 'Quarantäne / Quarantined' },
-    { value: 'downloaded', label: 'Heruntergeladen / Downloaded' },
-    { value: 'apply_failed,processing_failed', label: 'Fehlgeschlagen / Failed' },
-    { value: 'invited', label: 'Eingeladen / Invited' },
-    { value: 'role_changed', label: 'Rolle geändert / Role changed' },
+    { value: 'uploaded', label: 'Hochgeladen' },
+    { value: 'applied', label: 'Verbucht' },
+    { value: 'quarantined', label: 'Quarantäne' },
+    { value: 'downloaded', label: 'Heruntergeladen' },
+    { value: 'apply_failed,processing_failed', label: 'Fehlgeschlagen' },
+    { value: 'invited', label: 'Eingeladen' },
+    { value: 'role_changed', label: 'Rolle geändert' },
 ];
 
 // ─── Main component ──────────────────────────────────────────
@@ -219,15 +219,15 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
             <div className="flex flex-wrap items-center gap-3">
                 {/* Date range */}
                 <Select value={currentFilters.range || 'all'} onValueChange={(v) => updateFilter('range', v)}>
-                    <SelectTrigger className="w-[200px] text-sm" aria-label="Zeitraum filtern / Filter by date range">
+                    <SelectTrigger className="w-[200px] text-sm" aria-label="Zeitraum filtern">
                         <SelectValue placeholder="Zeitraum..." />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="today">Heute / Today</SelectItem>
-                        <SelectItem value="7d">Letzte 7 Tage / Last 7 days</SelectItem>
-                        <SelectItem value="30d">Letzter Monat / Last 30 days</SelectItem>
-                        <SelectItem value="90d">Letzte 90 Tage / Last 90 days</SelectItem>
-                        <SelectItem value="all">Alles / All time</SelectItem>
+                        <SelectItem value="today">Heute</SelectItem>
+                        <SelectItem value="7d">Letzte 7 Tage</SelectItem>
+                        <SelectItem value="30d">Letzter Monat</SelectItem>
+                        <SelectItem value="90d">Letzte 90 Tage</SelectItem>
+                        <SelectItem value="all">Gesamter Zeitraum</SelectItem>
                     </SelectContent>
                 </Select>
 
@@ -236,11 +236,11 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                     value={currentFilters.types.join(',') || 'all'}
                     onValueChange={(v) => updateFilter('types', v)}
                 >
-                    <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Aktion filtern / Filter by event type">
+                    <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Aktion filtern">
                         <SelectValue placeholder="Alle Aktionen..." />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Alle Aktionen / All types</SelectItem>
+                        <SelectItem value="all">Alle Aktionen</SelectItem>
                         {TYPE_GROUPS.map((g) => (
                             <SelectItem key={g.value} value={g.value}>
                                 {g.label}
@@ -254,11 +254,11 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                     value={currentFilters.actorId || 'all'}
                     onValueChange={(v) => updateFilter('actor', v)}
                 >
-                    <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Nutzer filtern / Filter by actor">
+                    <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Nutzer filtern">
                         <SelectValue placeholder="Alle Nutzer..." />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Alle Nutzer / All users</SelectItem>
+                        <SelectItem value="all">Alle Nutzer</SelectItem>
                         {actors.map((a) => (
                             <SelectItem key={a.id} value={a.id}>
                                 {a.email}
@@ -272,7 +272,7 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                     <Input
                         className="w-[200px] text-sm"
                         placeholder="Dokument suchen..."
-                        aria-label="Dokument suchen / Search documents"
+                        aria-label="Dokument suchen"
                         value={searchInput}
                         onChange={(e) => setSearchInput(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -297,16 +297,16 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                     <thead>
                         <tr className="border-b border-border bg-muted/50">
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Zeit / Time
+                                Zeit
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Aktion / Action
+                                Aktion
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Akteur / Actor
+                                Akteur
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                Ziel / Target
+                                Ziel
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                 Details
@@ -319,7 +319,7 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                                 <td colSpan={5} className="text-center py-16">
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                         <Activity className="h-8 w-8" />
-                                        <p className="text-sm">Keine Aktivitäten / No activity yet</p>
+                                        <p className="text-sm">Keine Aktivitäten</p>
                                     </div>
                                 </td>
                             </tr>
