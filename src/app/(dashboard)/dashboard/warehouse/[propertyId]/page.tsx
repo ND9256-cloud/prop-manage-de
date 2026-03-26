@@ -176,7 +176,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     {!readOnly && (
                         <div
                             className="flex items-center gap-1.5 text-sm"
-                            title="Basierend auf verbuchten Rechnungen / Based on applied invoices"
+                            title="Basierend auf verbuchten Rechnungen"
                         >
                             <Euro className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium text-foreground">
