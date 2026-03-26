@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
 import { getInboxDocuments, getInboxStats, getProperties, getOpenReviewCount } from '@/lib/warehouse-actions';
-import { bilingual, t } from '@/lib/i18n/warehouse';
+import { t } from '@/lib/i18n/warehouse';
 import { getOrgContext } from '@/lib/org';
 import { InboxStats } from './inbox-stats';
 import { InboxFilters } from './inbox-filters';
@@ -61,9 +61,6 @@ export default async function InboxPage({ searchParams }: PageProps) {
                     <h1 className="text-xl font-semibold text-foreground">
                         {t.inbox.de}
                     </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {bilingual('allDocuments')}
-                    </p>
                 </div>
                 <div className="flex gap-2">
                     {!readOnly && (

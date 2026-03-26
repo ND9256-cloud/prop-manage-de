@@ -12,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { X } from 'lucide-react';
-import { bilingual, t } from '@/lib/i18n/warehouse';
+import { t } from '@/lib/i18n/warehouse';
 
 interface Property {
     id: string;
@@ -59,7 +59,7 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
         <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
             <Input
-                placeholder={bilingual('search')}
+                placeholder={t.search.de}
                 defaultValue={searchParams.get('search') ?? ''}
                 className="w-56"
                 onChange={(e) => {
@@ -81,10 +81,10 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                 onValueChange={(v) => updateParam('status', v)}
             >
                 <SelectTrigger className="w-44">
-                    <SelectValue placeholder={bilingual('allStatuses')} />
+                    <SelectValue placeholder={t.allStatuses.de} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">{bilingual('allStatuses')}</SelectItem>
+                    <SelectItem value="all">{t.allStatuses.de}</SelectItem>
                     <SelectItem value="queued">{t.queued.de}</SelectItem>
                     <SelectItem value="processing">{t.processing.de}</SelectItem>
                     <SelectItem value="needs_review">{t.needsReview.de}</SelectItem>
@@ -100,10 +100,10 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                 onValueChange={(v) => updateParam('property', v)}
             >
                 <SelectTrigger className="w-44">
-                    <SelectValue placeholder={bilingual('allProperties')} />
+                    <SelectValue placeholder={t.allProperties.de} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">{bilingual('allProperties')}</SelectItem>
+                    <SelectItem value="all">{t.allProperties.de}</SelectItem>
                     {properties.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                             {p.shortCode ? `[${p.shortCode}] ` : ''}{p.name}
@@ -118,14 +118,14 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                 onValueChange={(v) => updateParam('docType', v)}
             >
                 <SelectTrigger className="w-36">
-                    <SelectValue placeholder={bilingual('allTypes')} />
+                    <SelectValue placeholder={t.allTypes.de} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">{bilingual('allTypes')}</SelectItem>
-                    <SelectItem value="invoice">Rechnung / Invoice</SelectItem>
-                    <SelectItem value="lease">Mietvertrag / Lease</SelectItem>
-                    <SelectItem value="inspection">Inspektion / Inspection</SelectItem>
-                    <SelectItem value="other">Sonstige / Other</SelectItem>
+                    <SelectItem value="all">{t.allTypes.de}</SelectItem>
+                    <SelectItem value="invoice">Rechnung</SelectItem>
+                    <SelectItem value="lease">Mietvertrag</SelectItem>
+                    <SelectItem value="inspection">Inspektion</SelectItem>
+                    <SelectItem value="other">Sonstige</SelectItem>
                 </SelectContent>
             </Select>
 
@@ -135,10 +135,10 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                 onValueChange={(v) => updateParam('source', v)}
             >
                 <SelectTrigger className="w-36">
-                    <SelectValue placeholder={bilingual('allSources')} />
+                    <SelectValue placeholder={t.allSources.de} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">{bilingual('allSources')}</SelectItem>
+                    <SelectItem value="all">{t.allSources.de}</SelectItem>
                     <SelectItem value="email">E-Mail</SelectItem>
                     <SelectItem value="telegram">Telegram</SelectItem>
                     <SelectItem value="ui">Web Upload</SelectItem>
@@ -151,13 +151,13 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                 onValueChange={(v) => updateParam('dateRange', v)}
             >
                 <SelectTrigger className="w-44">
-                    <SelectValue placeholder={bilingual('allTime')} />
+                    <SelectValue placeholder={t.allTime.de} />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="all">{bilingual('allTime')}</SelectItem>
-                    <SelectItem value="this_week">{bilingual('thisWeek')}</SelectItem>
-                    <SelectItem value="this_month">{bilingual('thisMonth')}</SelectItem>
-                    <SelectItem value="last_3_months">{bilingual('last3Months')}</SelectItem>
+                    <SelectItem value="all">{t.allTime.de}</SelectItem>
+                    <SelectItem value="this_week">{t.thisWeek.de}</SelectItem>
+                    <SelectItem value="this_month">{t.thisMonth.de}</SelectItem>
+                    <SelectItem value="last_3_months">{t.last3Months.de}</SelectItem>
                 </SelectContent>
             </Select>
 
@@ -165,7 +165,7 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
             {hasFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground">
                     <X className="h-3.5 w-3.5" />
-                    {bilingual('clearFilters')}
+                    {t.clearFilters.de}
                 </Button>
             )}
         </div>

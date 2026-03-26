@@ -33,7 +33,7 @@ import { ConfidenceBar } from '@/components/warehouse/ui/confidence-bar';
 import { SourceIcon } from '@/components/warehouse/ui/source-icon';
 import { EmptyState } from '@/components/warehouse/ui/empty-state';
 import { LoadingRows } from '@/components/warehouse/ui/loading-rows';
-import { bilingual, t } from '@/lib/i18n/warehouse';
+import { t } from '@/lib/i18n/warehouse';
 import { softDeleteDocument, type InboxDocument } from '@/lib/warehouse-actions';
 import { CATEGORIES } from '@/lib/warehouse-categories';
 
@@ -123,7 +123,7 @@ export function InboxTable({
         return (
             <EmptyState
                 icon={Inbox}
-                title={bilingual('noDocuments')}
+                title={t.noDocuments.de}
                 subtitle={t.noDocumentsYet.de}
             />
         );
@@ -139,7 +139,7 @@ export function InboxTable({
                     </span>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm">
-                            {bilingual('assignProperty')}
+                            {t.assignProperty.de}
                         </Button>
                         <Button variant="outline" size="sm" className="text-amber-600 border-amber-200 hover:bg-amber-50">
                             {t.quarantine.de}
@@ -327,15 +327,15 @@ export function InboxTable({
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuItem>
-                                                            {bilingual('viewDocument')}
+                                                            {t.viewDocument.de}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             onClick={() => handleCopyFilename(doc.file_name)}
                                                         >
-                                                            {bilingual('copyFilename')}
+                                                            {t.copyFilename.de}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem>
-                                                            {bilingual('download')}
+                                                            {t.download.de}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem className="text-amber-600">
@@ -390,7 +390,7 @@ export function InboxTable({
             <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{bilingual('confirmDelete')}</DialogTitle>
+                        <DialogTitle>{t.confirmDelete.de}</DialogTitle>
                         <DialogDescription>
                             {t.confirmDeleteMessage.de}
                         </DialogDescription>

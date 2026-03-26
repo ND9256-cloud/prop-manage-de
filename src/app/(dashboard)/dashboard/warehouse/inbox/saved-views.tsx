@@ -33,7 +33,7 @@ export function SavedViews({ needsReviewCount, appliedMonthCount }: SavedViewsPr
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
             >
-                Prüfung nötig / Needs Review
+                Prüfung nötig
                 {needsReviewCount > 0 && (
                     <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full px-1 text-xs font-semibold ${currentView === 'needs_review'
                             ? 'bg-amber-800 text-amber-100'
@@ -51,7 +51,7 @@ export function SavedViews({ needsReviewCount, appliedMonthCount }: SavedViewsPr
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
             >
-                Alle Dokumente / All
+                Alle Dokumente
             </button>
 
             <button
@@ -61,7 +61,7 @@ export function SavedViews({ needsReviewCount, appliedMonthCount }: SavedViewsPr
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
             >
-                Verbucht diesen Monat / Applied
+                Verbucht
                 {appliedMonthCount > 0 && (
                     <span className={`inline-flex items-center justify-center min-w-[1.25rem] h-5 rounded-full px-1 text-xs font-semibold ${currentView === 'applied_month'
                             ? 'bg-green-800 text-green-100'

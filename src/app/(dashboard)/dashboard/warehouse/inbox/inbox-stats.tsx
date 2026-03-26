@@ -1,4 +1,4 @@
-import { bilingual, t } from '@/lib/i18n/warehouse';
+import { t } from '@/lib/i18n/warehouse';
 
 interface InboxStatsProps {
     total: number;
@@ -10,23 +10,23 @@ interface InboxStatsProps {
 export function InboxStats({ total, needsReview, appliedThisMonth, failed }: InboxStatsProps) {
     const cards = [
         {
-            label: bilingual('total'),
+            label: t.total.de,
             value: total,
             accent: false,
         },
         {
-            label: bilingual('needsReview'),
+            label: t.needsReview.de,
             value: needsReview,
             accent: needsReview > 0,
             accentColor: 'text-amber-600',
         },
         {
-            label: bilingual('appliedThisMonth'),
+            label: t.appliedThisMonth.de,
             value: appliedThisMonth,
             accent: false,
         },
         {
-            label: bilingual('failed'),
+            label: t.failed.de,
             value: failed,
             accent: failed > 0,
             accentColor: 'text-red-600',
