@@ -72,7 +72,7 @@ const links = [
     // { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users, roles: WRITE_ROLES },
     // { name: 'Konten', href: '/dashboard/banking', icon: Landmark, roles: WRITE_ROLES },
     { name: 'Inbox', href: '/dashboard/warehouse/inbox', icon: Inbox, showBadge: true, roles: WRITE_ROLES },
-    { name: 'Properties', href: '/dashboard/warehouse', icon: Building },
+    { name: 'Dokumentenarchiv', href: '/dashboard/warehouse', icon: Building },
     { name: 'Protokoll', href: '/dashboard/warehouse/audit', icon: ShieldCheck, roles: WRITE_ROLES },
     { name: 'Team', href: '/dashboard/settings/users', icon: UserCog, roles: ADMIN_ROLES },
 ];
