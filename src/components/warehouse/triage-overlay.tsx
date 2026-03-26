@@ -142,7 +142,12 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const mimeType = (doc?.mime_type as string) ?? '';
     const displayName = (doc?.display_name as string) ?? (doc?.file_name as string) ?? documentId;
     const docType = (doc?.doc_type as string) ?? 'other';
+    const category = (doc?.category as string) ?? '';
     const fields = (extraction?.extracted_fields as Record<string, unknown>) ?? {};
+
+    // Determine field layout from category (doc_type uses open German taxonomy)
+    const isInvoiceLike = category === 'kosten_rechnungen' || category === 'instandhaltung' || category === 'finanzen';
+    const isLeaseLike = category === 'vertraege';
 
     // ─── Apply handler ─────────────────────────────────────────
     async function handleApply() {
@@ -355,7 +360,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                         )}
                                     </div>
 
-                                    {docType === 'invoice' ? (
+                                    {isInvoiceLike ? (
                                         <div className="space-y-2">
                                             <EditableField label="Anbieter" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Betrag" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
@@ -363,7 +368,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Kategorie" fieldName="category_hint" value={fields.category_hint as string} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
-                                    ) : docType === 'lease' ? (
+                                    ) : isLeaseLike ? (
                                         <div className="space-y-2">
                                             <EditableField label="Mieter" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Einheit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} readOnly={readOnly} />
@@ -371,9 +376,15 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             <EditableField label="Beginn" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Ende" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
+                                    ) : Object.keys(fields).length > 0 ? (
+                                        <div className="space-y-2">
+                                            {Object.entries(fields).map(([key, val]) => (
+                                                <EditableField key={key} label={key} fieldName={key} value={val != null ? String(val) : ''} isDirty={editedFields.has(key)} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            ))}
+                                        </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">
-                                            {(fields.summary as string) ?? 'Keine Felder verfügbar'}
+                                            Keine Felder verfügbar
                                         </p>
                                     )}
                                 </div>
