@@ -47,6 +47,7 @@ type Props = {
     folders: Folder[];
     stats: Stats;
     unassignedCount: number;
+    readOnly?: boolean;
 };
 
 function formatSize(bytes: number): string {
@@ -62,7 +63,7 @@ function formatDateDE(iso: string | null): string {
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
-export default function PropertyFolders({ property, folders, stats, unassignedCount }: Props) {
+export default function PropertyFolders({ property, folders, stats, unassignedCount, readOnly }: Props) {
     const router = useRouter();
     const [dragging, setDragging] = useState(false);
     const [showUpload, setShowUpload] = useState(false);
@@ -178,22 +179,24 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <Clock className="h-5 w-5 text-orange-500" />
-                        <div>
-                            <p className="text-sm font-bold">
-                                {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
-                        </div>
-                    </CardContent>
-                </Card>
+                {!readOnly && (
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-3">
+                            <Clock className="h-5 w-5 text-orange-500" />
+                            <div>
+                                <p className="text-sm font-bold">
+                                    {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
 
             {/* Category folder cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {folders.map((folder) => (
+                {folders.filter((f) => f.count > 0).map((folder) => (
                     <Card
                         key={folder.key}
                         className="cursor-pointer hover:shadow-md transition-shadow relative"
@@ -209,8 +212,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                                 <span className="text-lg">{folder.icon}</span>
                                 <span>{folder.de}</span>
                             </CardTitle>
-                            <p className="text-xs text-muted-foreground">{folder.en}</p>
-                        </CardHeader>
+                                        </CardHeader>
                         <CardContent className="pt-0 space-y-1 text-sm text-muted-foreground">
                             <p className="text-2xl font-bold text-foreground">{folder.count}</p>
                             <p>{formatDateDE(folder.mostRecent)}</p>

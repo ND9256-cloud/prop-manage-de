@@ -161,26 +161,30 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                         <span className="font-medium text-foreground">{totalDocs}</span>
                         <span className="text-muted-foreground">Dokumente</span>
                     </div>
-                    <div className={`flex items-center gap-1.5 text-sm ${needsReview > 0 ? 'text-amber-600' : ''}`}>
-                        <AlertCircle className="h-4 w-4" />
-                        <span className="font-medium">{needsReview}</span>
-                        <span>zu prüfen</span>
-                    </div>
+                    {!readOnly && (
+                        <div className={`flex items-center gap-1.5 text-sm ${needsReview > 0 ? 'text-amber-600' : ''}`}>
+                            <AlertCircle className="h-4 w-4" />
+                            <span className="font-medium">{needsReview}</span>
+                            <span>zu prüfen</span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-1.5 text-sm">
                         <Building className="h-4 w-4 text-muted-foreground" />
                         <span className="font-medium text-foreground">{unitCount}</span>
                         <span className="text-muted-foreground">Einheiten</span>
                     </div>
-                    <div
-                        className="flex items-center gap-1.5 text-sm"
-                        title="Basierend auf verbuchten Rechnungen / Based on applied invoices"
-                    >
-                        <Euro className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                            {totalCostsThisYear.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                        </span>
-                        <span className="text-muted-foreground">Erfasste Kosten {new Date().getFullYear()}</span>
-                    </div>
+                    {!readOnly && (
+                        <div
+                            className="flex items-center gap-1.5 text-sm"
+                            title="Basierend auf verbuchten Rechnungen / Based on applied invoices"
+                        >
+                            <Euro className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium text-foreground">
+                                {totalCostsThisYear.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                            </span>
+                            <span className="text-muted-foreground">Erfasste Kosten {new Date().getFullYear()}</span>
+                        </div>
+                    )}
                 </div>
             </div>
 

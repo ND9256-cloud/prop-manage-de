@@ -60,6 +60,7 @@ export function DokumenteTab({
                 folders={foldersData.folders}
                 stats={foldersData.stats}
                 unassignedCount={foldersData.unassignedCount}
+                readOnly={readOnly}
             />
 
             {/* All documents table */}
