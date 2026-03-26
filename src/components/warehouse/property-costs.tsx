@@ -137,12 +137,12 @@ export function PropertyCosts({
                                         <div>
                                             <p className="text-2xl font-bold text-foreground">{fmtEur(kpis.totalAmount)}</p>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                Erfasste Kosten {year} / Captured costs {year}
+                                                Erfasste Kosten {year}
                                             </p>
                                         </div>
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                        Basierend auf verbuchten Rechnungen / Based on applied invoices
+                                        Basierend auf verbuchten Rechnungen
                                     </TooltipContent>
                                 </Tooltip>
                             </TooltipProvider>
@@ -153,7 +153,7 @@ export function PropertyCosts({
                     <Card className="bg-card border border-border">
                         <CardContent className="p-4">
                             <p className="text-2xl font-bold text-foreground">{kpis.invoiceCount}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Rechnungen / Invoices</p>
+                            <p className="text-xs text-muted-foreground mt-1">Rechnungen</p>
                         </CardContent>
                     </Card>
 
@@ -161,7 +161,7 @@ export function PropertyCosts({
                     <Card className="bg-card border border-border">
                         <CardContent className="p-4">
                             <p className="text-2xl font-bold text-foreground">{fmtEur(kpis.averageAmount)}</p>
-                            <p className="text-xs text-muted-foreground mt-1">Ø pro Rechnung / Per invoice</p>
+                            <p className="text-xs text-muted-foreground mt-1">Ø pro Rechnung</p>
                         </CardContent>
                     </Card>
 
@@ -190,8 +190,7 @@ export function PropertyCosts({
                 {/* Info note */}
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Info className="h-3 w-3" />
-                    Erfasste Kosten basieren auf verbuchten Dokumenten im System /
-                    Captured costs based on documents applied in the system.
+                    Erfasste Kosten basieren auf verbuchten Dokumenten im System.
                 </p>
 
                 {/* ── Filter bar ── */}
@@ -248,13 +247,13 @@ export function PropertyCosts({
                         <thead>
                             <tr className="border-b border-border bg-muted/50">
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Datum / Date
+                                    Datum
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Anbieter / Vendor
+                                    Anbieter
                                 </th>
                                 <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Betrag / Amount
+                                    Betrag
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                     Kategorie
@@ -271,11 +270,10 @@ export function PropertyCosts({
                                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                             <Receipt className="h-8 w-8" />
                                             <p className="text-sm font-medium">
-                                                Keine Kosten erfasst / No costs captured
+                                                Keine Kosten erfasst
                                             </p>
                                             <p className="text-xs max-w-xs">
-                                                Laden Sie Rechnungen hoch und verbuchen Sie diese, um Kosten zu erfassen /
-                                                Upload and apply invoices to capture costs
+                                                Laden Sie Rechnungen hoch und verbuchen Sie diese, um Kosten zu erfassen.
                                             </p>
                                         </div>
                                     </td>
@@ -343,7 +341,7 @@ export function PropertyCosts({
                                     {/* Totals row */}
                                     <tr className="bg-muted/30 border-t border-border">
                                         <td className="px-4 py-3 text-sm font-semibold text-foreground">
-                                            Gesamt / Total
+                                            Gesamt
                                         </td>
                                         <td></td>
                                         <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
@@ -351,7 +349,7 @@ export function PropertyCosts({
                                         </td>
                                         <td></td>
                                         <td className="px-4 py-3 text-sm text-muted-foreground">
-                                            {total} Einträge
+                                            {total} {total === 1 ? 'Eintrag' : 'Einträge'}
                                         </td>
                                     </tr>
                                 </>
