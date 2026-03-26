@@ -1,25 +1,25 @@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { bilingual, t } from '@/lib/i18n/warehouse';
 
 interface ConfidenceBarProps {
     score: number; // 0-100
 }
 
-function getLevel(score: number) {
-    if (score >= 95) return { color: 'bg-green-500', label: t.high };
-    if (score >= 65) return { color: 'bg-amber-500', label: t.medium };
-    return { color: 'bg-red-500', label: t.low };
+function getBarColor(score: number) {
+    if (score >= 85) return 'bg-green-500';
+    if (score >= 50) return 'bg-amber-500';
+    return 'bg-red-500';
 }
 
 function getLabelColor(score: number) {
-    if (score >= 95) return 'text-green-700';
-    if (score >= 65) return 'text-amber-700';
+    if (score >= 85) return 'text-green-700';
+    if (score >= 50) return 'text-amber-700';
     return 'text-red-600';
 }
 
 export function ConfidenceBar({ score }: ConfidenceBarProps) {
-    const { color, label } = getLevel(score);
+    const barColor = getBarColor(score);
     const labelColor = getLabelColor(score);
+    const isLow = score < 50;
 
     return (
         <Tooltip>
@@ -28,23 +28,17 @@ export function ConfidenceBar({ score }: ConfidenceBarProps) {
                     {/* Progress bar */}
                     <div className="h-1.5 w-full rounded-full bg-muted">
                         <div
-                            className={`h-1.5 rounded-full transition-all ${color}`}
+                            className={`h-1.5 rounded-full transition-all ${barColor}`}
                             style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
                         />
                     </div>
-                    {/* Percentage + text label */}
-                    <div className="flex items-center justify-between">
-                        <span className={`text-xs font-medium ${labelColor}`}>
-                            {label.de}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                            {Math.round(score)}%
-                        </span>
-                    </div>
+                    <span className={`text-xs font-medium ${labelColor}`}>
+                        {isLow ? 'Niedrig' : `${Math.round(score)}%`}
+                    </span>
                 </div>
             </TooltipTrigger>
             <TooltipContent>
-                <p>{bilingual('confidence')}</p>
+                <p>Konfidenz</p>
             </TooltipContent>
         </Tooltip>
     );
