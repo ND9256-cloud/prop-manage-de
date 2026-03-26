@@ -169,12 +169,12 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
             {/* ── Section 1: Immobiliendaten ── */}
             <div className="space-y-4">
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Immobiliendaten / Property Details
+                    Immobiliendaten
                 </h3>
 
                 <InlineField
-                    label="Kurzcode / Short code"
-                    hint="Max. 5 Zeichen, Großbuchstaben / Max 5 chars, uppercase"
+                    label="Kurzcode"
+                    hint="Max. 5 Zeichen, Großbuchstaben"
                     value={property.short_code ?? ''}
                     field="short_code"
                     propertyId={property.id}
@@ -183,7 +183,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                 />
 
                 <InlineField
-                    label="Adresse / Address"
+                    label="Adresse"
                     value={property.address}
                     field="address"
                     propertyId={property.id}
@@ -191,7 +191,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                 />
 
                 <InlineField
-                    label="Notizen / Notes"
+                    label="Notizen"
                     value={property.notes ?? ''}
                     field="notes"
                     propertyId={property.id}
@@ -204,7 +204,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
             <Separator />
             <div className="space-y-4">
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Einheiten / Units
+                    Einheiten
                 </h3>
 
                 {units.length === 0 ? (
@@ -222,13 +222,13 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                                 <thead>
                                     <tr className="border-b border-border bg-muted/50">
                                         <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Einheit / Unit
+                                            Einheit
                                         </th>
                                         <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Etage / Floor
+                                            Etage
                                         </th>
                                         <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Größe / Size
+                                            Größe
                                         </th>
                                         <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                             Status
@@ -251,7 +251,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                                                 {unit.status === 'occupied' ? (
                                                     <span className="flex items-center gap-1.5 text-sm">
                                                         <span className="h-2 w-2 rounded-full bg-green-500" />
-                                                        Vermietet / Occupied
+                                                        Vermietet
                                                     </span>
                                                 ) : unit.status === 'vacant' ? (
                                                     <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
