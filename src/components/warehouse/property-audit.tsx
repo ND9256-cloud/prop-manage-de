@@ -72,11 +72,11 @@ function detailSummary(evt: AuditEvent): string {
 
 // ─── Type filter options (property-level only) ────────────────
 const TYPE_GROUPS = [
-    { value: 'uploaded', label: 'Hochgeladen / Uploaded' },
-    { value: 'applied', label: 'Verbucht / Applied' },
-    { value: 'quarantined', label: 'Quarantäne / Quarantined' },
-    { value: 'downloaded', label: 'Heruntergeladen / Downloaded' },
-    { value: 'unquarantined', label: 'Freigegeben / Unquarantined' },
+    { value: 'uploaded', label: 'Hochgeladen' },
+    { value: 'applied', label: 'Verbucht' },
+    { value: 'quarantined', label: 'Quarantäne' },
+    { value: 'downloaded', label: 'Heruntergeladen' },
+    { value: 'unquarantined', label: 'Freigegeben' },
 ];
 
 // ─── Props ────────────────────────────────────────────────────
@@ -145,14 +145,14 @@ export function PropertyAudit({
                 <div className="flex flex-wrap items-center gap-3">
                     {/* Date range */}
                     <Select value={currentFilters.range || '30d'} onValueChange={(v) => updateFilter('auditRange', v)}>
-                        <SelectTrigger className="w-[200px] text-sm" aria-label="Zeitraum filtern / Filter by date range">
+                        <SelectTrigger className="w-[200px] text-sm" aria-label="Zeitraum filtern">
                             <SelectValue placeholder="Zeitraum..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="7d">Letzte 7 Tage / Last 7 days</SelectItem>
-                            <SelectItem value="30d">Letzte 30 Tage / Last 30 days</SelectItem>
-                            <SelectItem value="90d">Letzte 90 Tage / Last 90 days</SelectItem>
-                            <SelectItem value="all">Alles / All time</SelectItem>
+                            <SelectItem value="7d">Letzte 7 Tage</SelectItem>
+                            <SelectItem value="30d">Letzte 30 Tage</SelectItem>
+                            <SelectItem value="90d">Letzte 90 Tage</SelectItem>
+                            <SelectItem value="all">Alles</SelectItem>
                         </SelectContent>
                     </Select>
 
@@ -161,11 +161,11 @@ export function PropertyAudit({
                         value={currentFilters.types.join(',') || 'all'}
                         onValueChange={(v) => updateFilter('auditTypes', v)}
                     >
-                        <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Aktion filtern / Filter by event type">
+                        <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Aktion filtern">
                             <SelectValue placeholder="Alle Aktionen..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Alle Aktionen / All types</SelectItem>
+                            <SelectItem value="all">Alle Aktionen</SelectItem>
                             {TYPE_GROUPS.map((g) => (
                                 <SelectItem key={g.value} value={g.value}>
                                     {g.label}
@@ -179,11 +179,11 @@ export function PropertyAudit({
                         value={currentFilters.actorId || 'all'}
                         onValueChange={(v) => updateFilter('auditActor', v)}
                     >
-                        <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Nutzer filtern / Filter by actor">
+                        <SelectTrigger className="w-[220px] text-sm" aria-label="Nach Nutzer filtern">
                             <SelectValue placeholder="Alle Nutzer..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Alle Nutzer / All users</SelectItem>
+                            <SelectItem value="all">Alle Nutzer</SelectItem>
                             {actors.map((a) => (
                                 <SelectItem key={a.id} value={a.id}>
                                     {a.email}
@@ -197,7 +197,7 @@ export function PropertyAudit({
                         <Input
                             className="w-[200px] text-sm"
                             placeholder="Suchen..."
-                            aria-label="Protokoll durchsuchen / Search audit log"
+                            aria-label="Protokoll durchsuchen"
                             value={searchInput}
                             onChange={(e) => setSearchInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
@@ -214,16 +214,16 @@ export function PropertyAudit({
                         <thead>
                             <tr className="border-b border-border bg-muted/50">
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Zeit / Time
+                                    Zeit
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Aktion / Action
+                                    Aktion
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Akteur / Actor
+                                    Akteur
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Ziel / Target
+                                    Ziel
                                 </th>
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                     Details
@@ -236,7 +236,7 @@ export function PropertyAudit({
                                     <td colSpan={5} className="text-center py-16">
                                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                             <Activity className="h-8 w-8" />
-                                            <p className="text-sm">Keine Aktivitäten / No activity yet</p>
+                                            <p className="text-sm">Keine Aktivitäten</p>
                                         </div>
                                     </td>
                                 </tr>
