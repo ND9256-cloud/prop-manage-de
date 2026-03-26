@@ -246,7 +246,7 @@ function ReviewTaskCard({
                                 <SelectContent>
                                     {CATEGORIES.map(cat => (
                                         <SelectItem key={cat.key} value={cat.key}>
-                                            {cat.de} / {cat.en}
+                                            {cat.de}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

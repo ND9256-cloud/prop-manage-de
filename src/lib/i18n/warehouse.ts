@@ -62,9 +62,9 @@ export const t = {
 
 export type TranslationKey = keyof typeof t;
 
-/** Show both languages: "DE / EN" */
+/** Get the German label */
 export function bilingual(key: TranslationKey): string {
-    return `${t[key].de} / ${t[key].en}`;
+    return t[key].de;
 }
 
 /** Get a single language value */
