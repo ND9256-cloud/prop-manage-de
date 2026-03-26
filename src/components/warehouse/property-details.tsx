@@ -210,9 +210,9 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                 {units.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
                         <Building2 className="h-8 w-8" />
-                        <p className="text-sm font-medium">Keine Einheiten erfasst / No units recorded</p>
+                        <p className="text-sm font-medium">Keine Einheiten erfasst</p>
                         <p className="text-xs">
-                            Einheiten werden aus dem PM-System synchronisiert / Units are synced from PM system
+                            Einheiten werden aus dem PM-System synchronisiert
                         </p>
                     </div>
                 ) : (
@@ -256,7 +256,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                                                 ) : unit.status === 'vacant' ? (
                                                     <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
                                                         <span className="h-2 w-2 rounded-full bg-gray-300" />
-                                                        Leer / Vacant
+                                                        Leer
                                                     </span>
                                                 ) : (
                                                     <span className="text-muted-foreground">—</span>
@@ -268,7 +268,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                             </table>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                            Einheiten werden im PM-System verwaltet / Units managed in PM system
+                            Einheiten werden im PM-System verwaltet
                         </p>
                     </>
                 )}
@@ -278,12 +278,11 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
             <Separator />
             <div className="space-y-4">
                 <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Verwalter / Managers
+                    Verwalter
                 </h3>
                 <div className="rounded-lg border border-dashed border-border p-6 text-center">
                     <p className="text-sm text-muted-foreground">
-                        Verwalterzuweisungen werden in Org & Nutzer konfiguriert /
-                        Manager assignments configured in Org & Users
+                        Verwalterzuweisungen werden unter Team konfiguriert
                     </p>
                     {!readOnly && (
                         <Button
@@ -292,7 +291,7 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                             className="mt-2 text-xs"
                             onClick={() => router.push('/dashboard/settings/users')}
                         >
-                            Zu Org & Nutzer →
+                            Zu Team →
                         </Button>
                     )}
                 </div>
@@ -302,13 +301,13 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
             <Separator />
             <dl className="grid grid-cols-2 gap-x-8 gap-y-2">
                 <div>
-                    <dt className="text-xs text-muted-foreground">Erstellt / Created</dt>
+                    <dt className="text-xs text-muted-foreground">Erstellt</dt>
                     <dd className="text-xs text-foreground font-mono">
                         {new Date(property.createdAt).toLocaleDateString('de-DE')}
                     </dd>
                 </div>
                 <div>
-                    <dt className="text-xs text-muted-foreground">Zuletzt verbucht / Last applied</dt>
+                    <dt className="text-xs text-muted-foreground">Zuletzt verbucht</dt>
                     <dd className="text-xs text-foreground font-mono">
                         {meta.lastAppliedAt
                             ? new Date(meta.lastAppliedAt).toLocaleDateString('de-DE')
@@ -316,11 +315,11 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
                     </dd>
                 </div>
                 <div>
-                    <dt className="text-xs text-muted-foreground">Dokumente gesamt / Total docs</dt>
+                    <dt className="text-xs text-muted-foreground">Dokumente gesamt</dt>
                     <dd className="text-xs text-foreground font-mono">{meta.totalDocuments}</dd>
                 </div>
                 <div>
-                    <dt className="text-xs text-muted-foreground">Immobilien-ID / Property ID</dt>
+                    <dt className="text-xs text-muted-foreground">Immobilien-ID</dt>
                     <dd className="text-xs text-foreground font-mono truncate">{property.id}</dd>
                 </div>
             </dl>
