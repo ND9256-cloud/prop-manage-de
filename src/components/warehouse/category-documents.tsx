@@ -77,6 +77,8 @@ const statusBadge: Record<string, string> = {
     needs_review: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
     applied: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
     failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    processing_failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+    apply_failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -85,6 +87,8 @@ const STATUS_LABELS: Record<string, string> = {
     needs_review: 'Prüfung nötig',
     applied: 'Verbucht',
     failed: 'Fehlgeschlagen',
+    processing_failed: 'Fehlgeschlagen',
+    apply_failed: 'Fehlgeschlagen',
 };
 
 const sourceIcon: Record<string, string> = {
