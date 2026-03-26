@@ -43,6 +43,7 @@ const STATUS_COLORS: Record<string, string> = {
     quarantined: 'bg-red-50 text-red-700 border-red-200',
     processing: 'bg-blue-50 text-blue-700 border-blue-200',
     uploaded: 'bg-gray-50 text-gray-700 border-gray-200',
+    failed: 'bg-red-50 text-red-700 border-red-200',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ const STATUS_LABELS: Record<string, string> = {
     quarantined: 'Quarantäne',
     processing: 'Verarbeitung',
     uploaded: 'Hochgeladen',
+    failed: 'Fehlgeschlagen',
 };
 
 function sourceIcon(source: string | null) {

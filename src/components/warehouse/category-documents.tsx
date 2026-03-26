@@ -79,6 +79,14 @@ const statusBadge: Record<string, string> = {
     failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
 
+const STATUS_LABELS: Record<string, string> = {
+    queued: 'Warteschlange',
+    processing: 'Verarbeitung',
+    needs_review: 'Prüfung nötig',
+    applied: 'Verbucht',
+    failed: 'Fehlgeschlagen',
+};
+
 const sourceIcon: Record<string, string> = {
     email: '📧',
     telegram: '📱',
@@ -124,7 +132,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
             setNotification({ msg: result.error, type: 'error' });
         } else {
             setDocs(prev => prev.map(d => d.id === editingId ? { ...d, display_name: editValue.trim() } : d));
-            setNotification({ msg: 'Umbenannt / Renamed', type: 'success' });
+            setNotification({ msg: 'Umbenannt', type: 'success' });
             setTimeout(() => setNotification(null), 3000);
         }
         setEditingId(null);
@@ -137,7 +145,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
             setNotification({ msg: result.error, type: 'error' });
         } else {
             setDocs(prev => prev.filter(d => d.id !== deleteId));
-            setNotification({ msg: 'Gelöscht (soft) / Deleted', type: 'success' });
+            setNotification({ msg: 'Gelöscht', type: 'success' });
             setTimeout(() => setNotification(null), 3000);
         }
         setDeleteId(null);
@@ -207,7 +215,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                     <span>{catInfo.icon}</span>
                     <span>{catInfo.de}</span>
                 </h1>
-                <p className="text-sm text-muted-foreground">{catInfo.en} · {property.address}</p>
+                <p className="text-sm text-muted-foreground">{property.address}</p>
             </div>
 
             {/* Filter + Sort bar */}
@@ -217,10 +225,10 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Alle / All</SelectItem>
-                        <SelectItem value="needs_review">Prüfung nötig / Needs Review</SelectItem>
-                        <SelectItem value="applied">Angewendet / Applied</SelectItem>
-                        <SelectItem value="failed">Fehlgeschlagen / Failed</SelectItem>
+                        <SelectItem value="all">Alle</SelectItem>
+                        <SelectItem value="needs_review">Prüfung nötig</SelectItem>
+                        <SelectItem value="applied">Verbucht</SelectItem>
+                        <SelectItem value="failed">Fehlgeschlagen</SelectItem>
                     </SelectContent>
                 </Select>
                 <Select value={sort} onValueChange={setSort}>
@@ -228,10 +236,10 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="newest">Neueste / Newest</SelectItem>
-                        <SelectItem value="oldest">Älteste / Oldest</SelectItem>
+                        <SelectItem value="newest">Neueste</SelectItem>
+                        <SelectItem value="oldest">Älteste</SelectItem>
                         <SelectItem value="name">Name</SelectItem>
-                        <SelectItem value="size">Größe / Size</SelectItem>
+                        <SelectItem value="size">Größe</SelectItem>
                     </SelectContent>
                 </Select>
             </div>
@@ -242,10 +250,9 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                     <CardContent className="py-12 text-center">
                         <FolderOpen className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
                         <p className="font-medium">Keine Dokumente in dieser Kategorie</p>
-                        <p className="text-sm text-muted-foreground mb-4">No documents in this category yet</p>
-                        <Button variant="outline" onClick={() => document.getElementById('cat-upload')?.click()}>
+                        <Button variant="outline" className="mt-4" onClick={() => document.getElementById('cat-upload')?.click()}>
                             <Upload className="mr-2 h-4 w-4" />
-                            Hochladen / Upload
+                            Hochladen
                         </Button>
                     </CardContent>
                 </Card>
@@ -306,7 +313,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                     {/* Status */}
                                     <td className="p-3">
                                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusBadge[doc.status] || statusBadge.queued}`}>
-                                            {doc.status}
+                                            {STATUS_LABELS[doc.status] ?? doc.status}
                                         </span>
                                     </td>
                                     {/* Size */}
@@ -328,10 +335,10 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                     {/* Actions */}
                                     <td className="p-3 text-right">
                                         <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Umbenennen / Rename" onClick={(e) => { e.stopPropagation(); startRename(doc); }}>
+                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Umbenennen" onClick={(e) => { e.stopPropagation(); startRename(doc); }}>
                                                 <Pencil className="h-3.5 w-3.5" />
                                             </Button>
-                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" title="Löschen / Delete" onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}>
+                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" title="Löschen" onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}>
                                                 <Trash2 className="h-3.5 w-3.5" />
                                             </Button>
                                         </div>
@@ -355,14 +362,11 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                     <p className="text-sm text-muted-foreground">
                                         Das Dokument wird als gelöscht markiert (GoBD-konform).
                                     </p>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        Document will be marked as deleted (soft delete, GoBD compliant).
-                                    </p>
                                 </div>
                             </div>
                             <div className="flex gap-2 justify-end">
                                 <Button variant="outline" size="sm" onClick={() => setDeleteId(null)}>Abbrechen</Button>
-                                <Button variant="destructive" size="sm" onClick={confirmDelete}>Löschen / Delete</Button>
+                                <Button variant="destructive" size="sm" onClick={confirmDelete}>Löschen</Button>
                             </div>
                         </CardContent>
                     </Card>
