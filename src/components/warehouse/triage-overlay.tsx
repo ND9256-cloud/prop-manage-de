@@ -185,9 +185,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
         if (editedFields.size > 0) {
             const confirmed = window.confirm(
                 'Sie haben ungespeicherte Änderungen.\n' +
-                'Möchten Sie wirklich schließen?\n\n' +
-                'You have unsaved changes.\n' +
-                'Close anyway?'
+                'Möchten Sie wirklich schließen?'
             );
             if (!confirmed) return;
         }
@@ -265,7 +263,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                     {loading ? (
                         <div className="flex-1 bg-muted flex items-center justify-center">
                             <div className="text-sm text-muted-foreground animate-pulse">
-                                Lädt... / Loading...
+                                Lädt...
                             </div>
                         </div>
                     ) : error || data?.error ? (
@@ -293,7 +291,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                     ) : (
                         <div className="flex-1 bg-muted flex flex-col items-center justify-center gap-4">
                             <p className="text-sm text-muted-foreground">
-                                Vorschau nicht verfügbar / Preview not available
+                                Vorschau nicht verfügbar
                             </p>
                             {signedUrl && (
                                 <Button variant="outline" onClick={() => window.open(signedUrl, '_blank')}>
@@ -319,7 +317,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 {/* ── SECTION 1: Document info ── */}
                                 <div className="space-y-3">
                                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Dokument / Document
+                                        Dokument
                                     </p>
                                     <p className="text-sm font-medium text-foreground">
                                         {displayName}
@@ -344,7 +342,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Extrahierte Felder / Extracted Fields
+                                            Extrahierte Felder
                                         </p>
                                         {saveState === 'saving' && (
                                             <span className="text-xs text-muted-foreground">Speichert...</span>
@@ -359,19 +357,19 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
 
                                     {docType === 'invoice' ? (
                                         <div className="space-y-2">
-                                            <EditableField label="Anbieter / Vendor" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Betrag / Amount" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Datum / Date" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Anbieter" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Betrag" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Datum" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Kategorie" fieldName="category_hint" value={fields.category_hint as string} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
                                     ) : docType === 'lease' ? (
                                         <div className="space-y-2">
-                                            <EditableField label="Mieter / Tenant" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Einheit / Unit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Mieter" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Einheit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Kaltmiete" fieldName="rent_cold" value={fields.rent_cold as string} isDirty={editedFields.has('rent_cold')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Beginn / Start" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Ende / End" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Beginn" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Ende" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
                                     ) : (
                                         <p className="text-sm text-muted-foreground">
@@ -385,12 +383,12 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 {/* ── SECTION 3: Filing decision ── */}
                                 <div className="space-y-3">
                                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                        Ablage / Filing
+                                        Ablage
                                     </p>
 
                                     {/* Property */}
                                     <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground">Immobilie / Property</p>
+                                        <p className="text-xs text-muted-foreground">Immobilie</p>
                                         <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
                                             <SelectTrigger className="text-sm">
                                                 <SelectValue placeholder="Immobilie wählen..." />
@@ -407,20 +405,20 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
 
                                     {/* Category */}
                                     <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground">Kategorie / Category</p>
+                                        <p className="text-xs text-muted-foreground">Kategorie</p>
                                         <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                                             <SelectTrigger className="text-sm">
                                                 <SelectValue placeholder="Kategorie wählen..." />
                                             </SelectTrigger>
                                             <SelectContent>
                                                 {[
-                                                    ['rechtliches', 'Rechtliches / Legal'],
-                                                    ['finanzen', 'Finanzen / Financial'],
-                                                    ['kosten_rechnungen', 'Kosten & Rechnungen / Costs'],
-                                                    ['vertraege', 'Verträge / Contracts'],
-                                                    ['instandhaltung', 'Instandhaltung / Maintenance'],
-                                                    ['behoerden', 'Behörden / Authority'],
-                                                    ['medien', 'Medien / Media'],
+                                                    ['rechtliches', 'Rechtliches'],
+                                                    ['finanzen', 'Finanzen'],
+                                                    ['kosten_rechnungen', 'Kosten & Rechnungen'],
+                                                    ['vertraege', 'Verträge'],
+                                                    ['instandhaltung', 'Instandhaltung'],
+                                                    ['behoerden', 'Behörden'],
+                                                    ['medien', 'Medien'],
                                                 ].map(([v, l]) => (
                                                     <SelectItem key={v} value={v}>
                                                         {l}
@@ -432,7 +430,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
 
                                     {/* Filename */}
                                     <div className="space-y-1">
-                                        <p className="text-xs text-muted-foreground">Dateiname / Filename</p>
+                                        <p className="text-xs text-muted-foreground">Dateiname</p>
                                         <Input
                                             className="text-sm"
                                             value={selectedFilename}
@@ -457,7 +455,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             ? <ChevronDown className="h-3 w-3" />
                                             : <ChevronRight className="h-3 w-3" />
                                         }
-                                        Herkunft / Provenance
+                                        Herkunft
                                     </button>
 
                                     {provenanceOpen && (
@@ -522,14 +520,14 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 {applying
                                     ? 'Wird verbucht...'
                                     : saveState === 'saving'
-                                        ? 'Speichert... / Saving...'
+                                        ? 'Speichert...'
                                         : failedFields.size > 0
-                                            ? '✓ Trotzdem verbuchen / Apply anyway'
-                                            : '✓ Verbuchen / Apply'}
+                                            ? '✓ Trotzdem verbuchen'
+                                            : '✓ Verbuchen'}
                             </Button>
                             {failedFields.size > 0 && (
                                 <p className="text-xs text-amber-600 text-center">
-                                    ⚠ {failedFields.size} Feld(er) nicht gespeichert / field(s) not saved
+                                    ⚠ {failedFields.size} Feld(er) nicht gespeichert
                                 </p>
                             )}
                             <Button
@@ -538,33 +536,33 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 onClick={() => setQuarantineOpen(true)}
                                 disabled={!data?.data}
                             >
-                                🚫 Quarantäne / Quarantine
+                                🚫 Quarantäne
                             </Button>
 
                             {/* Quarantine dialog */}
                             <Dialog open={quarantineOpen} onOpenChange={setQuarantineOpen}>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>Quarantäne / Quarantine</DialogTitle>
+                                        <DialogTitle>Quarantäne</DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-4 py-2">
                                         <div className="space-y-2">
-                                            <p className="text-sm text-muted-foreground">Grund / Reason *</p>
+                                            <p className="text-sm text-muted-foreground">Grund *</p>
                                             <Select value={quarantineReason} onValueChange={setQuarantineReason}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="Grund auswählen..." />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="suspicious">Verdächtige Datei / Suspicious file</SelectItem>
-                                                    <SelectItem value="cannot_classify">Kann nicht klassifiziert / Cannot classify</SelectItem>
-                                                    <SelectItem value="duplicate">Duplikat / Duplicate</SelectItem>
-                                                    <SelectItem value="wrong_format">Falsches Format / Wrong format</SelectItem>
-                                                    <SelectItem value="other">Sonstiges / Other</SelectItem>
+                                                    <SelectItem value="suspicious">Verdächtige Datei</SelectItem>
+                                                    <SelectItem value="cannot_classify">Kann nicht klassifiziert werden</SelectItem>
+                                                    <SelectItem value="duplicate">Duplikat</SelectItem>
+                                                    <SelectItem value="wrong_format">Falsches Format</SelectItem>
+                                                    <SelectItem value="other">Sonstiges</SelectItem>
                                                 </SelectContent>
                                             </Select>
                                         </div>
                                         <div className="space-y-2">
-                                            <p className="text-sm text-muted-foreground">Notizen / Notes (optional)</p>
+                                            <p className="text-sm text-muted-foreground">Notizen (optional)</p>
                                             <Textarea
                                                 placeholder="Weitere Details..."
                                                 value={quarantineNotes}
@@ -575,14 +573,14 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                     </div>
                                     <DialogFooter>
                                         <Button variant="outline" onClick={() => setQuarantineOpen(false)}>
-                                            Abbrechen / Cancel
+                                            Abbrechen
                                         </Button>
                                         <Button
                                             variant="destructive"
                                             onClick={handleQuarantine}
                                             disabled={!quarantineReason || quarantining}
                                         >
-                                            {quarantining ? 'Wird gespeichert...' : 'Bestätigen / Confirm'}
+                                            {quarantining ? 'Wird gespeichert...' : 'Bestätigen'}
                                         </Button>
                                     </DialogFooter>
                                 </DialogContent>
