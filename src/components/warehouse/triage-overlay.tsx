@@ -407,7 +407,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             <SelectContent>
                                                 {properties.map((p) => (
                                                     <SelectItem key={p.id} value={p.id}>
-                                                        {p.name} — {p.address}
+                                                        {p.name}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
