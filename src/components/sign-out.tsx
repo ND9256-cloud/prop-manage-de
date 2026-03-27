@@ -10,7 +10,7 @@ export function SignOut() {
             }}
         >
             <button className="text-sm font-medium hover:underline text-red-500">
-                Sign Out
+                Abmelden
             </button>
         </form>
     );
