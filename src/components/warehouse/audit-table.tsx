@@ -40,7 +40,7 @@ const EVENT_COLORS: Record<string, string> = {
 const EVENT_LABELS: Record<string, string> = {
     uploaded: 'Hochgeladen',
     applied: 'Verbucht',
-    quarantined: 'Quarantäne',
+    quarantined: 'Aussortiert',
     unquarantined: 'Freigegeben',
     dismissed: 'Verworfen',
     downloaded: 'Heruntergeladen',
@@ -133,7 +133,7 @@ async function exportCsv(filters: {
 const TYPE_GROUPS = [
     { value: 'uploaded', label: 'Hochgeladen' },
     { value: 'applied', label: 'Verbucht' },
-    { value: 'quarantined', label: 'Quarantäne' },
+    { value: 'quarantined', label: 'Aussortiert' },
     { value: 'downloaded', label: 'Heruntergeladen' },
     { value: 'apply_failed,processing_failed', label: 'Fehlgeschlagen' },
     { value: 'invited', label: 'Eingeladen' },

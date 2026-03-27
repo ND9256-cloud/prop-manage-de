@@ -35,7 +35,7 @@ const EVENT_COLORS: Record<string, string> = {
 const EVENT_LABELS: Record<string, string> = {
     uploaded: 'Hochgeladen',
     applied: 'Verbucht',
-    quarantined: 'Quarantäne',
+    quarantined: 'Aussortiert',
     unquarantined: 'Freigegeben',
     downloaded: 'Heruntergeladen',
 };
@@ -74,7 +74,7 @@ function detailSummary(evt: AuditEvent): string {
 const TYPE_GROUPS = [
     { value: 'uploaded', label: 'Hochgeladen' },
     { value: 'applied', label: 'Verbucht' },
-    { value: 'quarantined', label: 'Quarantäne' },
+    { value: 'quarantined', label: 'Aussortiert' },
     { value: 'downloaded', label: 'Heruntergeladen' },
     { value: 'unquarantined', label: 'Freigegeben' },
 ];

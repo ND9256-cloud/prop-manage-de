@@ -29,7 +29,7 @@ const EVENT_COLORS: Record<string, string> = {
 const EVENT_LABELS: Record<string, string> = {
     uploaded: 'Hochgeladen / Uploaded',
     applied: 'Verbucht / Applied',
-    quarantined: 'Quarantäne / Quarantined',
+    quarantined: 'Aussortiert',
     unquarantined: 'Freigegeben / Unquarantined',
     dismissed: 'Verworfen / Dismissed',
     downloaded: 'Heruntergeladen / Downloaded',

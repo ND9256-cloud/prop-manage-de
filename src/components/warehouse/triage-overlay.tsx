@@ -553,7 +553,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 onClick={() => setQuarantineOpen(true)}
                                 disabled={!data?.data}
                             >
-                                🚫 Quarantäne
+                                🚫 Aussortieren
                             </Button>
                             <p className="text-xs text-muted-foreground text-center">
                                 Dokument wird ausgeblendet und nicht weiter verarbeitet
@@ -563,7 +563,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                             <Dialog open={quarantineOpen} onOpenChange={setQuarantineOpen}>
                                 <DialogContent>
                                     <DialogHeader>
-                                        <DialogTitle>Quarantäne</DialogTitle>
+                                        <DialogTitle>Aussortieren</DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-4 py-2">
                                         <div className="space-y-2">

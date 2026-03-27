@@ -47,7 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
     needs_review: 'Prüfung',
     applied: 'Verbucht',
-    quarantined: 'Quarantäne',
+    quarantined: 'Aussortiert',
     processing: 'Verarbeitung',
     uploaded: 'Hochgeladen',
     failed: 'Fehlgeschlagen',
@@ -168,7 +168,7 @@ export function PropertyDocumentTable({
                         <SelectItem value="all">Alle Status</SelectItem>
                         <SelectItem value="needs_review">Prüfung</SelectItem>
                         <SelectItem value="applied">Verbucht</SelectItem>
-                        <SelectItem value="quarantined">Quarantäne</SelectItem>
+                        <SelectItem value="quarantined">Aussortiert</SelectItem>
                     </SelectContent>
                 </Select>
 
