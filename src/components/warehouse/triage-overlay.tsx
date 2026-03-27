@@ -103,7 +103,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                 const d = result?.data?.document as Record<string, unknown> | undefined;
                 setSelectedPropertyId((d?.property_id as string) ?? '');
                 setSelectedCategory((d?.category as string) ?? '');
-                setSelectedFilename((d?.display_name as string) ?? '');
+                setSelectedFilename((d?.file_name as string) ?? '');
             })
             .catch((e) => setError(String(e)))
             .finally(() => setLoading(false));
@@ -141,7 +141,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const properties = data?.data?.properties ?? [];
     const confidence = data?.data?.confidence;
     const mimeType = (doc?.mime_type as string) ?? '';
-    const displayName = (doc?.display_name as string) ?? (doc?.file_name as string) ?? documentId;
+    const displayName = (doc?.file_name as string) ?? documentId;
     const docType = (doc?.doc_type as string) ?? 'other';
     const category = (doc?.category as string) ?? '';
     const fields = (extraction?.extracted_fields as Record<string, unknown>) ?? {};

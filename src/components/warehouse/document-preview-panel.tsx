@@ -187,7 +187,7 @@ export default function DocumentPreviewPanel({ documentId, onClose }: Props) {
                         {/* Panel Header */}
                         <div className="sticky top-0 z-10 bg-background border-b p-4 flex items-center justify-between">
                             <h2 className="font-semibold text-base truncate pr-4">
-                                {doc.display_name || doc.file_name}
+                                {doc.file_name}
                             </h2>
                             <div className="flex items-center gap-2 shrink-0">
                                 {data?.signedUrl && (
@@ -220,7 +220,7 @@ export default function DocumentPreviewPanel({ documentId, onClose }: Props) {
                                             // eslint-disable-next-line @next/next/no-img-element
                                             <img
                                                 src={data.signedUrl}
-                                                alt={doc.display_name || doc.file_name}
+                                                alt={doc.file_name}
                                                 className="w-full object-contain"
                                                 style={{ maxHeight: '500px' }}
                                             />

@@ -189,7 +189,7 @@ function ReviewTaskCard({
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
     const [selectedUnitId, setSelectedUnitId] = useState<string>('');
     const [selectedCategory, setSelectedCategory] = useState<string>(task.document?.category || '');
-    const [editDisplayName, setEditDisplayName] = useState<string>(task.document?.display_name || '');
+    const [editDisplayName, setEditDisplayName] = useState<string>(task.document?.file_name || '');
     const [isApplying, setIsApplying] = useState(false);
     const [isDismissing, setIsDismissing] = useState(false);
 

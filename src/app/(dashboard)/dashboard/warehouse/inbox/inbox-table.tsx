@@ -206,8 +206,8 @@ export function InboxTable({
                             {documents.map((doc) => {
                                 const isSelected = selected.has(doc.id);
                                 const catLabel = getCategoryLabel(doc.category);
-                                const displayName = doc.display_name || doc.file_name;
-                                const showFileName = doc.display_name && doc.display_name !== doc.file_name;
+                                const displayName = doc.file_name;
+                                const showFileName = false;
 
                                 return (
                                     <TableRow

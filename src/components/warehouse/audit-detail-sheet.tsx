@@ -115,8 +115,7 @@ export function AuditDetailSheet({ event, onClose, properties }: AuditDetailShee
                         {event.document_id ? (
                             <div className="space-y-1">
                                 <p className="text-sm text-foreground">
-                                    {(event.metadata.display_name as string) ??
-                                        (event.metadata.file_name as string) ??
+                                    {(event.metadata.file_name as string) ??
                                         event.document_id}
                                 </p>
                                 <Button

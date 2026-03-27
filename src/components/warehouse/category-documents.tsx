@@ -116,7 +116,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
         list.sort((a, b) => {
             switch (sort) {
                 case 'oldest': return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-                case 'name': return (a.display_name || a.file_name).localeCompare(b.display_name || b.file_name);
+                case 'name': return a.file_name.localeCompare(b.file_name);
                 case 'size': return (b.file_size_bytes || 0) - (a.file_size_bytes || 0);
                 default: return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
             }
@@ -126,7 +126,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
 
     const startRename = (doc: Doc) => {
         setEditingId(doc.id);
-        setEditValue(doc.display_name || doc.file_name);
+        setEditValue(doc.file_name);
     };
 
     const saveRename = async () => {
@@ -301,10 +301,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                             </div>
                                         ) : (
                                             <div>
-                                                <p className="font-medium truncate">{doc.display_name || doc.file_name}</p>
-                                                {doc.display_name && (
-                                                    <p className="text-xs text-muted-foreground truncate">{doc.file_name}</p>
-                                                )}
+                                                <p className="font-medium truncate">{doc.file_name}</p>
                                             </div>
                                         )}
                                     </td>

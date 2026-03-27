@@ -64,7 +64,7 @@ function detailSummary(evt: AuditEvent): string {
         case 'quarantined':
             return (m.reason as string) ?? '—';
         case 'downloaded':
-            return (m.display_name as string) ?? '—';
+            return (m.file_name as string) ?? '—';
         default:
             return '—';
     }
@@ -276,8 +276,7 @@ export function PropertyAudit({
                                             {evt.document_id ? (
                                                 <span className="flex items-center gap-1 text-sm text-foreground">
                                                     <span className="truncate max-w-[180px]">
-                                                        {(evt.metadata.display_name as string) ??
-                                                            (evt.metadata.file_name as string) ??
+                                                        {(evt.metadata.file_name as string) ??
                                                             evt.document_id.slice(0, 8)}
                                                     </span>
                                                     <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />

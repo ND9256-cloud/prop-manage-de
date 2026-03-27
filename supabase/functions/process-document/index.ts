@@ -474,59 +474,66 @@ async function categorize(
         }
     }
 
-    // 3. GENERATE display_name
-    const dateSrc =
-        extractedFields.invoice_date ??
-        extractedFields.lease_start ??
-        extractedFields.inspection_date ??
-        null;
-    const dateObj = dateSrc ? new Date(dateSrc) : new Date();
-    const datePart = [
-        dateObj.getFullYear(),
-        String(dateObj.getMonth() + 1).padStart(2, "0"),
-        String(dateObj.getDate()).padStart(2, "0"),
-    ].join("");
+    // 3. GENERATE display_name — only for generic camera/scanner filenames
+    const rawName = (doc.file_name ?? "").replace(/\.[^.]+$/, ""); // strip extension
+    const isGenericName = /^(IMG_|image|document|scan)/i.test(rawName) || /^\d+$/.test(rawName);
 
-    const vendorRaw = String(
-        extractedFields.vendor_name ??
-        extractedFields.tenant_last_name ??
-        "Unbekannt"
-    )
-        .replace(/\s+/g, "-")
-        .replace(/[^A-Za-z0-9äöüÄÖÜß-]/g, "")
-        .slice(0, 20);
+    let displayName: string;
+    if (isGenericName) {
+        const dateSrc =
+            extractedFields.invoice_date ??
+            extractedFields.lease_start ??
+            extractedFields.inspection_date ??
+            null;
+        const dateObj = dateSrc ? new Date(dateSrc) : new Date();
+        const datePart = [
+            dateObj.getFullYear(),
+            String(dateObj.getMonth() + 1).padStart(2, "0"),
+            String(dateObj.getDate()).padStart(2, "0"),
+        ].join("");
 
-    // German translation map for category_hint
-    const descMapDe: Record<string, string> = {
-        utilities: "Betriebskosten",
-        maintenance: "Instandhaltung",
-        insurance: "Versicherung",
-        management: "Verwaltung",
-        cleaning: "Reinigung",
-        other: "Sonstiges",
-    };
-
-    const language = classification.language ?? "de";
-    const hintRaw = String(extractedFields.category_hint ?? classification.doc_type ?? "Dokument");
-    const descResolved =
-        language === "de" && descMapDe[hintRaw.toLowerCase()]
-            ? descMapDe[hintRaw.toLowerCase()]
-            : hintRaw;
-    const descPart =
-        descResolved.charAt(0).toUpperCase() +
-        descResolved
-            .slice(1)
+        const vendorRaw = String(
+            extractedFields.vendor_name ??
+            extractedFields.tenant_last_name ??
+            "Unbekannt"
+        )
             .replace(/\s+/g, "-")
             .replace(/[^A-Za-z0-9äöüÄÖÜß-]/g, "")
-            .slice(0, 19);
+            .slice(0, 20);
 
-    let displayName = `${datePart}_${vendorRaw}_${shortCode}_${descPart}`
-        .replace(/\s+/g, "-")
-        .replace(/[^A-Za-z0-9äöüÄÖÜß_-]/g, "")
-        .slice(0, 80);
+        // German translation map for category_hint
+        const descMapDe: Record<string, string> = {
+            utilities: "Betriebskosten",
+            maintenance: "Instandhaltung",
+            insurance: "Versicherung",
+            management: "Verwaltung",
+            cleaning: "Reinigung",
+            other: "Sonstiges",
+        };
 
-    // Ensure it's not empty
-    if (!displayName) displayName = `${datePart}_Dokument`;
+        const language = classification.language ?? "de";
+        const hintRaw = String(extractedFields.category_hint ?? classification.doc_type ?? "Dokument");
+        const descResolved =
+            language === "de" && descMapDe[hintRaw.toLowerCase()]
+                ? descMapDe[hintRaw.toLowerCase()]
+                : hintRaw;
+        const descPart =
+            descResolved.charAt(0).toUpperCase() +
+            descResolved
+                .slice(1)
+                .replace(/\s+/g, "-")
+                .replace(/[^A-Za-z0-9äöüÄÖÜß-]/g, "")
+                .slice(0, 19);
+
+        displayName = `${datePart}_${vendorRaw}_${shortCode}_${descPart}`
+            .replace(/\s+/g, "-")
+            .replace(/[^A-Za-z0-9äöüÄÖÜß_-]/g, "")
+            .slice(0, 80);
+
+        if (!displayName) displayName = `${datePart}_Dokument`;
+    } else {
+        displayName = doc.file_name;
+    }
 
     // 4. CALCULATE retention_until
     const baseDate = extractedFields.invoice_date
