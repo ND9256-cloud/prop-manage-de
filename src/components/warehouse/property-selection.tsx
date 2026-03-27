@@ -108,7 +108,7 @@ export default function PropertySelection({ stats, propertyCards, role }: Props)
                                             <span className="font-medium">{p.buckets.kosten}</span>
                                         </div>
                                         <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Versicherungen & Verträge</span>
+                                            <span className="text-muted-foreground">Verträge & Vers.</span>
                                             <span className="font-medium">{p.buckets.versicherungen_vertraege}</span>
                                         </div>
                                         <div className="flex justify-between">
