@@ -165,7 +165,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
             const docId = doc?.id as string;
             const extractionId = extraction?.id as string;
 
-            await applyReviewTask(
+            const result = await applyReviewTask(
                 docId,
                 extractionId,
                 docType,
@@ -175,11 +175,17 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                 triggerType,
             );
 
+            if (result?.error) {
+                setError(result.error);
+                return;
+            }
+
             setEditedFields(new Set());
             onClose();
             onApplied?.();
         } catch (err) {
             console.error('Apply failed:', err);
+            setError(err instanceof Error ? err.message : 'Verbuchen fehlgeschlagen');
         } finally {
             setApplying(false);
         }
