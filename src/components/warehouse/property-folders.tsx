@@ -182,9 +182,9 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 )}
             </div>
 
-            {/* Category folder cards */}
+            {/* Document category cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {folders.filter((f) => f.count > 0).map((folder) => (
+                {folders.filter((f) => f.count > 0 && f.key !== 'medien').map((folder) => (
                     <Card
                         key={folder.key}
                         className="cursor-pointer hover:shadow-md transition-shadow relative"
@@ -200,7 +200,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                                 <span className="text-lg">{folder.icon}</span>
                                 <span>{folder.de}</span>
                             </CardTitle>
-                                        </CardHeader>
+                        </CardHeader>
                         <CardContent className="pt-0 space-y-1 text-sm text-muted-foreground">
                             <p className="text-2xl font-bold text-foreground">{folder.count}</p>
                             <p>{formatDateDE(folder.mostRecent)}</p>
@@ -209,6 +209,38 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                     </Card>
                 ))}
             </div>
+
+            {/* Fotos & Medien section */}
+            {folders.filter((f) => f.key === 'medien' && f.count > 0).map((folder) => (
+                <div key={folder.key} className="space-y-3">
+                    <div className="border-t pt-4">
+                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Fotos & Medien</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <Card
+                            className="cursor-pointer hover:shadow-md transition-shadow relative"
+                            onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
+                        >
+                            {folder.needsReview > 0 && (
+                                <Badge className="absolute top-3 right-3 bg-amber-500 text-white hover:bg-amber-600">
+                                    {folder.needsReview}
+                                </Badge>
+                            )}
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2 pr-8">
+                                    <span className="text-lg">{folder.icon}</span>
+                                    <span>{folder.de}</span>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pt-0 space-y-1 text-sm text-muted-foreground">
+                                <p className="text-2xl font-bold text-foreground">{folder.count}</p>
+                                <p>{formatDateDE(folder.mostRecent)}</p>
+                                <p>{formatSize(folder.totalSize)}</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            ))}
 
             {/* Unassigned documents warning */}
             {unassignedCount > 0 && (
