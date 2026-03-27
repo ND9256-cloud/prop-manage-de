@@ -11,7 +11,6 @@ import {
     AlertTriangle,
     CheckCircle2,
     Clock,
-    ArrowLeft,
     Upload,
     X,
     FolderOpen,
@@ -119,19 +118,8 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 </div>
             )}
 
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Button variant="ghost" size="sm" onClick={() => router.push('/dashboard/warehouse')}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold">{property.address}</h1>
-                        {property.shortCode && (
-                            <Badge variant="secondary" className="mt-1">{property.shortCode}</Badge>
-                        )}
-                    </div>
-                </div>
+            {/* Upload button */}
+            <div className="flex justify-end">
                 <div>
                     <Button
                         variant="outline"
