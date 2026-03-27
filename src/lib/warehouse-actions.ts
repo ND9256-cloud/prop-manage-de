@@ -853,9 +853,9 @@ export async function applyReviewTask(
         .eq('document_id', documentId)
         .eq('status', 'open');
 
-    // Set applied_at on the document for "Applied this month" view
+    // Set applied_at and applied_by on the document for "Applied this month" view
     await db.from('documents')
-        .update({ applied_at: new Date().toISOString() })
+        .update({ applied_at: new Date().toISOString(), applied_by: userId })
         .eq('id', documentId);
 
     // Audit log
