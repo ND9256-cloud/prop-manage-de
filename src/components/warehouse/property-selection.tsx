@@ -8,7 +8,7 @@ import {
     FileText,
     AlertTriangle,
     Building2,
-    ClipboardList,
+
     Camera,
     AlertCircle,
     XCircle,
@@ -44,11 +44,10 @@ type Stats = {
 type Props = {
     stats: Stats;
     propertyCards: PropertyCard[];
-    reviewCount: number;
     role: string;
 };
 
-export default function PropertySelection({ stats, propertyCards, reviewCount, role }: Props) {
+export default function PropertySelection({ stats, propertyCards, role }: Props) {
     const router = useRouter();
 
     const isOperator = role === 'service_operator' || role === 'owner';
@@ -57,25 +56,8 @@ export default function PropertySelection({ stats, propertyCards, reviewCount, r
     return (
         <div className="space-y-6">
             {/* Page header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Dokumentenarchiv</h1>
-                </div>
-                {role !== 'viewer' && (
-                    <Button
-                        variant="outline"
-                        onClick={() => router.push('/dashboard/warehouse/review')}
-                        className="relative"
-                    >
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        Review Queue
-                        {reviewCount > 0 && (
-                            <Badge className="ml-2 bg-amber-500 text-white hover:bg-amber-600">
-                                {reviewCount}
-                            </Badge>
-                        )}
-                    </Button>
-                )}
+            <div>
+                <h1 className="text-2xl font-bold">Dokumentenarchiv</h1>
             </div>
 
             {/* Portfolio bar */}
