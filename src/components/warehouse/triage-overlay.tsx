@@ -549,12 +549,15 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                             )}
                             <Button
                                 variant="outline"
-                                className="w-full text-destructive border-destructive hover:bg-destructive/10"
+                                className="w-full text-amber-700 border-amber-300 bg-amber-50 hover:bg-amber-100"
                                 onClick={() => setQuarantineOpen(true)}
                                 disabled={!data?.data}
                             >
                                 🚫 Quarantäne
                             </Button>
+                            <p className="text-xs text-muted-foreground text-center">
+                                Dokument wird ausgeblendet und nicht weiter verarbeitet
+                            </p>
 
                             {/* Quarantine dialog */}
                             <Dialog open={quarantineOpen} onOpenChange={setQuarantineOpen}>

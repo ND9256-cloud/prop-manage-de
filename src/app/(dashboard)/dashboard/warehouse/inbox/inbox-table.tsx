@@ -219,7 +219,7 @@ export function InboxTable({
                                         onClick={() => setTriageDocId(doc.id)}
                                     >
                                         {/* Checkbox */}
-                                        <TableCell className="py-3 px-4">
+                                        <TableCell className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                                             <input
                                                 type="checkbox"
                                                 className="h-4 w-4 rounded border-border"
