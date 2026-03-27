@@ -61,7 +61,7 @@ const WRITE_ROLES = ['owner', 'manager', 'service_operator'];
 const ADMIN_ROLES = ['owner', 'service_operator'];
 
 const links = [
-    { name: 'Dashboard', href: '/dashboard', icon: Home, roles: WRITE_ROLES },
+    { name: 'Dashboard', href: '/dashboard/warehouse', icon: Home, roles: WRITE_ROLES },
     {
         name: 'Immobilien',
         href: '/dashboard/properties',
@@ -72,7 +72,6 @@ const links = [
     // { name: 'Rent Roll', href: '/dashboard/rent-roll', icon: Users, roles: WRITE_ROLES },
     // { name: 'Konten', href: '/dashboard/banking', icon: Landmark, roles: WRITE_ROLES },
     { name: 'Inbox', href: '/dashboard/warehouse/inbox', icon: Inbox, showBadge: true, roles: WRITE_ROLES },
-    { name: 'Dokumentenarchiv', href: '/dashboard/warehouse', icon: Building },
     { name: 'Protokoll', href: '/dashboard/warehouse/audit', icon: ShieldCheck, roles: WRITE_ROLES },
     { name: 'Team', href: '/dashboard/settings/users', icon: UserCog, roles: ADMIN_ROLES },
 ];
