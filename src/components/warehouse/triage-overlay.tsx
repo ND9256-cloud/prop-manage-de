@@ -281,8 +281,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                     ) : signedUrl && mimeType === 'application/pdf' ? (
                         <iframe
                             src={signedUrl}
-                            className="w-full flex-1"
-                            sandbox="allow-scripts allow-same-origin"
+                            className="w-full flex-1 min-h-0"
                             referrerPolicy="no-referrer"
                             title={displayName}
                         />
