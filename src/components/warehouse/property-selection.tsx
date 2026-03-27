@@ -60,7 +60,6 @@ export default function PropertySelection({ stats, propertyCards, reviewCount, r
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Dokumentenarchiv</h1>
-                    <p className="text-sm text-muted-foreground">Dokumentenverwaltung</p>
                 </div>
                 {role !== 'viewer' && (
                     <Button
@@ -89,18 +88,6 @@ export default function PropertySelection({ stats, propertyCards, reviewCount, r
                 <span className="mx-1">&middot;</span>
                 <Camera className="h-4 w-4" />
                 <span className="font-medium text-foreground">{stats.photos}</span> Fotos
-                {isOperator && stats.needs_review > 0 && (
-                    <>
-                        <span className="mx-1">&middot;</span>
-                        <span className="font-medium text-amber-600">{stats.needs_review} zur Prüfung</span>
-                    </>
-                )}
-                {isOperator && stats.failed > 0 && (
-                    <>
-                        <span className="mx-1">&middot;</span>
-                        <span className="font-medium text-red-600">{stats.failed} fehlgeschlagen</span>
-                    </>
-                )}
             </div>
 
             {/* Property cards grid */}
