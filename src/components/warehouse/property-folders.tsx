@@ -204,7 +204,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                         className="cursor-pointer hover:shadow-md transition-shadow relative"
                         onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
                     >
-                        {folder.needsReview > 0 && (
+                        {!readOnly && folder.needsReview > 0 && (
                             <Badge className="absolute top-3 right-3 bg-amber-500 text-white hover:bg-amber-600">
                                 {folder.needsReview}
                             </Badge>
@@ -235,7 +235,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                             className="cursor-pointer hover:shadow-md transition-shadow relative"
                             onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
                         >
-                            {folder.needsReview > 0 && (
+                            {!readOnly && folder.needsReview > 0 && (
                                 <Badge className="absolute top-3 right-3 bg-amber-500 text-white hover:bg-amber-600">
                                     {folder.needsReview}
                                 </Badge>
