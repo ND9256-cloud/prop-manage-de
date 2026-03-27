@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { getDocumentPreview } from '@/lib/warehouse-actions';
 import { X, Download, Loader2, ExternalLink } from 'lucide-react';
+import { getCategoryHintLabel } from '@/lib/warehouse-categories';
 
 type Props = {
     documentId: string;
@@ -84,7 +85,7 @@ function InvoiceFields({ f }: { f: Record<string, unknown> }) {
             <FieldRow label="Datum" value={formatDateDE(f.invoice_date as string)} />
             <FieldRow label="Rechnungsnr." value={f.invoice_number as string} />
             <FieldRow label="Beschreibung" value={f.description as string} />
-            <FieldRow label="Kategorie" value={f.category_hint as string} />
+            <FieldRow label="Kategorie" value={getCategoryHintLabel(f.category_hint as string)} />
         </>
     );
 }

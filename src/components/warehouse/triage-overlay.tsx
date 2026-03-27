@@ -25,6 +25,7 @@ import { StatusBadge } from '@/components/warehouse/ui/status-badge';
 import { SourceIcon } from '@/components/warehouse/ui/source-icon';
 import { ConfidenceBar } from '@/components/warehouse/ui/confidence-bar';
 import { getTriageDocument, updateExtractionField, applyReviewTask, quarantineDocument, logAuditEvent } from '@/lib/warehouse-actions';
+import { getCategoryHintLabel } from '@/lib/warehouse-categories';
 
 type TriageData = Awaited<ReturnType<typeof getTriageDocument>>;
 
@@ -366,7 +367,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             <EditableField label="Betrag" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Datum" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                             <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Kategorie" fieldName="category_hint" value={fields.category_hint as string} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                            <EditableField label="Kategorie" fieldName="category_hint" value={getCategoryHintLabel(fields.category_hint as string)} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
                                         </div>
                                     ) : isLeaseLike ? (
                                         <div className="space-y-2">

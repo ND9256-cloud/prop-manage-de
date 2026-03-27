@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { CATEGORIES } from '@/lib/warehouse-categories';
+import { CATEGORIES, getCategoryHintLabel } from '@/lib/warehouse-categories';
 import {
     ArrowLeft,
     Check,
@@ -116,7 +116,7 @@ function InvoiceFields({ fields }: { fields: Record<string, unknown> }) {
             </div>
             <div>
                 <span className="text-muted-foreground">Category</span>
-                <p className="font-medium">{String(fields.category_hint || '—')}</p>
+                <p className="font-medium">{getCategoryHintLabel(fields.category_hint as string)}</p>
             </div>
         </div>
     );
