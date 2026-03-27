@@ -39,6 +39,7 @@ interface DokumenteTabProps {
         sort: string;
     };
     readOnly?: boolean;
+    unitCount?: number;
 }
 
 export function DokumenteTab({
@@ -49,6 +50,7 @@ export function DokumenteTab({
     docsPage,
     currentFilters,
     readOnly,
+    unitCount,
 }: DokumenteTabProps) {
     const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
 
@@ -61,6 +63,7 @@ export function DokumenteTab({
                 stats={foldersData.stats}
                 unassignedCount={foldersData.unassignedCount}
                 readOnly={readOnly}
+                unitCount={unitCount}
             />
 
             {/* All documents table */}

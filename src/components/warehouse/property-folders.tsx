@@ -14,6 +14,7 @@ import {
     Upload,
     X,
     FolderOpen,
+    Building2,
 } from 'lucide-react';
 
 type Folder = {
@@ -47,6 +48,7 @@ type Props = {
     stats: Stats;
     unassignedCount: number;
     readOnly?: boolean;
+    unitCount?: number;
 };
 
 function formatSize(bytes: number): string {
@@ -62,7 +64,7 @@ function formatDateDE(iso: string | null): string {
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
 
-export default function PropertyFolders({ property, folders, stats, unassignedCount, readOnly }: Props) {
+export default function PropertyFolders({ property, folders, stats, unassignedCount, readOnly, unitCount }: Props) {
     const router = useRouter();
     const [dragging, setDragging] = useState(false);
     const [showUpload, setShowUpload] = useState(false);
@@ -139,7 +141,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
             </div>
 
             {/* Property stats row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`grid gap-4 ${readOnly ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4'}`}>
                 <Card>
                     <CardContent className="p-4 flex items-center gap-3">
                         <FileText className="h-5 w-5 text-blue-500" />
@@ -149,36 +151,48 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.needsReview}</p>
-                            <p className="text-xs text-muted-foreground">Prüfung nötig</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.appliedThisMonth}</p>
-                            <p className="text-xs text-muted-foreground">Angewendet (Monat)</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                {!readOnly && (
+                {readOnly ? (
                     <Card>
                         <CardContent className="p-4 flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-orange-500" />
+                            <Building2 className="h-5 w-5 text-indigo-500" />
                             <div>
-                                <p className="text-sm font-bold">
-                                    {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
+                                <p className="text-2xl font-bold">{unitCount ?? 0}</p>
+                                <p className="text-xs text-muted-foreground">Einheiten</p>
                             </div>
                         </CardContent>
                     </Card>
+                ) : (
+                    <>
+                        <Card>
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-amber-500" />
+                                <div>
+                                    <p className="text-2xl font-bold">{stats.needsReview}</p>
+                                    <p className="text-xs text-muted-foreground">Prüfung nötig</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                <div>
+                                    <p className="text-2xl font-bold">{stats.appliedThisMonth}</p>
+                                    <p className="text-xs text-muted-foreground">Angewendet (Monat)</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4 flex items-center gap-3">
+                                <Clock className="h-5 w-5 text-orange-500" />
+                                <div>
+                                    <p className="text-sm font-bold">
+                                        {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
                 )}
             </div>
 

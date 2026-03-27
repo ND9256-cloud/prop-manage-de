@@ -201,6 +201,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     docsPage={sp.docPage ? Number(sp.docPage) : 1}
                     currentFilters={docFilters}
                     readOnly={readOnly}
+                    unitCount={unitCount}
                 />
             )}
 
