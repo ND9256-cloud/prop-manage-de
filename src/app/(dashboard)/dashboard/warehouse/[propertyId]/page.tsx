@@ -152,7 +152,6 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                         </Badge>
                     )}
                 </div>
-                <p className="text-sm text-muted-foreground">{property.address}</p>
 
                 {/* Stats row */}
                 <div className="flex items-center gap-6 pt-2">
