@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { warehouseDb } from '@/lib/warehouse/db';
 import { CATEGORIES } from '@/lib/warehouse-categories';
 import { getOrgId, getOrgContext, getOrgIdWritable } from '@/lib/org';
+import { revalidatePath } from 'next/cache';
 
 export interface InboxDocument {
     id: string;
@@ -843,6 +844,13 @@ export async function applyReviewTask(
         }
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Unknown error';
+        // Handle idempotency — document was already applied
+        if (msg.includes('apply_log_idempotency_key_key')) {
+            // Not an error — just revalidate so UI updates
+            revalidatePath('/dashboard/warehouse/inbox');
+            revalidatePath(`/dashboard/warehouse`);
+            return { error: null };
+        }
         return { error: `Apply failed: ${msg}` };
     }
 
@@ -871,6 +879,10 @@ export async function applyReviewTask(
             ...(extractedFields.amount ? { amount: extractedFields.amount } : {}),
         },
     });
+
+    // Revalidate inbox and warehouse pages so applied document disappears from "Prüfung nötig"
+    revalidatePath('/dashboard/warehouse/inbox');
+    revalidatePath(`/dashboard/warehouse`);
 
     return { error: null };
 }
