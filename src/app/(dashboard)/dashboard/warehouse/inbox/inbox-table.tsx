@@ -278,7 +278,7 @@ export function InboxTable({
                                 const isSelected = selected.has(doc.id);
                                 const catLabel = getCategoryLabel(doc.category);
                                 const displayName = doc.file_name;
-                                const showFileName = false;
+                                const showDisplayName = doc.display_name && doc.display_name !== doc.file_name;
 
                                 return (
                                     <TableRow
@@ -304,9 +304,9 @@ export function InboxTable({
                                             <p className="truncate text-sm font-medium text-foreground">
                                                 {displayName}
                                             </p>
-                                            {showFileName && (
+                                            {showDisplayName && (
                                                 <p className="truncate text-xs text-muted-foreground">
-                                                    {doc.file_name}
+                                                    {doc.display_name}
                                                 </p>
                                             )}
                                         </TableCell>

@@ -407,6 +407,7 @@ export async function getPropertyDocuments(
     const docs = data.map(d => ({
         id: d.id as string,
         displayName: (d.display_name as string) ?? (d.file_name as string) ?? 'Unbekannt',
+        fileName: (d.file_name as string) ?? null,
         category: d.category as string | null,
         status: d.status as string,
         source: d.source as string | null,

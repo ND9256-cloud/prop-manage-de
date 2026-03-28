@@ -325,9 +325,9 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                             </div>
                                         ) : (
                                             <div>
-                                                <p className="font-medium truncate">{doc.display_name || doc.file_name}</p>
-                                                {doc.vendorName && (
-                                                    <p className="text-xs text-muted-foreground truncate">{doc.vendorName}</p>
+                                                <p className="font-medium truncate">{doc.file_name}</p>
+                                                {doc.display_name && doc.display_name !== doc.file_name && (
+                                                    <p className="text-xs text-muted-foreground truncate">{doc.display_name}</p>
                                                 )}
                                             </div>
                                         )}

@@ -19,6 +19,7 @@ import { CATEGORIES } from '@/lib/warehouse-categories';
 export interface PropertyDoc {
     id: string;
     displayName: string;
+    fileName: string | null;
     category: string | null;
     status: string;
     source: string | null;
@@ -231,10 +232,10 @@ export function PropertyDocumentTable({
                                     <td className="px-4 py-3">
                                         <div className="flex flex-col">
                                             <span className="text-sm text-foreground font-medium truncate max-w-[250px]">
-                                                {doc.displayName}
+                                                {doc.fileName || doc.displayName}
                                             </span>
-                                            {doc.vendorName && (
-                                                <span className="text-xs text-muted-foreground">{doc.vendorName}</span>
+                                            {doc.fileName && doc.displayName !== doc.fileName && (
+                                                <span className="text-xs text-muted-foreground truncate max-w-[250px]">{doc.displayName}</span>
                                             )}
                                         </div>
                                     </td>
