@@ -24,7 +24,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/warehouse/ui/status-badge';
 import { SourceIcon } from '@/components/warehouse/ui/source-icon';
 import { ConfidenceBar } from '@/components/warehouse/ui/confidence-bar';
-import { getTriageDocument, updateExtractionField, applyReviewTask, quarantineDocument, logAuditEvent } from '@/lib/warehouse-actions';
+import { getTriageDocument, updateExtractionField, applyReviewTask, updateDocumentMetadata, quarantineDocument, logAuditEvent } from '@/lib/warehouse-actions';
 import { getCategoryHintLabel } from '@/lib/warehouse-categories';
 
 type TriageData = Awaited<ReturnType<typeof getTriageDocument>>;
@@ -161,9 +161,29 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                 saveTimerRef.current = null;
             }
 
-            const triggerType = editedFields.size > 0 ? 'user_corrected' as const : 'user_confirmed' as const;
             const docId = doc?.id as string;
             const extractionId = extraction?.id as string;
+            const originalFilename = (doc?.file_name as string) ?? '';
+            const originalCategory = (doc?.category as string) ?? '';
+
+            // Persist filename/category changes before applying
+            const filenameChanged = selectedFilename !== originalFilename && selectedFilename !== '';
+            const categoryChanged = selectedCategory !== originalCategory && selectedCategory !== '';
+            if (filenameChanged || categoryChanged) {
+                const metaResult = await updateDocumentMetadata(
+                    docId,
+                    filenameChanged ? selectedFilename : (doc?.display_name as string) ?? originalFilename,
+                    categoryChanged ? selectedCategory : originalCategory,
+                );
+                if (metaResult?.error) {
+                    setError(metaResult.error);
+                    return;
+                }
+            }
+
+            const triggerType = editedFields.size > 0 || filenameChanged || categoryChanged
+                ? 'user_corrected' as const
+                : 'user_confirmed' as const;
 
             const result = await applyReviewTask(
                 docId,

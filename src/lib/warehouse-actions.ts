@@ -1143,12 +1143,12 @@ export async function getInboxDocuments({
     const db = warehouseDb(orgId);
 
     // Build query with Supabase query builder — NO raw SQL
+    // IMPORTANT: Apply all filter methods BEFORE transform methods (order/range)
+    // to ensure PostgREST generates correct WHERE clauses.
     let query = db.from('documents')
         .select('*', { count: 'exact' })
         .eq('org_id', orgId)
-        .neq('status', 'deleted')
-        .order('status', { ascending: true })
-        .order('created_at', { ascending: false });
+        .neq('status', 'deleted');
 
     // Apply saved view filters FIRST (before individual filters)
     if (filters.view === 'needs_review') {
@@ -1203,6 +1203,11 @@ export async function getInboxDocuments({
             query = query.gte('created_at', from.toISOString());
         }
     }
+
+    // Transform methods AFTER all filters
+    query = query
+        .order('status', { ascending: true })
+        .order('created_at', { ascending: false });
 
     // Pagination
     const offset = (page - 1) * pageSize;
