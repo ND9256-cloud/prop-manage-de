@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TriageOverlay } from '@/components/warehouse/triage-overlay';
 import {
@@ -37,6 +37,9 @@ import { t } from '@/lib/i18n/warehouse';
 import { softDeleteDocument, type InboxDocument } from '@/lib/warehouse-actions';
 import { CATEGORIES } from '@/lib/warehouse-categories';
 
+type SortKey = 'document' | 'property' | 'category' | 'status' | 'confidence' | 'date';
+type SortDir = 'asc' | 'desc';
+
 interface InboxTableProps {
     documents: InboxDocument[];
     total: number;
@@ -61,6 +64,35 @@ function getCategoryLabel(key: string | null): { de: string; sub?: string } {
     return { de: cat?.de ?? key };
 }
 
+function SortableHeader({
+    label,
+    sortKey,
+    activeSortKey,
+    sortDir,
+    onSort,
+}: {
+    label: string;
+    sortKey: SortKey;
+    activeSortKey: SortKey;
+    sortDir: SortDir;
+    onSort: (key: SortKey) => void;
+}) {
+    const isActive = sortKey === activeSortKey;
+    return (
+        <TableHead
+            className="text-xs font-medium uppercase tracking-wide text-muted-foreground cursor-pointer select-none hover:text-foreground transition-colors"
+            onClick={() => onSort(sortKey)}
+        >
+            <span className="inline-flex items-center gap-1">
+                {label}
+                {isActive && (
+                    <span className="text-foreground">{sortDir === 'asc' ? '▲' : '▼'}</span>
+                )}
+            </span>
+        </TableHead>
+    );
+}
+
 export function InboxTable({
     documents,
     total,
@@ -75,6 +107,57 @@ export function InboxTable({
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [triageDocId, setTriageDocId] = useState<string | null>(null);
+    const [sortKey, setSortKey] = useState<SortKey>('date');
+    const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+    const toggleSort = useCallback((key: SortKey) => {
+        setSortKey((prev) => {
+            if (prev === key) {
+                setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+            } else {
+                setSortDir(key === 'confidence' || key === 'date' ? 'desc' : 'asc');
+            }
+            return key;
+        });
+    }, []);
+
+    const sortedDocuments = useMemo(() => {
+        const docs = [...documents];
+        const dir = sortDir === 'asc' ? 1 : -1;
+        docs.sort((a, b) => {
+            switch (sortKey) {
+                case 'document': {
+                    const av = (a.file_name ?? '').toLowerCase();
+                    const bv = (b.file_name ?? '').toLowerCase();
+                    return av.localeCompare(bv, 'de') * dir;
+                }
+                case 'property': {
+                    const av = (a.property_short_code ?? '').toLowerCase();
+                    const bv = (b.property_short_code ?? '').toLowerCase();
+                    return av.localeCompare(bv, 'de') * dir;
+                }
+                case 'category': {
+                    const av = getCategoryLabel(a.category).de.toLowerCase();
+                    const bv = getCategoryLabel(b.category).de.toLowerCase();
+                    return av.localeCompare(bv, 'de') * dir;
+                }
+                case 'status': {
+                    return a.status.localeCompare(b.status, 'de') * dir;
+                }
+                case 'confidence': {
+                    const av = a.confidence_score ?? -1;
+                    const bv = b.confidence_score ?? -1;
+                    return (av - bv) * dir;
+                }
+                case 'date': {
+                    return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * dir;
+                }
+                default:
+                    return 0;
+            }
+        });
+        return docs;
+    }, [documents, sortKey, sortDir]);
 
     const toggleSelect = useCallback((id: string) => {
         setSelected((prev) => {
@@ -174,24 +257,12 @@ export function InboxTable({
                                     onChange={toggleAll}
                                 />
                             </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.document.de.toUpperCase()}
-                            </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.property.de.toUpperCase()}
-                            </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.category.de.toUpperCase()}
-                            </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.status.de.toUpperCase()}
-                            </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.confidence.de.toUpperCase()}
-                            </TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                {t.date.de.toUpperCase()}
-                            </TableHead>
+                            <SortableHeader label={t.document.de.toUpperCase()} sortKey="document" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <SortableHeader label={t.property.de.toUpperCase()} sortKey="property" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <SortableHeader label={t.category.de.toUpperCase()} sortKey="category" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <SortableHeader label={t.status.de.toUpperCase()} sortKey="status" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <SortableHeader label={t.confidence.de.toUpperCase()} sortKey="confidence" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <SortableHeader label={t.date.de.toUpperCase()} sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 {t.source.de.toUpperCase()}
                             </TableHead>
@@ -203,7 +274,7 @@ export function InboxTable({
                         <LoadingRows rows={5} cols={7} />
                     ) : (
                         <TableBody>
-                            {documents.map((doc) => {
+                            {sortedDocuments.map((doc) => {
                                 const isSelected = selected.has(doc.id);
                                 const catLabel = getCategoryLabel(doc.category);
                                 const displayName = doc.file_name;
