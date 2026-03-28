@@ -994,9 +994,31 @@ export async function getCategoryDocuments(propertyId: string, category: string)
 
     if (error) return { error: error.message, documents: [], property: null };
 
+    // Fetch extractions for amounts/vendor
+    const docIds = (data || []).map(d => d.id as string);
+    let extractionMap: Record<string, { amount?: string; vendor_name?: string }> = {};
+    if (docIds.length > 0) {
+        const { data: extractions } = await db.from('document_extractions')
+            .select('document_id, extracted_fields')
+            .in('document_id', docIds);
+        if (extractions) {
+            for (const ext of extractions) {
+                const fields = ext.extracted_fields as Record<string, unknown> | null;
+                extractionMap[ext.document_id as string] = {
+                    amount: fields?.amount ? String(fields.amount) : undefined,
+                    vendor_name: fields?.vendor_name ? String(fields.vendor_name) : undefined,
+                };
+            }
+        }
+    }
+
     return {
         error: null,
-        documents: data || [],
+        documents: (data || []).map(d => ({
+            ...d,
+            amount: extractionMap[d.id as string]?.amount ?? null,
+            vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
+        })),
         property: {
             id: property.id,
             name: property.name,
