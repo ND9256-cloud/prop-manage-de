@@ -368,13 +368,15 @@ async function extractFields(
     // deno-lint-ignore no-explicit-any
     let extractedFields: Record<string, any> = { confidence_score: 0, missing_fields: ["parse_error"] };
 
+    const germanInstruction = "IMPORTANT: All free-text field values (description, summary, key_dates, key_amounts, missing_fields, condition_summary, damages, parties_mentioned, address_hint) MUST be written in German, even if the source document is in English.";
+
     const prompts: Record<string, string> = {
-        invoice: `Extract from this German or English invoice.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"vendor_name":"","amount":0,"currency":"EUR","invoice_date":"YYYY-MM-DD","invoice_number":null,"description":"","category_hint":"maintenance|utilities|insurance|management|cleaning|other","address_hint":null,"unit_hint":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
-        lease: `Extract from this German or English lease agreement.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"tenant_first_name":"","tenant_last_name":"","tenant_email":null,"address_street":"","address_number":"","address_zip":"","address_city":"","unit_ref":"","rent_cold":0,"rent_warm":null,"deposit":null,"lease_start":"YYYY-MM-DD","lease_end":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
-        inspection_report: `Extract from this German or English inspection report.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"inspection_date":"YYYY-MM-DD","unit_ref":null,"address_hint":null,"condition_summary":"","meter_readings":{"electricity":null,"gas":null,"water":null},"damages":[],"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
+        invoice: `Extract from this German or English invoice.\n${germanInstruction}\nReturn ONLY valid JSON, no markdown, no explanation:\n{"vendor_name":"","amount":0,"currency":"EUR","invoice_date":"YYYY-MM-DD","invoice_number":null,"description":"","category_hint":"maintenance|utilities|insurance|management|cleaning|other","address_hint":null,"unit_hint":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
+        lease: `Extract from this German or English lease agreement.\n${germanInstruction}\nReturn ONLY valid JSON, no markdown, no explanation:\n{"tenant_first_name":"","tenant_last_name":"","tenant_email":null,"address_street":"","address_number":"","address_zip":"","address_city":"","unit_ref":"","rent_cold":0,"rent_warm":null,"deposit":null,"lease_start":"YYYY-MM-DD","lease_end":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
+        inspection_report: `Extract from this German or English inspection report.\n${germanInstruction}\nReturn ONLY valid JSON, no markdown, no explanation:\n{"inspection_date":"YYYY-MM-DD","unit_ref":null,"address_hint":null,"condition_summary":"","meter_readings":{"electricity":null,"gas":null,"water":null},"damages":[],"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`,
     };
 
-    const defaultPrompt = `Extract any relevant property management fields.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"summary":"","key_dates":[],"key_amounts":[],"parties_mentioned":[],"address_hint":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`;
+    const defaultPrompt = `Extract any relevant property management fields.\n${germanInstruction}\nReturn ONLY valid JSON, no markdown, no explanation:\n{"summary":"","key_dates":[],"key_amounts":[],"parties_mentioned":[],"address_hint":null,"confidence_score":0,"missing_fields":[]}\n\nDocument text:\n${extractedText.slice(0, 6000)}`;
 
     try {
         const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
