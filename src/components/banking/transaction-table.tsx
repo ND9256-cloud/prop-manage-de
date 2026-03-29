@@ -308,7 +308,7 @@ export default function TransactionTable({
                                                     <ChevronDown className="h-4 w-4" />
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                            <td className="px-4 py-3 whitespace-nowrap text-muted-foreground" suppressHydrationWarning>
                                                 {formatDate(tx.bookingDate)}
                                             </td>
                                             <td className="px-4 py-3">
@@ -483,7 +483,7 @@ function DetailField({ label, value, className }: { label: string; value: string
     return (
         <div>
             <span className="text-xs text-muted-foreground uppercase tracking-wide">{label}</span>
-            <p className={className || ''}>{value}</p>
+            <p className={className || ''} suppressHydrationWarning>{value}</p>
         </div>
     );
 }

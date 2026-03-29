@@ -123,7 +123,7 @@ export default function ConnectionList({ connections }: ConnectionListProps) {
                                 </div>
                                 <div>
                                     <CardTitle className="text-base">{connection.aspspName}</CardTitle>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground" suppressHydrationWarning>
                                         Verbunden am {new Date(connection.createdAt).toLocaleDateString('de-DE')}
                                         {connection.validUntil && (
                                             <> · Gültig bis {new Date(connection.validUntil).toLocaleDateString('de-DE')}</>
@@ -177,7 +177,7 @@ export default function ConnectionList({ connections }: ConnectionListProps) {
                                                     {account._count.transactions} Buchungen
                                                 </span>
                                                 {account.lastSyncedAt && (
-                                                    <span className="text-xs text-muted-foreground">
+                                                    <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                                                         Zuletzt: {new Date(account.lastSyncedAt).toLocaleString('de-DE')}
                                                     </span>
                                                 )}

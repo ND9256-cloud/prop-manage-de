@@ -350,7 +350,7 @@ export function InboxTable({
 
                                         {/* Date */}
                                         <TableCell className="py-3 px-4">
-                                            <span className="text-sm text-muted-foreground">
+                                            <span className="text-sm text-muted-foreground" suppressHydrationWarning>
                                                 {formatDate(doc.created_at)}
                                             </span>
                                         </TableCell>

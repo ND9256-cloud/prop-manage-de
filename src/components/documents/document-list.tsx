@@ -172,7 +172,7 @@ export default function DocumentList({
                                 {fileIcon(doc.mimeType)}
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium truncate">{doc.name}</p>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-xs text-muted-foreground" suppressHydrationWarning>
                                         {typeLabel(doc.type)} · {formatSize(doc.fileSize)} ·{' '}
                                         {new Date(doc.createdAt).toLocaleDateString('de-DE')}
                                     </p>

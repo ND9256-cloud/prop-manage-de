@@ -290,11 +290,11 @@ export function PropertyCosts({
                                                 <TooltipProvider>
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
-                                                            <span className="text-sm text-foreground">
+                                                            <span className="text-sm text-foreground" suppressHydrationWarning>
                                                                 {new Date(row.displayDate).toLocaleDateString('de-DE')}
                                                             </span>
                                                         </TooltipTrigger>
-                                                        <TooltipContent>
+                                                        <TooltipContent suppressHydrationWarning>
                                                             {new Date(row.displayDate).toLocaleString('de-DE')}
                                                             {row.invoiceDate
                                                                 ? ' (Rechnungsdatum)'

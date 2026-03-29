@@ -195,7 +195,7 @@ export default function ServiceProviderList({
                                 <th className="text-left p-3 font-medium hidden md:table-cell">Kontakt</th>
                                 <th className="text-left p-3 font-medium hidden lg:table-cell">Referenz</th>
                                 <th className="text-right p-3 font-medium">Häufigkeit</th>
-                                <th className="text-right p-3 font-medium">{currentYear}</th>
+                                <th className="text-right p-3 font-medium" suppressHydrationWarning>{currentYear}</th>
                                 <th className="p-3 w-8"></th>
                             </tr>
                         </thead>

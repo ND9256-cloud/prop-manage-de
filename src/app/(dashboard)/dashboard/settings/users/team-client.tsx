@@ -245,7 +245,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
                                                 {getRoleLabel(m.role)}
                                             </Badge>
                                         </td>
-                                        <td className="p-3 whitespace-nowrap text-muted-foreground">
+                                        <td className="p-3 whitespace-nowrap text-muted-foreground" suppressHydrationWarning>
                                             {fmtDate(m.joinedAt)}
                                         </td>
                                         <td className="p-3 text-right">
@@ -336,7 +336,7 @@ export function TeamClient({ members, invitations }: TeamClientProps) {
                                                     {getRoleLabel(inv.role)}
                                                 </Badge>
                                             </td>
-                                            <td className="p-3 text-muted-foreground whitespace-nowrap">
+                                            <td className="p-3 text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
                                                 {fmtRelative(inv.expiresAt)}
                                             </td>
                                             <td className="p-3 text-right">

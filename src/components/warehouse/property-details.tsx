@@ -302,13 +302,13 @@ export function PropertyDetails({ property, units, meta, readOnly }: PropertyDet
             <dl className="grid grid-cols-2 gap-x-8 gap-y-2">
                 <div>
                     <dt className="text-xs text-muted-foreground">Erstellt</dt>
-                    <dd className="text-xs text-foreground font-mono">
+                    <dd className="text-xs text-foreground font-mono" suppressHydrationWarning>
                         {new Date(property.createdAt).toLocaleDateString('de-DE')}
                     </dd>
                 </div>
                 <div>
                     <dt className="text-xs text-muted-foreground">Zuletzt verbucht</dt>
-                    <dd className="text-xs text-foreground font-mono">
+                    <dd className="text-xs text-foreground font-mono" suppressHydrationWarning>
                         {meta.lastAppliedAt
                             ? new Date(meta.lastAppliedAt).toLocaleDateString('de-DE')
                             : '—'}

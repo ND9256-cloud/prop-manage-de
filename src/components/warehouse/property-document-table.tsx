@@ -259,7 +259,7 @@ export function PropertyDocumentTable({
                                     <td className="px-4 py-3 text-sm text-foreground font-mono">
                                         {doc.amount ?? '—'}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
                                         {new Date(doc.createdAt).toLocaleDateString('de-DE')}
                                     </td>
                                     <td className="px-4 py-3">

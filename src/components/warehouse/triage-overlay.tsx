@@ -359,7 +359,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                         </Badge>
                                         <StatusBadge status={doc.status as string} />
                                         <SourceIcon source={(doc.source as 'email' | 'telegram' | 'ui') ?? 'ui'} />
-                                        <span className="text-xs text-muted-foreground">
+                                        <span className="text-xs text-muted-foreground" suppressHydrationWarning>
                                             {doc.created_at
                                                 ? new Date(doc.created_at as string).toLocaleDateString('de-DE')
                                                 : '—'}
@@ -505,7 +505,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             </div>
                                             <div className="flex gap-2">
                                                 <span>📅</span>
-                                                <span className="text-muted-foreground">
+                                                <span className="text-muted-foreground" suppressHydrationWarning>
                                                     {extraction?.created_at
                                                         ? new Date(extraction.created_at).toLocaleString('de-DE')
                                                         : '—'}

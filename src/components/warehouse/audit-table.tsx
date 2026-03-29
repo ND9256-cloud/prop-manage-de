@@ -337,11 +337,11 @@ export function AuditTable({ events, total, page, actors, properties, currentFil
                                             <TooltipProvider>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
-                                                        <span className="text-sm text-foreground">
+                                                        <span className="text-sm text-foreground" suppressHydrationWarning>
                                                             {relativeTime(evt.created_at)}
                                                         </span>
                                                     </TooltipTrigger>
-                                                    <TooltipContent>
+                                                    <TooltipContent suppressHydrationWarning>
                                                         {new Date(evt.created_at).toLocaleString('de-DE')}
                                                     </TooltipContent>
                                                 </Tooltip>

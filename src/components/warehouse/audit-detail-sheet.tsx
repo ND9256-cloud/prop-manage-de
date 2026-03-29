@@ -87,7 +87,7 @@ export function AuditDetailSheet({ event, onClose, properties }: AuditDetailShee
                             {EVENT_LABELS[event.event_type] ?? event.event_type}
                         </Badge>
                     </div>
-                    <SheetTitle className="text-lg">
+                    <SheetTitle className="text-lg" suppressHydrationWarning>
                         {new Date(event.created_at).toLocaleString('de-DE', {
                             dateStyle: 'full',
                             timeStyle: 'medium',

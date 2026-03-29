@@ -108,7 +108,7 @@ function InvoiceFields({ fields }: { fields: Record<string, unknown> }) {
             </div>
             <div>
                 <span className="text-muted-foreground">Date</span>
-                <p className="font-medium">
+                <p className="font-medium" suppressHydrationWarning>
                     {fields.invoice_date
                         ? new Date(String(fields.invoice_date)).toLocaleDateString('de-DE')
                         : '—'}

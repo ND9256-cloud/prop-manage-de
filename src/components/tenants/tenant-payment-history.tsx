@@ -117,7 +117,7 @@ export default function TenantPaymentHistory({
                         ) : (
                             transactions.map((tx) => (
                                 <tr key={tx.id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
-                                    <td className="p-3 whitespace-nowrap text-muted-foreground">
+                                    <td className="p-3 whitespace-nowrap text-muted-foreground" suppressHydrationWarning>
                                         {formatDate(tx.bookingDate)}
                                     </td>
                                     <td className="p-3 max-w-[250px] truncate">
