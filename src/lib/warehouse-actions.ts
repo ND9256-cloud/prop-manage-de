@@ -1015,7 +1015,7 @@ export async function getCategoryDocuments(propertyId: string, category: string)
 
     // Fetch extractions for amounts/vendor
     const docIds = (data || []).map(d => d.id as string);
-    let extractionMap: Record<string, { amount?: string; vendor_name?: string }> = {};
+    let extractionMap: Record<string, { amount?: string; vendor_name?: string; extracted_date?: string }> = {};
     if (docIds.length > 0) {
         const { data: extractions } = await db.from('document_extractions')
             .select('document_id, extracted_fields')
@@ -1023,9 +1023,11 @@ export async function getCategoryDocuments(propertyId: string, category: string)
         if (extractions) {
             for (const ext of extractions) {
                 const fields = ext.extracted_fields as Record<string, unknown> | null;
+                const extractedDate = fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date;
                 extractionMap[ext.document_id as string] = {
                     amount: fields?.amount ? String(fields.amount) : undefined,
                     vendor_name: fields?.vendor_name ? String(fields.vendor_name) : undefined,
+                    extracted_date: extractedDate ? String(extractedDate) : undefined,
                 };
             }
         }
@@ -1037,6 +1039,7 @@ export async function getCategoryDocuments(propertyId: string, category: string)
             ...d,
             amount: extractionMap[d.id as string]?.amount ?? null,
             vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
+            extractedDate: extractionMap[d.id as string]?.extracted_date ?? null,
         })),
         property: {
             id: property.id,

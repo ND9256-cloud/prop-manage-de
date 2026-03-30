@@ -38,6 +38,7 @@ type Doc = {
     created_at: string;
     amount: string | null;
     vendorName: string | null;
+    extractedDate: string | null;
 };
 
 type PropertyInfo = {
@@ -62,6 +63,11 @@ function formatSize(bytes: number): string {
 
 function formatDateDE(iso: string | null): string {
     if (!iso) return '\u2014';
+    // Parse YYYY-MM-DD directly to avoid timezone shift from new Date()
+    const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+        return `${match[3]}.${match[2]}.${match[1]}`;
+    }
     const d = new Date(iso);
     return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
 }
@@ -362,7 +368,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                     </td>
                                     {/* Date */}
                                     <td className="p-3 text-muted-foreground">
-                                        {formatDateDE(doc.created_at)}
+                                        {formatDateDE(doc.extractedDate ?? doc.created_at)}
                                     </td>
                                     {/* Source */}
                                     <td className="p-3 text-center">
