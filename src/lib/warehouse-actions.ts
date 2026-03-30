@@ -1297,9 +1297,9 @@ export async function getInboxDocuments({
             confidence_score: extraction?.confidence_score ?? null,
             applied_by: applyData?.applied_by ?? null,
             applied_at: applyData?.applied_at ?? null,
-            vendorName: (fields?.absender ?? fields?.vendor ?? fields?.lieferant ?? null) as string | null,
-            amount: (fields?.betrag ?? fields?.amount ?? fields?.gesamtbetrag ?? null) as string | null,
-            extractedDate: (fields?.datum ?? fields?.date ?? fields?.rechnungsdatum ?? null) as string | null,
+            vendorName: fields?.vendor_name ? String(fields.vendor_name) : null,
+            amount: fields?.amount ? String(fields.amount) : null,
+            extractedDate: (fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date) ? String(fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date) : null,
         };
     });
 
