@@ -26,6 +26,9 @@ export interface InboxDocument {
     confidence_score: number | null;
     applied_by: string | null;
     applied_at: string | null;
+    vendorName: string | null;
+    amount: string | null;
+    extractedDate: string | null;
 }
 
 
@@ -385,7 +388,7 @@ export async function getPropertyDocuments(
 
     // Fetch extractions for amounts/vendor
     const docIds = data.map(d => d.id);
-    let extractionMap: Record<string, { amount?: string; vendor_name?: string }> = {};
+    let extractionMap: Record<string, { amount?: string; vendor_name?: string; extracted_date?: string }> = {};
     if (docIds.length > 0) {
         const { data: extractions } = await db.from('document_extractions')
             .select('document_id, extracted_fields')
@@ -396,9 +399,11 @@ export async function getPropertyDocuments(
         if (extractions) {
             for (const ext of extractions) {
                 const fields = ext.extracted_fields as Record<string, unknown> | null;
+                const extractedDate = fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date;
                 extractionMap[ext.document_id as string] = {
                     amount: fields?.amount ? String(fields.amount) : undefined,
                     vendor_name: fields?.vendor_name ? String(fields.vendor_name) : undefined,
+                    extracted_date: extractedDate ? String(extractedDate) : undefined,
                 };
             }
         }
@@ -415,6 +420,7 @@ export async function getPropertyDocuments(
         createdAt: d.created_at as string,
         amount: extractionMap[d.id as string]?.amount ?? null,
         vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
+        extractedDate: extractionMap[d.id as string]?.extracted_date ?? null,
     }));
 
     return { docs, total: count ?? 0 };
@@ -1234,16 +1240,19 @@ export async function getInboxDocuments({
     }
 
     // Fetch extractions — SECURITY: org-scoped
-    let extractionsMap: Record<string, number | null> = {};
+    let extractionsMap: Record<string, { confidence_score: number | null; extracted_fields: Record<string, unknown> | null }> = {};
     if (docIds.length > 0) {
         const { data: extractions } = await db.from('document_extractions')
-            .select('document_id, confidence_score')
+            .select('document_id, confidence_score, extracted_fields')
             .eq('org_id', orgId)
             .in('document_id', docIds)
             .eq('is_current', true);
         if (extractions) {
             extractionsMap = Object.fromEntries(
-                extractions.map((e: Record<string, unknown>) => [e.document_id, e.confidence_score as number | null])
+                extractions.map((e: Record<string, unknown>) => [e.document_id, {
+                    confidence_score: e.confidence_score as number | null,
+                    extracted_fields: e.extracted_fields as Record<string, unknown> | null,
+                }])
             );
         }
     }
@@ -1268,6 +1277,8 @@ export async function getInboxDocuments({
     const documents: InboxDocument[] = (docs || []).map((d: Record<string, unknown>) => {
         const propData = propertiesMap[d.property_id as string];
         const applyData = applyMap[d.id as string];
+        const extraction = extractionsMap[d.id as string];
+        const fields = extraction?.extracted_fields;
         return {
             id: d.id as string,
             file_name: d.file_name as string,
@@ -1283,9 +1294,12 @@ export async function getInboxDocuments({
             subcategory: d.subcategory as string | null ?? null,
             property_address: propData?.address ?? null,
             property_short_code: propData?.short_code ?? null,
-            confidence_score: extractionsMap[d.id as string] ?? null,
+            confidence_score: extraction?.confidence_score ?? null,
             applied_by: applyData?.applied_by ?? null,
             applied_at: applyData?.applied_at ?? null,
+            vendorName: (fields?.absender ?? fields?.vendor ?? fields?.lieferant ?? null) as string | null,
+            amount: (fields?.betrag ?? fields?.amount ?? fields?.gesamtbetrag ?? null) as string | null,
+            extractedDate: (fields?.datum ?? fields?.date ?? fields?.rechnungsdatum ?? null) as string | null,
         };
     });
 

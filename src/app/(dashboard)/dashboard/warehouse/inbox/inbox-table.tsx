@@ -261,6 +261,9 @@ export function InboxTable({
                             <SortableHeader label={t.property.de.toUpperCase()} sortKey="property" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.category.de.toUpperCase()} sortKey="category" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.status.de.toUpperCase()} sortKey="status" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
+                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ABSENDER</TableHead>
+                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">BETRAG</TableHead>
+                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DATUM</TableHead>
                             <SortableHeader label={t.confidence.de.toUpperCase()} sortKey="confidence" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.date.de.toUpperCase()} sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -337,6 +340,23 @@ export function InboxTable({
                                         {/* Status */}
                                         <TableCell className="py-3 px-4">
                                             <StatusBadge status={doc.status} />
+                                        </TableCell>
+
+                                        {/* Absender */}
+                                        <TableCell className="py-3 px-4 text-sm text-foreground truncate max-w-[180px]">
+                                            {doc.vendorName ?? '—'}
+                                        </TableCell>
+
+                                        {/* Betrag */}
+                                        <TableCell className="py-3 px-4 text-sm text-foreground font-mono whitespace-nowrap">
+                                            {doc.amount ? `€${parseFloat(String(doc.amount).replace(',', '.')).toFixed(2)}` : '—'}
+                                        </TableCell>
+
+                                        {/* Datum (extracted) */}
+                                        <TableCell className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
+                                            {doc.extractedDate
+                                                ? new Date(doc.extractedDate).toLocaleDateString('de-DE')
+                                                : '—'}
                                         </TableCell>
 
                                         {/* Confidence */}
