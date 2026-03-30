@@ -27,6 +27,7 @@ export interface PropertyDoc {
     createdAt: string;
     amount: string | null;
     vendorName: string | null;
+    extractedDate: string | null;
 }
 
 function getCategoryLabel(key: string): string {
@@ -202,6 +203,9 @@ export function PropertyDocumentTable({
                                 Status
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                Absender
+                            </th>
+                            <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                 Betrag
                             </th>
                             <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -215,7 +219,7 @@ export function PropertyDocumentTable({
                     <tbody>
                         {docs.length === 0 ? (
                             <tr>
-                                <td colSpan={6} className="text-center py-16">
+                                <td colSpan={7} className="text-center py-16">
                                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                         <FileText className="h-8 w-8" />
                                         <p className="text-sm">Keine Dokumente</p>
@@ -230,14 +234,9 @@ export function PropertyDocumentTable({
                                     onClick={() => onDocumentClick(doc.id)}
                                 >
                                     <td className="px-4 py-3">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm text-foreground font-medium truncate max-w-[250px]">
-                                                {doc.fileName || doc.displayName}
-                                            </span>
-                                            {doc.fileName && doc.displayName !== doc.fileName && (
-                                                <span className="text-xs text-muted-foreground truncate max-w-[250px]">{doc.displayName}</span>
-                                            )}
-                                        </div>
+                                        <span className="text-sm text-foreground font-medium truncate max-w-[250px] block">
+                                            {doc.fileName || doc.displayName}
+                                        </span>
                                     </td>
                                     <td className="px-4 py-3">
                                         {doc.category ? (
@@ -256,11 +255,18 @@ export function PropertyDocumentTable({
                                             {STATUS_LABELS[doc.status] ?? doc.status}
                                         </Badge>
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-foreground font-mono">
-                                        {doc.amount ?? '—'}
+                                    <td className="px-4 py-3 text-sm text-foreground truncate max-w-[180px]">
+                                        {doc.vendorName ?? '—'}
                                     </td>
-                                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
-                                        {new Date(doc.createdAt).toLocaleDateString('de-DE')}
+                                    <td className="px-4 py-3 text-sm text-foreground font-mono whitespace-nowrap">
+                                        {doc.amount ? `€${parseFloat(String(doc.amount).replace(',', '.')).toFixed(2)}` : '—'}
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
+                                        {doc.extractedDate
+                                            ? (/^\d{4}-\d{2}-\d{2}/.test(doc.extractedDate)
+                                                ? doc.extractedDate.slice(8, 10) + '.' + doc.extractedDate.slice(5, 7) + '.' + doc.extractedDate.slice(0, 4)
+                                                : doc.extractedDate)
+                                            : '—'}
                                     </td>
                                     <td className="px-4 py-3">
                                         {sourceIcon(doc.source)}
