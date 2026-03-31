@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-03-29. Update this file after every architectural change._
+_Last updated: 2026-03-31. Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -13,7 +13,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.review_tasks: low-confidence review queue
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
-- warehouse.document_intelligence: DOES NOT EXIST — must be created
+- warehouse.document_intelligence: summaries, tags, entity refs, action signals per document (is_current=true pattern, RLS enabled)
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
@@ -31,7 +31,7 @@ Step 8b generateIntelligence: NOT IMPLEMENTED
 
 ### Files that DO NOT exist
 - src/lib/document-intelligence-schema.ts (was in Antigravity, never on Mac Mini)
-- Intelligence migration SQL
+- Intelligence runs migration SQL
 - Step 8b in pipeline
 
 ### Known Issues
