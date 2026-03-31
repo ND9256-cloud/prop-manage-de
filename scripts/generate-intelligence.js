@@ -99,7 +99,7 @@ async function callAnthropic(ocrText, docType, extractedFields) {
       messages: [
         {
           role: "user",
-          content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true}\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
+          content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true}\n\nWICHTIG zu unit_ref: Bekannte Einheiten sind EG, 1.OG, DG, Keller. Wenn der Mieter oder die Adresse auf eine bestimmte Einheit hinweist, gib diese an. Normalisiere immer zu: EG, 1.OG, DG, Keller.\nWICHTIG zu viewer_safe: NUR false für persönliche Dokumente (Gehaltsabrechnung, Kontoauszug, Personalausweis, Reisepass, Bonitätsauskunft, Selbstauskunft). Alle Immobilien-bezogenen Dokumente (Mietverträge, Nebenkostenabrechnungen, Rechnungen, Versicherungen, Bescheide, Übergabeprotokolle) sind IMMER viewer_safe: true.\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
         },
       ],
     }),
