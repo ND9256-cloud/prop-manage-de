@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-03-31. Update this file after every architectural change._
+_Last updated: 2026-03-31 (step 8b added). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -26,13 +26,11 @@ _Read this before writing any code or sending any task to Claude Code._
 ### Pipeline (10 functions, all active)
 1. claimJob 2. fetchDocument 3. extractText 4. classifyDocument
 5. extractFields 5b. categorize 6. storeExtraction 7. matchEntities
-8. routeByConfidence 9. completeJob
-Step 8b generateIntelligence: NOT IMPLEMENTED
+8. routeByConfidence 8b. generateIntelligence 9. completeJob
 
 ### Files that DO NOT exist
 - src/lib/document-intelligence-schema.ts (was in Antigravity, never on Mac Mini)
 - Intelligence runs migration SQL
-- Step 8b in pipeline
 
 ### Known Issues
 - connector.apply() fails for angebot/vollmacht/informationsmaterial doc_types
@@ -50,7 +48,6 @@ Step 8b generateIntelligence: NOT IMPLEMENTED
 - last_seen_at on memberships
 
 ### Designed but NOT implemented
-- Document Intelligence Layer (summaries, facts, action signals, viewer safety)
 - Full-text search, cost aggregation API
 - Auto-apply learning, vendor normalization
 - German summaries, tags

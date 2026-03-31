@@ -859,6 +859,100 @@ async function routeByConfidence(
     return finalStatus;
 }
 
+// ─── 8b. generateIntelligence (NON-FATAL) ────────────────────
+
+async function generateIntelligence(
+    supabase: SupabaseClient,
+    job: Job,
+    doc: Doc,
+    classification: Classification,
+    // deno-lint-ignore no-explicit-any
+    extractedFields: Record<string, any>,
+): Promise<void> {
+    try {
+        const ocrText = (doc.ocr_text ?? "").slice(0, 4000);
+        if (!ocrText) {
+            console.log("generateIntelligence: no ocr_text, skipping");
+            return;
+        }
+
+        const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
+        const contextBlock = JSON.stringify({
+            doc_type: classification.doc_type,
+            extracted_fields: extractedFields,
+        });
+
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: {
+                "x-api-key": anthropicKey,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            body: JSON.stringify({
+                model: "claude-sonnet-4-20250514",
+                max_tokens: 600,
+                messages: [{
+                    role: "user",
+                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true}\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
+                }],
+            }),
+        });
+
+        if (!response.ok) {
+            console.error(`generateIntelligence: API error ${response.status}`);
+            return;
+        }
+
+        const result = await response.json();
+        const text = result.content?.[0]?.text || "";
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) {
+            console.error("generateIntelligence: no JSON in response");
+            return;
+        }
+
+        const intel = JSON.parse(match[0]);
+
+        // Mark previous intelligence rows as not current
+        await supabase
+            .schema("warehouse")
+            .from("document_intelligence")
+            .update({ is_current: false })
+            .eq("document_id", job.document_id);
+
+        // Insert new intelligence
+        const { error: insertError } = await supabase
+            .schema("warehouse")
+            .from("document_intelligence")
+            .insert({
+                document_id: job.document_id,
+                org_id: job.org_id,
+                summary: intel.summary ?? "",
+                tags: intel.tags ?? [],
+                entity_name: intel.entity_name ?? null,
+                entity_type: intel.entity_type ?? null,
+                unit_ref: intel.unit_ref ?? null,
+                period_start: intel.period_start ?? null,
+                period_end: intel.period_end ?? null,
+                action_signals: intel.action_signals ?? [],
+                viewer_safe: intel.viewer_safe ?? true,
+                is_current: true,
+            });
+
+        if (insertError) {
+            console.error(`generateIntelligence: insert failed: ${insertError.message}`);
+            return;
+        }
+
+        console.log(`generateIntelligence complete: summary=${(intel.summary ?? "").slice(0, 60)}...`);
+    } catch (err) {
+        const errMsg = err instanceof Error ? err.message : "Intelligence generation failed";
+        console.error(`generateIntelligence failed (non-fatal): ${errMsg}`);
+        // NON-FATAL: do not throw, do not retry — pipeline continues
+    }
+}
+
 // ─── 10. completeJob ─────────────────────────────────────────────
 
 async function completeJob(supabase: SupabaseClient, job: Job): Promise<void> {
@@ -919,6 +1013,9 @@ serve(async (req: Request) => {
 
         // 9. Route by confidence
         const finalStatus = await routeByConfidence(supabase, job, classification, fields, extractionId, allMatches);
+
+        // 9b. Generate intelligence (non-fatal)
+        await generateIntelligence(supabase, job, doc, classification, fields);
 
         // 10. Complete job
         await completeJob(supabase, job);
