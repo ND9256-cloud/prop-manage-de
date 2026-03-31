@@ -45,6 +45,7 @@ yarn-error.log*
 /src/generated/prisma
 .env*.local
 scripts/debug-sp.ts
+scripts/.intelligence-state.json
 supabase/.temp/
 supabase/.temp/
 .claude/
