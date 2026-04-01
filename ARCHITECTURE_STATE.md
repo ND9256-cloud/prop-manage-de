@@ -13,7 +13,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.review_tasks: low-confidence review queue
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
-- warehouse.document_intelligence: summaries, tags, entity refs, action signals per document (is_current=true pattern, RLS enabled)
+- warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals per document (is_current=true pattern, RLS enabled)
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
