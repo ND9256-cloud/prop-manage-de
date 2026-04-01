@@ -37,6 +37,9 @@ _Read this before writing any code or sending any task to Claude Code._
 - 6 failed documents (HEIC, large PDFs)
 - Vendor name duplication (83 extracted, ~50 real)
 - Audit log property_id column: FIXED
+- viewer_safe incorrectly flags Mieteingänge summaries as false
+- unit_ref inconsistent across documents
+- Cost amounts include purchase prices
 
 ### Live Features
 - Open taxonomy (120 German types), DOC_TYPE_MAP
@@ -46,12 +49,12 @@ _Read this before writing any code or sending any task to Claude Code._
 - Triage overlay with apply/quarantine
 - CI/CD (GitHub Actions), 16 golden + 11 Playwright tests
 - last_seen_at on memberships
-- Document intelligence (summaries, entity_name, unit_ref in UI)
+- Document intelligence (summaries, entity_name, unit_ref in UI, German tags)
+- viewer_safe filtering on intelligence summaries
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
 - Auto-apply learning, vendor normalization
-- German summaries, tags
 
 ### Deferred
 - IBAN, due_date, payment_status extraction
