@@ -29,6 +29,7 @@ export interface InboxDocument {
     vendorName: string | null;
     amount: string | null;
     extractedDate: string | null;
+    summary: string | null;
 }
 
 
@@ -992,10 +993,12 @@ export async function getProperties() {
 }
 
 export async function getCategoryDocuments(propertyId: string, category: string) {
-    const orgId = await getOrgId();
+    const ctx = await getOrgContext().catch(() => null);
+    const orgId = ctx?.orgId;
     if (!orgId) return { error: 'Not authenticated', documents: [], property: null };
 
     const db = warehouseDb(orgId);
+    const isViewer = ctx.role === 'viewer';
 
     // Fetch property info
     const property = await prisma.property.findFirst({
@@ -1033,14 +1036,42 @@ export async function getCategoryDocuments(propertyId: string, category: string)
         }
     }
 
+    // Fetch intelligence (summary, viewer_safe)
+    let intelligenceMap: Record<string, { summary: string | null; viewer_safe: boolean }> = {};
+    if (docIds.length > 0) {
+        const { data: intelligence } = await db.from('document_intelligence')
+            .select('document_id, summary, viewer_safe')
+            .in('document_id', docIds)
+            .eq('is_current', true);
+        if (intelligence) {
+            for (const row of intelligence) {
+                intelligenceMap[row.document_id as string] = {
+                    summary: row.summary as string | null,
+                    viewer_safe: row.viewer_safe as boolean,
+                };
+            }
+        }
+    }
+
+    // Build documents, filtering out viewer_safe=false for viewer role
+    let documents = (data || []).map(d => ({
+        ...d,
+        amount: extractionMap[d.id as string]?.amount ?? null,
+        vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
+        extractedDate: extractionMap[d.id as string]?.extracted_date ?? null,
+        summary: intelligenceMap[d.id as string]?.summary ?? null,
+    }));
+
+    if (isViewer) {
+        documents = documents.filter(d => {
+            const intel = intelligenceMap[d.id as string];
+            return !intel || intel.viewer_safe !== false;
+        });
+    }
+
     return {
         error: null,
-        documents: (data || []).map(d => ({
-            ...d,
-            amount: extractionMap[d.id as string]?.amount ?? null,
-            vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
-            extractedDate: extractionMap[d.id as string]?.extracted_date ?? null,
-        })),
+        documents,
         property: {
             id: property.id,
             name: property.name,
@@ -1146,10 +1177,12 @@ export async function getInboxDocuments({
     page?: number;
     pageSize?: number;
 }): Promise<{ documents: InboxDocument[]; total: number; error: string | null }> {
-    const orgId = await getOrgId();
+    const ctx = await getOrgContext().catch(() => null);
+    const orgId = ctx?.orgId;
     if (!orgId) return { documents: [], total: 0, error: 'Not authenticated' };
 
     const db = warehouseDb(orgId);
+    const isViewer = ctx.role === 'viewer';
 
     // Build query with Supabase query builder — NO raw SQL
     // IMPORTANT: Apply all filter methods BEFORE transform methods (order/range)
@@ -1277,7 +1310,32 @@ export async function getInboxDocuments({
         }
     }
 
-    const documents: InboxDocument[] = (docs || []).map((d: Record<string, unknown>) => {
+    // Fetch intelligence (summary, viewer_safe) — SECURITY: org-scoped via RLS
+    let intelligenceMap: Record<string, { summary: string | null; viewer_safe: boolean }> = {};
+    if (docIds.length > 0) {
+        const { data: intelligence } = await db.from('document_intelligence')
+            .select('document_id, summary, viewer_safe')
+            .in('document_id', docIds)
+            .eq('is_current', true);
+        if (intelligence) {
+            for (const row of intelligence) {
+                intelligenceMap[row.document_id as string] = {
+                    summary: row.summary as string | null,
+                    viewer_safe: row.viewer_safe as boolean,
+                };
+            }
+        }
+    }
+
+    // Filter out viewer_safe=false for viewer role BEFORE mapping
+    const filteredDocs = isViewer
+        ? (docs || []).filter((d: Record<string, unknown>) => {
+            const intel = intelligenceMap[d.id as string];
+            return !intel || intel.viewer_safe !== false;
+        })
+        : (docs || []);
+
+    const documents: InboxDocument[] = filteredDocs.map((d: Record<string, unknown>) => {
         const propData = propertiesMap[d.property_id as string];
         const applyData = applyMap[d.id as string];
         const extraction = extractionsMap[d.id as string];
@@ -1303,10 +1361,11 @@ export async function getInboxDocuments({
             vendorName: fields?.vendor_name ? String(fields.vendor_name) : null,
             amount: fields?.amount ? String(fields.amount) : null,
             extractedDate: (fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date) ? String(fields?.invoice_date ?? fields?.lease_start ?? fields?.inspection_date) : null,
+            summary: intelligenceMap[d.id as string]?.summary ?? null,
         };
     });
 
-    return { documents, total: count ?? 0, error: null };
+    return { documents, total: isViewer ? documents.length : (count ?? 0), error: null };
 }
 
 export async function getInboxStats() {

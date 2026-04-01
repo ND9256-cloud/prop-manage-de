@@ -312,6 +312,11 @@ export function InboxTable({
                                                     {doc.display_name}
                                                 </p>
                                             )}
+                                            {doc.summary && (
+                                                <p className="truncate text-xs text-muted-foreground/70 mt-0.5">
+                                                    {doc.summary}
+                                                </p>
+                                            )}
                                         </TableCell>
 
                                         {/* Property */}
