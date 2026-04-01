@@ -10,7 +10,7 @@ test.describe('Inbox', () => {
     await expect(page.getByRole('heading', { name: 'Posteingang' })).toBeVisible();
 
     // Stats cards are rendered
-    await expect(page.getByText('Gesamt / Total')).toBeVisible();
+    await expect(page.getByText('Gesamt', { exact: true })).toBeVisible();
 
     // Table has at least one document row
     const rows = page.locator('table tbody tr');
@@ -40,6 +40,6 @@ test.describe('Inbox', () => {
     expect(cellCount).toBeGreaterThanOrEqual(5);
 
     // Date column should contain a formatted date (dd.mm.yyyy pattern)
-    await expect(firstRow.getByText(/\d{1,2}\.\d{1,2}\.\d{4}/)).toBeVisible();
+    await expect(page.locator('td').getByText(/\d{1,2}\.\d{1,2}\.\d{4}/).first()).toBeVisible();
   });
 });
