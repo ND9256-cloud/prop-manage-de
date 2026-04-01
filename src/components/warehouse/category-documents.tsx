@@ -40,6 +40,8 @@ type Doc = {
     vendorName: string | null;
     extractedDate: string | null;
     summary: string | null;
+    entityName: string | null;
+    unitRef: string | null;
 };
 
 type PropertyInfo = {
@@ -335,6 +337,11 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                                 <p className="font-medium truncate">{doc.file_name}</p>
                                                 {doc.display_name && doc.display_name !== doc.file_name && (
                                                     <p className="text-xs text-muted-foreground truncate">{doc.display_name}</p>
+                                                )}
+                                                {(doc.entityName || doc.unitRef) && (
+                                                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                        {[doc.entityName, doc.unitRef].filter(Boolean).join(' · ')}
+                                                    </p>
                                                 )}
                                                 {doc.summary && (
                                                     <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{doc.summary}</p>

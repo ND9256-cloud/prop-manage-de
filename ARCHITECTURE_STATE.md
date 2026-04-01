@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-03-31 (step 8b added). Update this file after every architectural change._
+_Last updated: 2026-04-01 (document_intelligence LIVE). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -46,6 +46,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - Triage overlay with apply/quarantine
 - CI/CD (GitHub Actions), 16 golden + 11 Playwright tests
 - last_seen_at on memberships
+- Document intelligence (summaries, entity_name, unit_ref in UI)
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API

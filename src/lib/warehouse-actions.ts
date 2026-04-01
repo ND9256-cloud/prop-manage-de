@@ -1036,17 +1036,19 @@ export async function getCategoryDocuments(propertyId: string, category: string)
         }
     }
 
-    // Fetch intelligence (summary, viewer_safe)
-    let intelligenceMap: Record<string, { summary: string | null; viewer_safe: boolean }> = {};
+    // Fetch intelligence (summary, entity_name, unit_ref, viewer_safe)
+    let intelligenceMap: Record<string, { summary: string | null; entity_name: string | null; unit_ref: string | null; viewer_safe: boolean }> = {};
     if (docIds.length > 0) {
         const { data: intelligence } = await db.from('document_intelligence')
-            .select('document_id, summary, viewer_safe')
+            .select('document_id, summary, entity_name, unit_ref, viewer_safe')
             .in('document_id', docIds)
             .eq('is_current', true);
         if (intelligence) {
             for (const row of intelligence) {
                 intelligenceMap[row.document_id as string] = {
                     summary: row.summary as string | null,
+                    entity_name: row.entity_name as string | null,
+                    unit_ref: row.unit_ref as string | null,
                     viewer_safe: row.viewer_safe as boolean,
                 };
             }
@@ -1060,6 +1062,8 @@ export async function getCategoryDocuments(propertyId: string, category: string)
         vendorName: extractionMap[d.id as string]?.vendor_name ?? null,
         extractedDate: extractionMap[d.id as string]?.extracted_date ?? null,
         summary: intelligenceMap[d.id as string]?.summary ?? null,
+        entityName: intelligenceMap[d.id as string]?.entity_name ?? null,
+        unitRef: intelligenceMap[d.id as string]?.unit_ref ?? null,
     }));
 
     if (isViewer) {
