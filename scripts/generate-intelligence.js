@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+require("dotenv").config({path: __dirname + "/../.env.local"});
 /**
  * Batch generate document intelligence for applied documents
  * that don't yet have a current intelligence row.
