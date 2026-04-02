@@ -122,6 +122,24 @@ async function testFixture(entry: ManifestEntry): Promise<TestResult> {
             `confidence_score out of range: expected ${expectedConfidence} ±0.1, got ${actualConfidence}`,
         );
 
+        // Assert document intelligence row exists
+        const { data: intelligence, error: intelError } = await supabase
+            .schema('warehouse')
+            .from('document_intelligence')
+            .select('summary')
+            .eq('document_id', entry.document_id)
+            .eq('is_current', true)
+            .single();
+
+        if (intelError) {
+            throw new Error(`document_intelligence query failed: ${intelError.message}`);
+        }
+
+        assert.ok(
+            intelligence.summary !== null && intelligence.summary !== undefined,
+            'document_intelligence summary must not be null',
+        );
+
         return { name: testName, passed: true };
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
