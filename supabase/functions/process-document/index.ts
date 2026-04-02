@@ -21,6 +21,7 @@ interface CategorizeResult {
     display_name: string;
     retention_until: string;
     property_id: string | null;
+    cost_class: string;
 }
 
 // ─── Open taxonomy: doc_type → category / subcategory / extraction prompt / retention ───
@@ -48,6 +49,27 @@ const DOC_TYPE_MAP: Record<string, {
 };
 
 const DOC_TYPE_DEFAULT = { category: "rechtliches", subcategory: null as string | null, extraction_prompt_key: "default", retention_years: 10 };
+
+// ─── Cost classification: doc_type → cost_class ─────────────────
+const COST_CLASS_MAP: Record<string, string> = {
+    handwerkerrechnung:             "betriebskosten",
+    grundsteuerbescheid:            "betriebskosten",
+    versicherungspolice:            "betriebskosten",
+    wartungsvertrag:                "betriebskosten",
+    schornsteinfegerbescheinigung:  "betriebskosten",
+    legionellenuntersuchung:        "betriebskosten",
+    nebenkostenabrechnung:          "abrechnung",
+    heizkostenabrechnung:           "abrechnung",
+    betriebskostenabrechnung:       "abrechnung",
+    notarieller_kaufvertrag:        "erwerbskosten",
+    grunderwerbsteuerbescheid:      "erwerbskosten",
+    courtagerechnung:               "erwerbskosten",
+    maklervereinbarung:             "erwerbskosten",
+    grundschuldbestellung:          "erwerbskosten",
+    darlehensvertrag:               "finanzierung",
+    kreditangebot:                  "finanzierung",
+    grundschuld:                    "finanzierung",
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
@@ -546,12 +568,16 @@ async function categorize(
     retentionDate.setFullYear(retentionDate.getFullYear() + retentionYears);
     const retentionUntil = retentionDate.toISOString().split("T")[0];
 
+    // 5. COST CLASS from COST_CLASS_MAP
+    const costClass = COST_CLASS_MAP[classification.doc_type] ?? "nicht_zugeordnet";
+
     const metadata: CategorizeResult = {
         category,
         subcategory,
         display_name: displayName,
         retention_until: retentionUntil,
         property_id: propertyId,
+        cost_class: costClass,
     };
 
     // Update the document
@@ -561,6 +587,7 @@ async function categorize(
             category: metadata.category,
             subcategory: metadata.subcategory,
             retention_until: metadata.retention_until,
+            cost_class: metadata.cost_class,
             updated_at: new Date().toISOString(),
         };
         if (metadata.property_id) {
@@ -580,6 +607,7 @@ async function categorize(
                 `categorize complete: category=${metadata.category}, ` +
                 `display_name=${metadata.display_name}, ` +
                 `property_id=${metadata.property_id ?? "none"}, ` +
+                `cost_class=${metadata.cost_class}, ` +
                 `retention=${metadata.retention_until}`
             );
         }

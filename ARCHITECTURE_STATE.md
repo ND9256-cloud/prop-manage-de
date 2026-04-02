@@ -6,7 +6,7 @@ _Read this before writing any code or sending any task to Claude Code._
 ## Database Tables — What Exists
 
 ### warehouse schema
-- warehouse.documents: 634 rows (626 applied, 6 failed, 2 quarantined)
+- warehouse.documents: 634 rows (626 applied, 6 failed, 2 quarantined) — has cost_class column (text)
 - warehouse.document_extractions: ~410 rows (is_current=true per doc, JSONB extracted_fields)
 - warehouse.processing_jobs: job queue, pg_cron every minute
 - warehouse.suggested_matches: entity matching results
@@ -40,7 +40,8 @@ _Read this before writing any code or sending any task to Claude Code._
 - viewer_safe incorrectly flags Mieteingänge summaries as false
 - unit_ref inconsistent across documents
 - Cost amounts include purchase prices
-- cost_class/umlagefaehig columns exist but only populated for new documents (397 existing rows have NULL)
+- cost_class/umlagefaehig columns on document_intelligence only populated for new documents (397 existing rows have NULL)
+- cost_class column on warehouse.documents set by pipeline via COST_CLASS_MAP, existing rows have NULL
 
 ### Live Features
 - Open taxonomy (120 German types), DOC_TYPE_MAP
