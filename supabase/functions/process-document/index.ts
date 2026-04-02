@@ -975,6 +975,17 @@ async function generateIntelligence(
             return;
         }
 
+        // Flag property brain as stale so it gets regenerated
+        const { error: staleError } = await supabase
+            .from("property_intelligence")
+            .update({ is_stale: true })
+            .eq("property_id", doc.property_id)
+            .eq("is_current", true);
+
+        if (staleError) {
+            console.error(`generateIntelligence: staleness flag failed: ${staleError.message}`);
+        }
+
         console.log(`generateIntelligence complete: summary=${(intel.summary ?? "").slice(0, 60)}...`);
     } catch (err) {
         const errMsg = err instanceof Error ? err.message : "Intelligence generation failed";

@@ -27,7 +27,7 @@ _Read this before writing any code or sending any task to Claude Code._
 ### Pipeline (10 functions, all active)
 1. claimJob 2. fetchDocument 3. extractText 4. classifyDocument
 5. extractFields 5b. categorize 6. storeExtraction 7. matchEntities
-8. routeByConfidence 8b. generateIntelligence 9. completeJob
+8. routeByConfidence 8b. generateIntelligence (flags property_intelligence stale) 9. completeJob
 
 ### Files that DO NOT exist
 - src/lib/document-intelligence-schema.ts (was in Antigravity, never on Mac Mini)
