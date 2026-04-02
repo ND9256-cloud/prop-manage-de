@@ -4,6 +4,7 @@ import { DokumenteTab } from '@/components/warehouse/dokumente-tab';
 import { PropertyCosts } from '@/components/warehouse/property-costs';
 import { PropertyAudit } from '@/components/warehouse/property-audit';
 import { PropertyDetails } from '@/components/warehouse/property-details';
+import { PropertyChat } from '@/components/warehouse/property-chat';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
@@ -239,6 +240,8 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     readOnly={readOnly}
                 />
             )}
+
+            <PropertyChat propertyId={propertyId} />
         </div>
     );
 }
