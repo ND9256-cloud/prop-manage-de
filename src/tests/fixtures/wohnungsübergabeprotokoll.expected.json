@@ -1,6 +1,6 @@
 {
   "doc_type": "wohnungsübergabeprotokoll",
-  "category": "instandhaltung",
+  "category": "vertraege",
   "subcategory": "uebergabe",
   "extracted_fields": {
     "damages": [

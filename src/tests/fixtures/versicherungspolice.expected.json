@@ -1,6 +1,6 @@
 {
   "doc_type": "versicherungspolice",
-  "category": "kosten_rechnungen",
+  "category": "vertraege",
   "subcategory": "versicherung",
   "extracted_fields": {
     "summary": "Comparison document of residential building insurance (Wohngebäudeversicherung) between VGB 2023 Classic (new offer) and VGB 2018 Classic (previous offer), highlighting coverage differences for garages, carports, outbuildings, wind turbines, natural hazards, and various service inclusions.",
