@@ -54,6 +54,13 @@ _Read this before writing any code or sending any task to Claude Code._
 - Document intelligence (summaries, entity_name, unit_ref, cost_class, umlagefaehig in UI, German tags)
 - viewer_safe filtering on intelligence summaries
 
+### SQL Views (warehouse schema)
+- warehouse.v_cost_overview: cost aggregation by property, cost_class, year
+- warehouse.v_vendor_summary: vendor aggregation by property
+- warehouse.v_insurance_status: applied insurance documents with intelligence
+- warehouse.v_open_actions: documents with pending action signals
+- warehouse.v_property_summary: doc and photo counts per property
+
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
 - Auto-apply learning, vendor normalization
