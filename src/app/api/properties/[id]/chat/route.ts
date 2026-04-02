@@ -44,6 +44,7 @@ export async function POST(
 
         // Load brain from warehouse.property_intelligence
         const { data: brain } = await supabase
+            .schema('warehouse')
             .from('property_intelligence')
             .select('analysis, is_stale')
             .eq('property_id', propertyId)
