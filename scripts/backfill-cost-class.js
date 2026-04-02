@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: __dirname + "/../.env.local" });
 /**
- * Backfill cost_class + umlagefaehig on existing document_intelligence rows
- * using keyword matching (no AI calls).
+ * Backfill cost_class on warehouse.documents for all applied documents.
+ *
+ * Logic:
+ * 1. Use COST_CLASS_MAP (same as pipeline) for doc_type → cost_class.
+ * 2. For doc_type=rechnung, check filename for personal cost patterns →
+ *    nicht_immobilien. If amount > 10000 → erwerbskosten. Otherwise betriebskosten.
+ * 3. Fallback: nicht_zugeordnet.
  *
  * Usage: node scripts/backfill-cost-class.js
  */
@@ -21,137 +26,185 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   db: { schema: "warehouse" },
 });
 
-// --- keyword rules (order matters: first match wins) ---
+// Same as pipeline (supabase/functions/process-document/index.ts)
+const COST_CLASS_MAP = {
+  handwerkerrechnung:             "betriebskosten",
+  grundsteuerbescheid:            "betriebskosten",
+  versicherungspolice:            "betriebskosten",
+  wartungsvertrag:                "betriebskosten",
+  schornsteinfegerbescheinigung:  "betriebskosten",
+  legionellenuntersuchung:        "betriebskosten",
+  nebenkostenabrechnung:          "abrechnung",
+  heizkostenabrechnung:           "abrechnung",
+  betriebskostenabrechnung:       "abrechnung",
+  notarieller_kaufvertrag:        "erwerbskosten",
+  grunderwerbsteuerbescheid:      "erwerbskosten",
+  courtagerechnung:               "erwerbskosten",
+  maklervereinbarung:             "erwerbskosten",
+  grundschuldbestellung:          "erwerbskosten",
+  darlehensvertrag:               "finanzierung",
+  kreditangebot:                  "finanzierung",
+  grundschuld:                    "finanzierung",
+};
 
-const UMLAGEFAEHIG_KEYWORDS = [
-  "grundsteuer", "wasser", "abwasser", "müll", "heizung",
-  "schornsteinfeger", "versicherung", "hauswart", "winterdienst",
-  "gartenpflege", "rauchmelder", "wartung", "beleuchtung",
+// Filename patterns that indicate personal / non-property costs
+const PERSONAL_COST_PATTERNS = [
+  "db ticket", "deutsche bahn",
+  "restaurant", "pizzeria", "café", "cafe",
+  "verpflegung",
+  "sixt", "mietwagen",
+  "öbb", "obb",
+  "geschenk",
+  "thinkimmo", "think immo",
+  "ohne makler", "ohnemakler",
 ];
 
-const NICHT_IMMOBILIEN_KEYWORDS = [
-  "restaurant", "pizzeria", "verpflegung", "reisekosten",
-  "zugfahrkarte", "mietwagen", "privat", "einkauf", "kassenbon", "transport",
+// Tenant name patterns (miete + tenant-like context in filename)
+const MIETE_TENANT_PATTERNS = [
+  /miete\s*[a-zäöüß]+/i,  // "Miete Müller", "Miete Schmidt"
 ];
 
-const ERWERBSKOSTEN_KEYWORDS = [
-  "kaufvertrag", "grunderwerbsteuer", "courtage", "makler",
-  "notar", "grundbuch", "eigentümer", "beurkundung",
-];
+function classifyRechnung(fileName, amount) {
+  const fn = (fileName || "").toLowerCase();
 
-const FINANZIERUNG_KEYWORDS = ["darlehen", "kredit", "grundschuld"];
+  // Check personal cost patterns
+  if (PERSONAL_COST_PATTERNS.some((p) => fn.includes(p))) {
+    return "nicht_immobilien";
+  }
 
-const MIETEINGANG_KEYWORDS = ["mietzahlung", "mieteingang"];
+  // Check miete + tenant name pattern
+  if (MIETE_TENANT_PATTERNS.some((re) => re.test(fn))) {
+    return "nicht_immobilien";
+  }
 
-const ABRECHNUNG_DOC_TYPES = ["nebenkostenabrechnung", "heizkostenabrechnung"];
+  // High-value invoices are acquisition costs
+  if (amount != null && amount > 10000) {
+    return "erwerbskosten";
+  }
 
-function classify(row) {
-  const text = [
-    row.summary || "",
-    ...(row.tags || []),
-  ].join(" ").toLowerCase();
+  // Default for rechnung
+  return "betriebskosten";
+}
 
-  const docType = (row.doc_type || "").toLowerCase();
+function classify(doc, amount) {
+  const docType = (doc.doc_type || "").toLowerCase();
 
-  if (UMLAGEFAEHIG_KEYWORDS.some((k) => text.includes(k))) {
-    return { cost_class: "betriebskosten", umlagefaehig: true };
+  // Special handling for rechnung
+  if (docType === "rechnung") {
+    return classifyRechnung(doc.file_name, amount);
   }
-  if (NICHT_IMMOBILIEN_KEYWORDS.some((k) => text.includes(k))) {
-    return { cost_class: "nicht_immobilien", umlagefaehig: false };
+
+  // Use COST_CLASS_MAP (same as pipeline)
+  if (COST_CLASS_MAP[docType]) {
+    return COST_CLASS_MAP[docType];
   }
-  if (ERWERBSKOSTEN_KEYWORDS.some((k) => text.includes(k))) {
-    return { cost_class: "erwerbskosten", umlagefaehig: false };
-  }
-  if (FINANZIERUNG_KEYWORDS.some((k) => text.includes(k))) {
-    return { cost_class: "finanzierung", umlagefaehig: false };
-  }
-  if (MIETEINGANG_KEYWORDS.some((k) => text.includes(k))) {
-    return { cost_class: "mieteingang", umlagefaehig: false };
-  }
-  if (ABRECHNUNG_DOC_TYPES.includes(docType)) {
-    return { cost_class: "abrechnung", umlagefaehig: true };
-  }
-  // Fallback for rows that have an amount → non-apportionable operating cost
-  if (row.amount != null) {
-    return { cost_class: "betriebskosten", umlagefaehig: false };
-  }
-  return null; // no classification possible
+
+  return "nicht_zugeordnet";
 }
 
 async function main() {
-  // Fetch rows where cost_class is NULL, join doc_type + amount from documents
-  const { data: rows, error } = await supabase
-    .from("document_intelligence")
-    .select("id, document_id, summary, tags")
-    .is("cost_class", null)
-    .eq("is_current", true);
+  // Fetch all applied documents with NULL cost_class
+  const { data: docs, error } = await supabase
+    .from("documents")
+    .select("id, doc_type, file_name, property_id, status")
+    .eq("status", "applied")
+    .is("cost_class", null);
 
   if (error) {
-    console.error("Failed to fetch intelligence rows:", error.message);
+    console.error("Failed to fetch documents:", error.message);
     process.exit(1);
   }
 
-  console.log(`Found ${rows.length} rows with NULL cost_class`);
-  if (rows.length === 0) return;
+  console.log(`Found ${docs.length} applied documents with NULL cost_class`);
+  if (docs.length === 0) return;
 
-  // Batch fetch helper (Supabase URL length limits)
-  async function batchIn(table, selectCols, colName, ids, extraFilters) {
-    const BATCH = 100;
-    const all = [];
-    for (let i = 0; i < ids.length; i += BATCH) {
-      let q = supabase.from(table).select(selectCols).in(colName, ids.slice(i, i + BATCH));
-      if (extraFilters) q = extraFilters(q);
-      const { data, error } = await q;
-      if (error) throw new Error(`Fetch ${table}: ${error.message}`);
-      all.push(...data);
+  // Fetch extraction amounts for these documents
+  const docIds = docs.map((d) => d.id);
+  const amountMap = {};
+
+  const BATCH = 100;
+  for (let i = 0; i < docIds.length; i += BATCH) {
+    const batch = docIds.slice(i, i + BATCH);
+    const { data: exts, error: extErr } = await supabase
+      .from("document_extractions")
+      .select("document_id, extracted_fields")
+      .in("document_id", batch)
+      .eq("is_current", true);
+
+    if (extErr) {
+      console.error("Failed to fetch extractions:", extErr.message);
+      process.exit(1);
     }
-    return all;
+    for (const ext of exts) {
+      const amt = ext.extracted_fields?.amount;
+      if (amt != null) amountMap[ext.document_id] = parseFloat(amt);
+    }
   }
 
-  const docIds = rows.map((r) => r.document_id);
-  const docs = await batchIn("documents", "id, doc_type", "id", docIds);
-  const extractions = await batchIn(
-    "document_extractions", "document_id, extracted_fields", "document_id", docIds,
-    (q) => q.eq("is_current", true),
-  );
+  // Fetch property names for reporting
+  const propertyIds = [...new Set(docs.map((d) => d.property_id).filter(Boolean))];
+  const propertyNames = {};
+  if (propertyIds.length > 0) {
+    const { data: props } = await supabase
+      .from("documents")
+      .select("property_id")
+      .in("property_id", propertyIds);
+    // Get property names from public schema
+    const pubSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+    for (const pid of propertyIds) {
+      const { data: prop } = await pubSupabase
+        .from("Property")
+        .select("name, code")
+        .eq("id", pid)
+        .single();
+      if (prop) propertyNames[pid] = prop.code || prop.name || pid;
+    }
+  }
 
-  const docMap = Object.fromEntries(docs.map((d) => [d.id, d]));
-  const extMap = Object.fromEntries(extractions.map((e) => [e.document_id, e]));
-
-  const counts = {};
-  let skipped = 0;
+  // Classify and update
+  const classCounts = {};
+  const propertyAmounts = {}; // { propertyId: { class: totalAmount } }
   let updated = 0;
 
-  for (const row of rows) {
-    const doc = docMap[row.document_id] || {};
-    const ext = extMap[row.document_id];
-    const amount = ext?.extracted_fields?.amount ?? null;
-    const enriched = { ...row, doc_type: doc.doc_type, amount };
-    const result = classify(enriched);
-
-    if (!result) {
-      skipped++;
-      continue;
-    }
+  for (const doc of docs) {
+    const amount = amountMap[doc.id] ?? null;
+    const costClass = classify(doc, amount);
 
     const { error: upErr } = await supabase
-      .from("document_intelligence")
-      .update({ cost_class: result.cost_class, umlagefaehig: result.umlagefaehig })
-      .eq("id", row.id);
+      .from("documents")
+      .update({ cost_class: costClass })
+      .eq("id", doc.id);
 
     if (upErr) {
-      console.error(`Failed to update row ${row.id}:`, upErr.message);
+      console.error(`Failed to update doc ${doc.id}:`, upErr.message);
       continue;
     }
 
-    counts[result.cost_class] = (counts[result.cost_class] || 0) + 1;
+    classCounts[costClass] = (classCounts[costClass] || 0) + 1;
     updated++;
+
+    // Track amounts per property per class
+    if (doc.property_id && amount != null) {
+      if (!propertyAmounts[doc.property_id]) propertyAmounts[doc.property_id] = {};
+      const pa = propertyAmounts[doc.property_id];
+      pa[costClass] = (pa[costClass] || 0) + amount;
+    }
   }
 
-  console.log(`\nUpdated ${updated} rows, skipped ${skipped}`);
-  console.log("Breakdown:");
-  for (const [cls, count] of Object.entries(counts).sort((a, b) => b[1] - a[1])) {
+  console.log(`\nUpdated ${updated} documents`);
+
+  console.log("\n--- Counts per class ---");
+  for (const [cls, count] of Object.entries(classCounts).sort((a, b) => b[1] - a[1])) {
     console.log(`  ${cls}: ${count}`);
+  }
+
+  console.log("\n--- Amounts per class per property ---");
+  for (const [pid, classes] of Object.entries(propertyAmounts)) {
+    const label = propertyNames[pid] || pid;
+    console.log(`\n  ${label}:`);
+    for (const [cls, total] of Object.entries(classes).sort((a, b) => b[1] - a[1])) {
+      console.log(`    ${cls}: €${total.toLocaleString("de-DE", { minimumFractionDigits: 2 })}`);
+    }
   }
 }
 
