@@ -894,7 +894,7 @@ async function generateIntelligence(
                 max_tokens: 600,
                 messages: [{
                     role: "user",
-                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true}\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
+                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true,"cost_class":"betriebskosten|erwerbskosten|abrechnung|finanzierung|mieteingang|nicht_immobilien|nicht_zugeordnet","umlagefaehig":true|false|null}\n\ncost_class: Klassifiziere die Kostenart. nicht_zugeordnet wenn unklar.\numlagefaehig: true wenn Kosten nach BetrKV auf Mieter umlegbar (Grundsteuer, Wasser, Abwasser, Müllabfuhr, Versicherung, Schornsteinfeger, Winterdienst, Hausmeister, Gartenpflege, Aufzug, Gemeinschaftsstrom, Kabelanschluss). false wenn nicht umlegbar (Instandhaltung, Reparaturen, Verwaltungskosten). null wenn kein Kostendokument.\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
                 }],
             }),
         });
@@ -937,6 +937,8 @@ async function generateIntelligence(
                 period_end: intel.period_end ?? null,
                 action_signals: intel.action_signals ?? [],
                 viewer_safe: intel.viewer_safe ?? true,
+                cost_class: intel.cost_class ?? null,
+                umlagefaehig: intel.umlagefaehig ?? null,
                 is_current: true,
             });
 

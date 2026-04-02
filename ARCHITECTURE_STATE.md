@@ -13,7 +13,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.review_tasks: low-confidence review queue
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
-- warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals per document (is_current=true pattern, RLS enabled)
+- warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled)
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
@@ -40,6 +40,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - viewer_safe incorrectly flags Mieteingänge summaries as false
 - unit_ref inconsistent across documents
 - Cost amounts include purchase prices
+- cost_class/umlagefaehig columns exist but only populated for new documents (397 existing rows have NULL)
 
 ### Live Features
 - Open taxonomy (120 German types), DOC_TYPE_MAP
@@ -49,7 +50,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - Triage overlay with apply/quarantine
 - CI/CD (GitHub Actions), 16 golden + 11 Playwright tests
 - last_seen_at on memberships
-- Document intelligence (summaries, entity_name, unit_ref in UI, German tags)
+- Document intelligence (summaries, entity_name, unit_ref, cost_class, umlagefaehig in UI, German tags)
 - viewer_safe filtering on intelligence summaries
 
 ### Designed but NOT implemented
