@@ -14,6 +14,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
 - warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled)
+- warehouse.property_intelligence: 0 rows — per-property AI analysis brain table (analysis jsonb, suggested_views jsonb, is_current=true pattern, RLS disabled)
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
