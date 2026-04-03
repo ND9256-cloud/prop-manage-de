@@ -141,7 +141,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
             </div>
 
             {/* Property stats row */}
-            <div className={`grid gap-4 ${readOnly ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-4'}`}>
+            <div className={`grid gap-4 ${readOnly ? 'grid-cols-2' : stats.needsReview > 0 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'}`}>
                 <Card>
                     <CardContent className="p-4 flex items-center gap-3">
                         <FileText className="h-5 w-5 text-blue-500" />
@@ -161,7 +161,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                             </div>
                         </CardContent>
                     </Card>
-                ) : (
+                ) : stats.needsReview > 0 ? (
                     <>
                         <Card>
                             <CardContent className="p-4 flex items-center gap-3">
@@ -193,7 +193,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                             </CardContent>
                         </Card>
                     </>
-                )}
+                ) : null}
             </div>
 
             {/* Document category cards */}
