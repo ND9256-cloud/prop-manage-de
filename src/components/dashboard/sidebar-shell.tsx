@@ -8,8 +8,8 @@ import {
     Inbox,
     ShieldCheck,
     Settings,
-    PanelLeftClose,
-    PanelLeftOpen,
+    ChevronLeft,
+    ChevronRight,
     LogOut,
 } from 'lucide-react';
 import {
@@ -90,10 +90,19 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
 
     return (
         <div
-            className={`flex h-full flex-col border-r bg-white overflow-hidden transition-[width] duration-200 ${
+            className={`relative flex h-full flex-col border-r bg-white overflow-visible transition-[width] duration-200 ${
                 collapsed ? 'w-[60px]' : 'w-64'
             }`}
         >
+            {/* Edge toggle button */}
+            <button
+                onClick={toggle}
+                className="absolute top-1/2 -right-3 z-50 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border bg-white text-gray-400 shadow-sm hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
+            >
+                {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+            </button>
+
             {/* Logo */}
             <div className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-4'} h-14 shrink-0`}>
                 <Link href="/dashboard/warehouse" className="flex items-center gap-2 overflow-hidden">
@@ -103,18 +112,6 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
                     <span className={`text-lg font-bold text-gray-900 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>PropManager</span>
                 </Link>
             </div>
-
-            {/* Toggle */}
-            <div className={`flex ${collapsed ? 'justify-center' : 'justify-end px-2'} pb-2 shrink-0`}>
-                <button
-                    onClick={toggle}
-                    className="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                    aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
-                >
-                    {collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-                </button>
-            </div>
-
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1 px-2 py-3 overflow-y-auto">
