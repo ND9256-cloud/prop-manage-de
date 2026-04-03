@@ -18,7 +18,6 @@ export const metadata: Metadata = {
 };
 
 import { auth } from '@/auth';
-import { SignOut } from '@/components/sign-out';
 import { getUserOrgs } from '@/lib/org-actions';
 import Link from 'next/link';
 
@@ -44,12 +43,7 @@ export default async function RootLayout({
             )}
           </div>
           <div>
-            {session?.user ? (
-              <div className="flex gap-4 items-center">
-                <span className="text-sm">Willkommen, {session.user.name || session.user.email}</span>
-                <SignOut />
-              </div>
-            ) : (
+            {!session?.user && (
               <Link href="/login" className="text-sm font-medium hover:underline">Login</Link>
             )}
           </div>
