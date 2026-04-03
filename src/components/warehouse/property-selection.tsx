@@ -8,11 +8,12 @@ import {
     FileText,
     AlertTriangle,
     Building2,
-
     Camera,
     AlertCircle,
     XCircle,
+    Brain,
 } from 'lucide-react';
+import type { BrainSummary } from '@/lib/dashboard-actions';
 
 type PropertyCard = {
     id: string;
@@ -45,12 +46,14 @@ type Props = {
     stats: Stats;
     propertyCards: PropertyCard[];
     role: string;
+    brainSummaries?: BrainSummary[];
 };
 
-export default function PropertySelection({ stats, propertyCards, role }: Props) {
+export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [] }: Props) {
     const router = useRouter();
 
     const isOperator = role === 'service_operator' || role === 'owner';
+    const isViewer = role === 'viewer';
 
 
     return (
@@ -193,6 +196,117 @@ export default function PropertySelection({ stats, propertyCards, role }: Props)
                         </div>
                     </CardContent>
                 </Card>
+            )}
+
+            {/* Immobilien-Analyse section */}
+            {brainSummaries.length > 0 && (
+                <div>
+                    <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        Immobilien-Analyse
+                    </h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        {brainSummaries.map((brain) => {
+                            const analysis = brain.analysis as Record<string, unknown>;
+                            const propertyCard = propertyCards.find((p) => p.id === brain.propertyId);
+                            const propertyName = propertyCard?.address ?? brain.propertyId;
+                            const propertyCode = propertyCard?.shortCode;
+
+                            // Extract fields from brain analysis
+                            const overview = analysis?.property_overview as { summary?: string } | undefined;
+                            const tenantData = analysis?.tenant_overview as { identified_tenants?: { name?: string; unit_ref?: string; rent_cold?: number }[] } | undefined;
+                            const tenants = tenantData?.identified_tenants ?? [];
+                            const riskSignals = analysis?.risk_signals as { high?: string[] } | undefined;
+                            const highRisks = riskSignals?.high ?? [];
+                            const actionItems = analysis?.action_items as { urgent?: { action?: string; reason?: string; deadline?: string }[] } | undefined;
+                            const urgentActions = actionItems?.urgent ?? [];
+
+                            return (
+                                <Card key={brain.propertyId}>
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-base font-semibold">
+                                                {propertyName}
+                                                {propertyCode && (
+                                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                                        {propertyCode}
+                                                    </Badge>
+                                                )}
+                                            </CardTitle>
+                                            {brain.isStale && (
+                                                <Badge variant="outline" className="text-yellow-600 border-yellow-400 bg-yellow-50 text-xs">
+                                                    Aktualisierung verfügbar
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="pt-0 space-y-3">
+                                        {/* Property status summary */}
+                                        {overview?.summary && (
+                                            <p className="text-sm text-muted-foreground line-clamp-3">
+                                                {overview.summary}
+                                            </p>
+                                        )}
+
+                                        {/* Tenant list */}
+                                        {tenants.length > 0 && (
+                                            <div>
+                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Mieter</h4>
+                                                <ul className="text-sm space-y-0.5">
+                                                    {tenants.map((t, i) => (
+                                                        <li key={i} className="flex items-center gap-1 text-xs">
+                                                            <span className="text-muted-foreground">{t.unit_ref ?? '–'}</span>
+                                                            <span className="mx-0.5">–</span>
+                                                            <span>{t.name ?? 'Unbekannt'}</span>
+                                                            {t.rent_cold != null && (
+                                                                <>
+                                                                    <span className="mx-0.5">–</span>
+                                                                    <span className="font-medium">{t.rent_cold.toLocaleString('de-DE')} €</span>
+                                                                </>
+                                                            )}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* High risks (top 2, hidden for viewer) */}
+                                        {!isViewer && highRisks.length > 0 && (
+                                            <div>
+                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Risiken (hoch)</h4>
+                                                <ul className="text-sm space-y-0.5">
+                                                    {highRisks.slice(0, 2).map((risk, i) => (
+                                                        <li key={i} className="text-xs text-red-600 dark:text-red-400">
+                                                            {risk}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+
+                                        {/* First urgent action (hidden for viewer) */}
+                                        {!isViewer && urgentActions.length > 0 && urgentActions[0]?.action && (
+                                            <div>
+                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Nächste Maßnahme</h4>
+                                                <div className="flex items-center gap-2 text-xs">
+                                                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                                        Dringend
+                                                    </Badge>
+                                                    <span>{urgentActions[0].action}</span>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Timestamp */}
+                                        <p className="text-[11px] text-muted-foreground pt-1 border-t">
+                                            Erstellt: {new Date(brain.generatedAt).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
 
         </div>
