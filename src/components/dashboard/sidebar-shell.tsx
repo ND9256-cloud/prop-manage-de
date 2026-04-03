@@ -90,19 +90,17 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
 
     return (
         <div
-            className={`flex h-full flex-col border-r bg-white transition-[width] duration-200 ${
+            className={`flex h-full flex-col border-r bg-white overflow-hidden transition-[width] duration-200 ${
                 collapsed ? 'w-[60px]' : 'w-64'
             }`}
         >
             {/* Logo */}
             <div className={`flex items-center ${collapsed ? 'justify-center px-2' : 'px-4'} h-14 shrink-0`}>
-                <Link href="/dashboard/warehouse" className="flex items-center gap-2">
+                <Link href="/dashboard/warehouse" className="flex items-center gap-2 overflow-hidden">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white font-bold text-sm">
                         P
                     </div>
-                    {!collapsed && (
-                        <span className="text-lg font-bold text-gray-900">PropManager</span>
-                    )}
+                    <span className={`text-lg font-bold text-gray-900 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>PropManager</span>
                 </Link>
             </div>
 
@@ -135,49 +133,37 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
 
             {/* Bottom section — Settings gear */}
             <div className="border-t px-2 py-3 shrink-0 relative">
-                {collapsed && mounted ? (
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <button
-                                ref={gearRef}
-                                onClick={() => setFlyoutOpen((v) => !v)}
-                                className={`flex items-center justify-center rounded-md py-2 w-full text-sm font-medium transition-colors ${
-                                    flyoutOpen
-                                        ? 'bg-blue-50 text-blue-700'
-                                        : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                                }`}
-                                aria-label="Einstellungen"
-                            >
-                                <Settings className="h-5 w-5 shrink-0" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" sideOffset={8}>
-                            Einstellungen
-                        </TooltipContent>
-                    </Tooltip>
-                ) : collapsed ? (
-                    <button
-                        ref={gearRef}
-                        onClick={() => setFlyoutOpen((v) => !v)}
-                        className="flex items-center justify-center rounded-md py-2 w-full text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-                        aria-label="Einstellungen"
-                    >
-                        <Settings className="h-5 w-5 shrink-0" />
-                    </button>
-                ) : (
-                    <button
-                        ref={gearRef}
-                        onClick={() => setFlyoutOpen((v) => !v)}
-                        className={`flex items-center gap-3 rounded-md py-2 px-3 w-full text-sm font-medium transition-colors ${
-                            flyoutOpen
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                        }`}
-                    >
-                        <Settings className="h-5 w-5 shrink-0" />
-                        <span>Einstellungen</span>
-                    </button>
-                )}
+                {(() => {
+                    const settingsButton = (
+                        <button
+                            ref={gearRef}
+                            onClick={() => setFlyoutOpen((v) => !v)}
+                            className={`flex items-center gap-3 rounded-md py-2 w-full text-sm font-medium transition-colors overflow-hidden ${
+                                collapsed ? 'justify-center px-0' : 'px-3'
+                            } ${
+                                flyoutOpen
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            }`}
+                            aria-label="Einstellungen"
+                        >
+                            <Settings className="h-5 w-5 shrink-0" />
+                            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>Einstellungen</span>
+                        </button>
+                    );
+
+                    if (collapsed && mounted) {
+                        return (
+                            <Tooltip>
+                                <TooltipTrigger asChild>{settingsButton}</TooltipTrigger>
+                                <TooltipContent side="right" sideOffset={8}>
+                                    Einstellungen
+                                </TooltipContent>
+                            </Tooltip>
+                        );
+                    }
+                    return settingsButton;
+                })()}
 
                 {/* Settings flyout */}
                 {flyoutOpen && (
@@ -258,20 +244,20 @@ function NavItem({
     const linkContent = (
         <Link
             href={item.href}
-            className={`relative flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors ${
+            className={`relative flex items-center gap-3 rounded-md py-2 text-sm font-medium transition-colors overflow-hidden ${
                 isActive
                     ? 'bg-blue-50 text-blue-700'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
             } ${collapsed ? 'justify-center px-0' : 'px-3'}`}
         >
             <Icon className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>{item.name}</span>}
+            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>{item.name}</span>
             {item.showBadge && reviewCount > 0 && role !== 'viewer' && (
                 <>
                     {collapsed ? (
                         <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
                     ) : (
-                        <span className="ml-auto flex items-center gap-1.5">
+                        <span className={`ml-auto flex items-center gap-1.5 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>
                             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                             <span className="text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
                                 {reviewCount}
