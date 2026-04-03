@@ -33,9 +33,9 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased h-screen flex flex-col overflow-hidden`}
       >
-        <header className="p-4 border-b flex justify-between items-center bg-white">
+        <header className="shrink-0 sticky top-0 z-50 p-4 border-b flex justify-between items-center bg-white">
           <div className="flex items-center gap-3">
             <Link href="/" className="font-bold text-xl">PropManager DE</Link>
             {activeOrg && (
@@ -48,7 +48,9 @@ export default async function RootLayout({
             )}
           </div>
         </header>
-        {children}
+        <div className="flex-1 overflow-hidden">
+          {children}
+        </div>
       </body>
     </html>
   );
