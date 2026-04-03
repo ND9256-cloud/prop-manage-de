@@ -58,11 +58,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
     return (
         <div className="space-y-6">
-            {/* Page header */}
-            <div>
-                <h1 className="text-2xl font-bold">Dokumentenarchiv</h1>
-            </div>
-
             {/* Portfolio bar */}
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Building2 className="h-4 w-4" />

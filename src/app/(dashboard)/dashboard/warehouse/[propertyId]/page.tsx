@@ -8,7 +8,7 @@ import { PropertyChat } from '@/components/warehouse/property-chat';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, FileText, AlertCircle, Building, Euro } from 'lucide-react';
+import { ChevronRight, FileText, AlertCircle, Building } from 'lucide-react';
 import { getOrgContext } from '@/lib/org';
 
 interface PageProps {
@@ -25,7 +25,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
     const { error: statsError, data: statsData } = await getPropertyStats(propertyId);
     if (statsError || !statsData) notFound();
 
-    const { property, totalDocs, needsReview, unitCount, totalCostsThisYear } = statsData;
+    const { property, totalDocs, needsReview, unitCount } = statsData;
 
     // Role for viewer enforcement
     const ctx = await getOrgContext().catch(() => null);
@@ -173,18 +173,6 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                         <span className="font-medium text-foreground">{unitCount}</span>
                         <span className="text-muted-foreground">Einheiten</span>
                     </div>
-                    {!readOnly && (
-                        <div
-                            className="flex items-center gap-1.5 text-sm"
-                            title="Basierend auf verbuchten Rechnungen"
-                        >
-                            <Euro className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium text-foreground">
-                                {totalCostsThisYear.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                            </span>
-                            <span className="text-muted-foreground">Erfasste Kosten {new Date().getFullYear()}</span>
-                        </div>
-                    )}
                 </div>
             </div>
 
