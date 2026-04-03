@@ -100,7 +100,7 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-blue-600 text-white font-bold text-sm">
                         P
                     </div>
-                    <span className={`text-lg font-bold text-gray-900 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>PropManager</span>
+                    <span className={`text-lg font-bold text-gray-900 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>PropManager</span>
                 </Link>
             </div>
 
@@ -148,7 +148,7 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
                             aria-label="Einstellungen"
                         >
                             <Settings className="h-5 w-5 shrink-0" />
-                            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>Einstellungen</span>
+                            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>Einstellungen</span>
                         </button>
                     );
 
@@ -251,13 +251,13 @@ function NavItem({
             } ${collapsed ? 'justify-center px-0' : 'px-3'}`}
         >
             <Icon className="h-5 w-5 shrink-0" />
-            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>{item.name}</span>
+            <span className={`whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>{item.name}</span>
             {item.showBadge && reviewCount > 0 && role !== 'viewer' && (
                 <>
                     {collapsed ? (
                         <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500" />
                     ) : (
-                        <span className={`ml-auto flex items-center gap-1.5 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0' : 'opacity-100'}`}>
+                        <span className={`ml-auto flex items-center gap-1.5 whitespace-nowrap transition-opacity duration-200 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
                             <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
                             <span className="text-xs font-semibold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">
                                 {reviewCount}
