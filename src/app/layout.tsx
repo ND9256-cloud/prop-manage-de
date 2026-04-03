@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 
 import { auth } from '@/auth';
 import { SignOut } from '@/components/sign-out';
+import { getUserOrgs } from '@/lib/org-actions';
 import Link from 'next/link';
 
 export default async function RootLayout({
@@ -27,6 +28,8 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const session = await auth();
+  const { orgs, activeOrgId } = session?.user ? await getUserOrgs() : { orgs: [], activeOrgId: null };
+  const activeOrg = orgs.find((o) => o.orgId === activeOrgId);
 
   return (
     <html lang="en">
@@ -34,7 +37,12 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <header className="p-4 border-b flex justify-between items-center bg-white">
-          <Link href="/" className="font-bold text-xl">PropManager DE</Link>
+          <div className="flex items-center gap-3">
+            <Link href="/" className="font-bold text-xl">PropManager DE</Link>
+            {activeOrg && (
+              <span className="text-sm text-muted-foreground">{activeOrg.orgName}</span>
+            )}
+          </div>
           <div>
             {session?.user ? (
               <div className="flex gap-4 items-center">

@@ -11,7 +11,6 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
 } from 'lucide-react';
-import { OrgSwitcher } from '@/components/dashboard/org-switcher';
 import {
     Tooltip,
     TooltipTrigger,
@@ -34,13 +33,11 @@ const settingsItem = { name: 'Einstellungen', href: '/dashboard/settings/users',
 interface SidebarShellProps {
     reviewCount: number;
     role: string;
-    orgs: { orgId: string; orgName: string; role: string }[];
-    activeOrgId: string;
     signOutSlot: React.ReactNode;
     signOutCollapsedSlot: React.ReactNode;
 }
 
-export function SidebarShell({ reviewCount, role, orgs, activeOrgId, signOutSlot, signOutCollapsedSlot }: SidebarShellProps) {
+export function SidebarShell({ reviewCount, role, signOutSlot, signOutCollapsedSlot }: SidebarShellProps) {
     const [collapsed, setCollapsed] = useState(true);
     const [mounted, setMounted] = useState(false);
     const pathname = usePathname();
@@ -96,12 +93,6 @@ export function SidebarShell({ reviewCount, role, orgs, activeOrgId, signOutSlot
                 </button>
             </div>
 
-            {/* Org switcher - only when expanded */}
-            {!collapsed && orgs.length > 1 && (
-                <div className="border-b px-2 pb-3 shrink-0">
-                    <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId} />
-                </div>
-            )}
 
             {/* Navigation */}
             <nav className="flex-1 space-y-1 px-2 py-3 overflow-y-auto">
