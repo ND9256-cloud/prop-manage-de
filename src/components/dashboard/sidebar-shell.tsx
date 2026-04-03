@@ -97,7 +97,7 @@ export function SidebarShell({ reviewCount, role, userInfo, signOutSlot }: Sideb
             {/* Edge toggle button */}
             <button
                 onClick={toggle}
-                className="absolute top-1/2 -right-3 z-50 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full border bg-white text-gray-400 shadow-sm hover:bg-gray-50 hover:text-gray-600 transition-colors"
+                className="absolute top-[18px] -right-3 z-50 flex h-6 w-6 items-center justify-center rounded-full border bg-white text-gray-400 shadow-sm hover:bg-gray-50 hover:text-gray-600 transition-colors"
                 aria-label={collapsed ? 'Sidebar ausklappen' : 'Sidebar einklappen'}
             >
                 {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
