@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-01 (document_intelligence LIVE). Update this file after every architectural change._
+_Last updated: 2026-04-03 (sidebar redesign, brain, chat). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -14,7 +14,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
 - warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled)
-- warehouse.property_intelligence: 0 rows — per-property AI analysis brain table (analysis jsonb, suggested_views jsonb, is_current=true pattern, RLS disabled)
+- warehouse.property_intelligence: 2 rows — per-property AI analysis brain table (analysis jsonb, suggested_views jsonb, is_current=true pattern, staleness trigger from pipeline, RLS disabled)
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
@@ -27,7 +27,7 @@ _Read this before writing any code or sending any task to Claude Code._
 ### Pipeline (10 functions, all active)
 1. claimJob 2. fetchDocument 3. extractText 4. classifyDocument
 5. extractFields 5b. categorize 6. storeExtraction 7. matchEntities
-8. routeByConfidence 8b. generateIntelligence (flags property_intelligence stale) 9. completeJob
+8. routeByConfidence 8b. generateIntelligence (includes cost_class + umlagefaehig, flags property_intelligence stale) 9. completeJob
 
 ### Files that DO NOT exist
 - src/lib/document-intelligence-schema.ts (was in Antigravity, never on Mac Mini)
@@ -54,6 +54,11 @@ _Read this before writing any code or sending any task to Claude Code._
 - last_seen_at on memberships
 - Document intelligence (summaries, entity_name, unit_ref, cost_class, umlagefaehig in UI, German tags)
 - viewer_safe filtering on intelligence summaries
+- Proda-style icon-only sidebar with expand/collapse chevron toggle
+- Settings flyout with user info and logout
+- Fixed shell layout (header + sidebar fixed, content area scrolls independently)
+- Immobilien-Analyse brain summary cards on dashboard
+- Property chat endpoint at /api/properties/[id]/chat
 
 ### SQL Views (warehouse schema)
 - warehouse.v_cost_overview: cost aggregation by property, cost_class, year
@@ -61,6 +66,7 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.v_insurance_status: applied insurance documents with intelligence
 - warehouse.v_open_actions: documents with pending action signals
 - warehouse.v_property_summary: doc and photo counts per property
+- warehouse.v_unit_timeline: ⚠️ EXISTS but has permission issue (SELECT not granted)
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
