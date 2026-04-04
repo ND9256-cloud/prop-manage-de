@@ -209,7 +209,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <button onClick={() => router.push('/dashboard/warehouse')} className="hover:text-foreground">Dokumentenarchiv</button>
+                        <button onClick={() => router.push('/dashboard/warehouse')} className="hover:text-foreground">Dashboard</button>
                         <span>&rarr;</span>
                         <button onClick={() => router.push(`/dashboard/warehouse/${property.id}`)} className="hover:text-foreground">
                             {property.shortCode || property.address}
