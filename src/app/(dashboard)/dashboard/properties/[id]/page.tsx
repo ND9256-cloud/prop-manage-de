@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Edit, Home, Plus, Users, Trash2, UserPlus } from 'lucide-react';
+import { ArrowLeft, Edit, Home, Plus, Users, Trash2, UserPlus, Lightbulb } from 'lucide-react';
 import PropertyForm from '@/components/properties/property-form';
 import UnitForm from '@/components/properties/unit-form';
 import LeaseForm from '@/components/tenants/lease-form';
@@ -15,6 +15,7 @@ import ServiceProviderList from '@/components/properties/service-provider-list';
 import PropertyCashFlow from '@/components/properties/property-cash-flow';
 import { deleteProperty } from '@/lib/property-actions';
 import { getPropertyCashFlow, getServiceProviderCosts } from '@/lib/bank-actions';
+import { getBrainSummaries } from '@/lib/dashboard-actions';
 import { getOrgContext } from '@/lib/org';
 import { getSupabaseAdmin } from '@/lib/supabase';
 
@@ -77,7 +78,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
 
     // Fetch cash flow, service provider costs, and warehouse documents
     const sb = getSupabaseAdmin();
-    const [cashFlowData, spCosts, warehouseDocs] = await Promise.all([
+    const [cashFlowData, spCosts, warehouseDocs, brainSummaries] = await Promise.all([
         getPropertyCashFlow(propertyId),
         getServiceProviderCosts(propertyId, property.serviceProviders),
         sb
@@ -88,6 +89,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                   .eq('org_id', orgId)
                   .order('created_at', { ascending: false })
             : Promise.resolve({ data: [] }),
+        getBrainSummaries(),
     ]);
     const documents = (warehouseDocs.data ?? []).map((d: { id: string; file_name: string; doc_type: string | null; file_size_bytes: number; mime_type: string; created_at: string }) => ({
         id: d.id,
@@ -97,6 +99,25 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         mimeType: d.mime_type,
         createdAt: d.created_at,
     }));
+
+    // Extract brain insight for this property
+    const brain = brainSummaries.find(b => b.propertyId === propertyId);
+    let insightLine: string | null = null;
+    if (brain?.analysis) {
+        const a = brain.analysis as Record<string, unknown>;
+        const riskSignals = a.risk_signals as Record<string, unknown> | undefined;
+        const highRisks = Array.isArray(riskSignals?.high) ? riskSignals.high : [];
+        const riskCount = highRisks.length;
+        const actionItems = a.action_items as Record<string, unknown> | undefined;
+        const urgentActions = Array.isArray(actionItems?.urgent) ? actionItems.urgent : [];
+        const firstAction = urgentActions[0] as { action?: string } | undefined;
+        const parts: string[] = [];
+        if (riskCount > 0) parts.push(`${riskCount} offene Risiken`);
+        if (firstAction?.action?.trim()) {
+            parts.push(`Nächste Maßnahme: ${firstAction.action.trim()}`);
+        }
+        if (parts.length > 0) insightLine = parts.join(' · ');
+    }
 
     return (
         <main className="p-6">
@@ -177,6 +198,14 @@ export default async function PropertyDetailPage({ params }: PageProps) {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Brain insight line */}
+            {insightLine && (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200 mb-6">
+                    <Lightbulb className="h-4 w-4 shrink-0" />
+                    <span>{insightLine}</span>
+                </div>
+            )}
 
             {/* Units */}
             <Card>
