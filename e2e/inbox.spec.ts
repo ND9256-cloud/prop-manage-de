@@ -7,7 +7,7 @@ test.describe('Inbox', () => {
 
   test('page loads and shows document list', async ({ page }) => {
     // Header is visible
-    await expect(page.getByRole('heading', { name: 'Posteingang' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Alle Dokumente' })).toBeVisible();
 
     // Stats cards are rendered
     await expect(page.getByText('Gesamt', { exact: true })).toBeVisible();

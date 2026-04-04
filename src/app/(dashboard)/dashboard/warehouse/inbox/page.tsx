@@ -46,7 +46,7 @@ export default async function InboxPage({ searchParams }: PageProps) {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-xl font-semibold text-foreground">
-                        {t.inbox.de}
+                        {t.allDocuments.de}
                     </h1>
                     <p className="mt-1 text-sm text-muted-foreground">
                         {stats.total} Dokumente
