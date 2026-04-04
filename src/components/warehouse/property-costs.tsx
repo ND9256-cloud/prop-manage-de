@@ -19,7 +19,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Download, Receipt, Info, ExternalLink } from 'lucide-react';
+import { Download, Receipt, Info } from 'lucide-react';
 import { TriageOverlay } from '@/components/warehouse/triage-overlay';
 import type { CostRow, CostKpis } from '@/lib/warehouse-actions';
 
@@ -137,7 +137,7 @@ export function PropertyCosts({
                                         <div>
                                             <p className="text-2xl font-bold text-foreground">{fmtEur(kpis.totalAmount)}</p>
                                             <p className="text-xs text-muted-foreground mt-1">
-                                                Erfasste Kosten {year}
+                                                Betriebskosten {year}
                                             </p>
                                         </div>
                                     </TooltipTrigger>
@@ -190,7 +190,7 @@ export function PropertyCosts({
                 {/* Info note */}
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <Info className="h-3 w-3" />
-                    Erfasste Kosten basieren auf verbuchten Dokumenten im System.
+                    Basierend auf verbuchten Dokumenten · Betriebskosten ohne Erwerbskosten
                 </p>
 
                 {/* ── Filter bar ── */}
@@ -258,15 +258,12 @@ export function PropertyCosts({
                                 <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                     Kategorie
                                 </th>
-                                <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Dokument
-                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {pagedRows.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="text-center py-16">
+                                    <td colSpan={4} className="text-center py-16">
                                         <div className="flex flex-col items-center gap-2 text-muted-foreground">
                                             <Receipt className="h-8 w-8" />
                                             <p className="text-sm font-medium">
@@ -329,12 +326,6 @@ export function PropertyCosts({
                                                     <span className="text-muted-foreground text-xs">—</span>
                                                 )}
                                             </td>
-                                            <td className="px-4 py-3">
-                                                <span className="flex items-center gap-1 text-sm text-foreground">
-                                                    <span className="truncate max-w-[180px]">{row.displayName}</span>
-                                                    <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />
-                                                </span>
-                                            </td>
                                         </tr>
                                     ))}
 
@@ -346,10 +337,6 @@ export function PropertyCosts({
                                         <td></td>
                                         <td className="px-4 py-3 text-right text-sm font-semibold text-foreground">
                                             {fmtEur(kpis.totalAmount)}
-                                        </td>
-                                        <td></td>
-                                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                                            {total} {total === 1 ? 'Eintrag' : 'Einträge'}
                                         </td>
                                     </tr>
                                 </>
