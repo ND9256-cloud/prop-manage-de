@@ -140,6 +140,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const signedUrl = data?.data?.signedUrl;
     const properties = data?.data?.properties ?? [];
     const confidence = data?.data?.confidence;
+    const intelligenceSummary = data?.data?.intelligenceSummary ?? null;
     const mimeType = (doc?.mime_type as string) ?? '';
     const displayName = (doc?.file_name as string) ?? documentId;
     const docType = (doc?.doc_type as string) ?? 'other';
@@ -149,6 +150,9 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     // Determine field layout from category (doc_type uses open German taxonomy)
     const isInvoiceLike = category === 'kosten_rechnungen' || category === 'instandhaltung' || category === 'finanzen';
     const isLeaseLike = category === 'vertraege';
+
+    // Helper: check if extraction field has a non-empty value
+    const hasValue = (v: unknown) => v != null && String(v).trim() !== '';
 
     // ─── Apply handler ─────────────────────────────────────────
     async function handleApply() {
@@ -365,6 +369,11 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                                 : '—'}
                                         </span>
                                     </div>
+                                    {intelligenceSummary && (
+                                        <p className="text-sm text-muted-foreground leading-relaxed">
+                                            {intelligenceSummary}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <Separator />
@@ -386,33 +395,52 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                         )}
                                     </div>
 
-                                    {isInvoiceLike ? (
-                                        <div className="space-y-2">
-                                            <EditableField label="Anbieter" fieldName="vendor_name" value={fields.vendor_name as string} isDirty={editedFields.has('vendor_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Betrag" fieldName="amount" value={fields.amount as string} isDirty={editedFields.has('amount')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Datum" fieldName="invoice_date" value={fields.invoice_date as string} isDirty={editedFields.has('invoice_date')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Rechnungsnr." fieldName="invoice_number" value={fields.invoice_number as string} isDirty={editedFields.has('invoice_number')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Kategorie" fieldName="category_hint" value={getCategoryHintLabel(fields.category_hint as string)} isDirty={editedFields.has('category_hint')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                        </div>
-                                    ) : isLeaseLike ? (
-                                        <div className="space-y-2">
-                                            <EditableField label="Mieter" fieldName="tenant_last_name" value={fields.tenant_last_name as string} isDirty={editedFields.has('tenant_last_name')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Einheit" fieldName="unit_ref" value={fields.unit_ref as string} isDirty={editedFields.has('unit_ref')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Kaltmiete" fieldName="rent_cold" value={fields.rent_cold as string} isDirty={editedFields.has('rent_cold')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Beginn" fieldName="lease_start" value={fields.lease_start as string} isDirty={editedFields.has('lease_start')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            <EditableField label="Ende" fieldName="lease_end" value={fields.lease_end as string} isDirty={editedFields.has('lease_end')} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                        </div>
-                                    ) : Object.keys(fields).length > 0 ? (
-                                        <div className="space-y-2">
-                                            {Object.entries(fields).map(([key, val]) => (
-                                                <EditableField key={key} label={key} fieldName={key} value={val != null ? String(val) : ''} isDirty={editedFields.has(key)} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">
-                                            Keine Felder verfügbar
-                                        </p>
-                                    )}
+                                    {isInvoiceLike ? (() => {
+                                        const invoiceFields = [
+                                            { label: 'Anbieter', fieldName: 'vendor_name', value: fields.vendor_name },
+                                            { label: 'Betrag', fieldName: 'amount', value: fields.amount },
+                                            { label: 'Datum', fieldName: 'invoice_date', value: fields.invoice_date },
+                                            { label: 'Rechnungsnr.', fieldName: 'invoice_number', value: fields.invoice_number },
+                                            { label: 'Kategorie', fieldName: 'category_hint', value: getCategoryHintLabel(fields.category_hint as string) },
+                                        ].filter(f => hasValue(f.value) || editedFields.has(f.fieldName));
+                                        return invoiceFields.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {invoiceFields.map(f => (
+                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={f.value as string} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
+                                        );
+                                    })() : isLeaseLike ? (() => {
+                                        const leaseFields = [
+                                            { label: 'Mieter', fieldName: 'tenant_last_name', value: fields.tenant_last_name },
+                                            { label: 'Einheit', fieldName: 'unit_ref', value: fields.unit_ref },
+                                            { label: 'Kaltmiete', fieldName: 'rent_cold', value: fields.rent_cold },
+                                            { label: 'Beginn', fieldName: 'lease_start', value: fields.lease_start },
+                                            { label: 'Ende', fieldName: 'lease_end', value: fields.lease_end },
+                                        ].filter(f => hasValue(f.value) || editedFields.has(f.fieldName));
+                                        return leaseFields.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {leaseFields.map(f => (
+                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={f.value as string} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
+                                        );
+                                    })() : (() => {
+                                        const populatedFields = Object.entries(fields).filter(([, val]) => hasValue(val));
+                                        return populatedFields.length > 0 ? (
+                                            <div className="space-y-2">
+                                                {populatedFields.map(([key, val]) => (
+                                                    <EditableField key={key} label={key} fieldName={key} value={String(val)} isDirty={editedFields.has(key)} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
+                                        );
+                                    })()}
                                 </div>
 
                                 <Separator />

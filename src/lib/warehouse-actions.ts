@@ -1555,7 +1555,15 @@ export async function getTriageDocument(documentId: string) {
         });
     }
 
-    // 6) Last apply log entry
+    // 6) Document intelligence summary
+    const { data: intelligence } = await db.from('document_intelligence')
+        .select('summary')
+        .eq('org_id', orgId)
+        .eq('document_id', documentId)
+        .eq('is_current', true)
+        .single();
+
+    // 7) Last apply log entry
     const { data: applyLogEntries } = await db.from('apply_log')
         .select('id, trigger_type, status, created_at')
         .eq('org_id', orgId)
@@ -1565,7 +1573,7 @@ export async function getTriageDocument(documentId: string) {
 
     const applyLog = applyLogEntries?.[0] || null;
 
-    // 7) Confidence info
+    // 8) Confidence info
     const confidenceScore = extraction?.confidence_score as number | null;
     const flags = (extraction?.flags as string[]) || [];
     let confidenceLevel: 'high' | 'medium' | 'low' = 'low';
@@ -1604,6 +1612,7 @@ export async function getTriageDocument(documentId: string) {
             signedUrl,
             properties,
             units,
+            intelligenceSummary: (intelligence?.summary as string) ?? null,
             applyLog,
             confidence: {
                 score: confidenceScore,
