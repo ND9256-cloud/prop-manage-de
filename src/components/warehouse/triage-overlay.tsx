@@ -293,34 +293,6 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
 
                 {/* ═══ LEFT — 60% preview ═══ */}
                 <div className="w-[60%] flex flex-col border-r border-border">
-                    <div className="h-14 flex items-center justify-between px-4 border-b border-border shrink-0">
-                        <Button variant="ghost" size="sm" onClick={safeClose}>
-                            <X className="h-4 w-4 mr-2" />
-                            Schließen
-                        </Button>
-                        <span className="text-sm font-medium text-foreground truncate max-w-xs">
-                            {displayName}
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!signedUrl}
-                            onClick={() => {
-                                if (!signedUrl) return;
-                                window.open(signedUrl, '_blank');
-                                logAuditEvent({
-                                    eventType: 'downloaded',
-                                    documentId: doc?.id as string,
-                                    propertyId: (doc?.property_id as string) ?? undefined,
-                                    metadata: { display_name: displayName },
-                                });
-                            }}
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                        </Button>
-                    </div>
-
                     {loading ? (
                         <div className="flex-1 bg-muted flex items-center justify-center">
                             <div className="text-sm text-muted-foreground animate-pulse">
@@ -366,8 +338,15 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                 {/* ═══ RIGHT — 40% fields ═══ */}
                 <div className="w-[40%] flex flex-col bg-card">
 
+                    {/* Close button */}
+                    <div className="flex justify-end p-2 shrink-0">
+                        <Button variant="ghost" size="icon" onClick={safeClose} className="h-8 w-8">
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+
                     {/* Scrollable content */}
-                    <div className="flex-1 overflow-y-auto p-6 pb-32 space-y-5">
+                    <div className="flex-1 overflow-y-auto px-6 pb-32 space-y-5">
                         {loading ? (
                             <p className="text-sm text-muted-foreground animate-pulse">
                                 Dokument wird geladen...
@@ -379,9 +358,29 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                                         Dokument
                                     </p>
-                                    <p className="text-sm font-medium text-foreground">
-                                        {displayName}
-                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-sm font-medium text-foreground flex-1 min-w-0 truncate">
+                                            {displayName}
+                                        </p>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 shrink-0"
+                                            disabled={!signedUrl}
+                                            onClick={() => {
+                                                if (!signedUrl) return;
+                                                window.open(signedUrl, '_blank');
+                                                logAuditEvent({
+                                                    eventType: 'downloaded',
+                                                    documentId: doc?.id as string,
+                                                    propertyId: (doc?.property_id as string) ?? undefined,
+                                                    metadata: { display_name: displayName },
+                                                });
+                                            }}
+                                        >
+                                            <Download className="h-4 w-4" />
+                                        </Button>
+                                    </div>
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <Badge variant="outline">
                                             {docType}
