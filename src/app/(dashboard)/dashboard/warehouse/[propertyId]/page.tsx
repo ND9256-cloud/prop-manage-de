@@ -1,4 +1,5 @@
 import { getPropertyStats, getPropertyWarehouseDetail, getPropertyDocuments, getPropertyCosts, getAuditEvents, getAuditActors, getProperties, getPropertyDetails } from '@/lib/warehouse-actions';
+import { getBrainSummaries } from '@/lib/dashboard-actions';
 import { AssetTabs } from '@/components/warehouse/asset-tabs';
 import { DokumenteTab } from '@/components/warehouse/dokumente-tab';
 import { PropertyCosts } from '@/components/warehouse/property-costs';
@@ -8,7 +9,7 @@ import { PropertyChat } from '@/components/warehouse/property-chat';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, FileText, AlertCircle, Building } from 'lucide-react';
+import { ChevronRight, FileText, AlertCircle, Building, Lightbulb } from 'lucide-react';
 import { getOrgContext } from '@/lib/org';
 
 interface PageProps {
@@ -22,10 +23,30 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
     const tab = (sp.tab as string) ?? 'dokumente';
 
     // Fetch stats for header — ownership check inside
-    const { error: statsError, data: statsData } = await getPropertyStats(propertyId);
+    const [{ error: statsError, data: statsData }, brainSummaries] = await Promise.all([
+        getPropertyStats(propertyId),
+        getBrainSummaries(),
+    ]);
     if (statsError || !statsData) notFound();
 
     const { property, totalDocs, needsReview, unitCount } = statsData;
+
+    // Extract brain insight for this property
+    const brain = brainSummaries.find(b => b.propertyId === propertyId);
+    let insightLine: string | null = null;
+    if (brain?.analysis) {
+        const a = brain.analysis as Record<string, unknown>;
+        // Try to extract risks count and next action from the analysis JSON
+        const risks = a.offene_risiken ?? a.risks ?? a.open_risks;
+        const riskCount = Array.isArray(risks) ? risks.length : 0;
+        const nextAction = (a.naechste_massnahme ?? a.next_action ?? a.empfehlung ?? a.recommendation) as string | undefined;
+        const parts: string[] = [];
+        if (riskCount > 0) parts.push(`${riskCount} offene Risiken`);
+        if (typeof nextAction === 'string' && nextAction.trim()) {
+            parts.push(`Nächste Maßnahme: ${nextAction.trim()}`);
+        }
+        if (parts.length > 0) insightLine = parts.join(' · ');
+    }
 
     // Role for viewer enforcement
     const ctx = await getOrgContext().catch(() => null);
@@ -175,6 +196,14 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                     </div>
                 </div>
             </div>
+
+            {/* ── Brain insight line ── */}
+            {insightLine && (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-md bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-sm text-blue-800 dark:text-blue-200">
+                    <Lightbulb className="h-4 w-4 shrink-0" />
+                    <span>{insightLine}</span>
+                </div>
+            )}
 
             {/* ── Tab bar ── */}
             <AssetTabs propertyId={propertyId} activeTab={tab} />

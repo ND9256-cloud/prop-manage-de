@@ -14,7 +14,6 @@ import {
     Upload,
     X,
     FolderOpen,
-    Building2,
 } from 'lucide-react';
 
 type Folder = {
@@ -50,13 +49,6 @@ type Props = {
     readOnly?: boolean;
     unitCount?: number;
 };
-
-function formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function formatDateDE(iso: string | null): string {
     if (!iso) return 'Keine Dokumente';
@@ -140,61 +132,40 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 </div>
             </div>
 
-            {/* Property stats row */}
-            <div className={`grid gap-4 ${readOnly ? 'grid-cols-2' : stats.needsReview > 0 ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'}`}>
-                <Card>
-                    <CardContent className="p-4 flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-blue-500" />
-                        <div>
-                            <p className="text-2xl font-bold">{stats.total}</p>
-                            <p className="text-xs text-muted-foreground">Dokumente</p>
-                        </div>
-                    </CardContent>
-                </Card>
-                {readOnly ? (
+            {/* Property stats row — only shown when there are items to review */}
+            {stats.needsReview > 0 && !readOnly && (
+                <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
                     <Card>
                         <CardContent className="p-4 flex items-center gap-3">
-                            <Building2 className="h-5 w-5 text-indigo-500" />
+                            <AlertTriangle className="h-5 w-5 text-amber-500" />
                             <div>
-                                <p className="text-2xl font-bold">{unitCount ?? 0}</p>
-                                <p className="text-xs text-muted-foreground">Einheiten</p>
+                                <p className="text-2xl font-bold">{stats.needsReview}</p>
+                                <p className="text-xs text-muted-foreground">Prüfung nötig</p>
                             </div>
                         </CardContent>
                     </Card>
-                ) : stats.needsReview > 0 ? (
-                    <>
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-3">
-                                <AlertTriangle className="h-5 w-5 text-amber-500" />
-                                <div>
-                                    <p className="text-2xl font-bold">{stats.needsReview}</p>
-                                    <p className="text-xs text-muted-foreground">Prüfung nötig</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-3">
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                <div>
-                                    <p className="text-2xl font-bold">{stats.appliedThisMonth}</p>
-                                    <p className="text-xs text-muted-foreground">Angewendet (Monat)</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardContent className="p-4 flex items-center gap-3">
-                                <Clock className="h-5 w-5 text-orange-500" />
-                                <div>
-                                    <p className="text-sm font-bold">
-                                        {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </>
-                ) : null}
-            </div>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-3">
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                            <div>
+                                <p className="text-2xl font-bold">{stats.appliedThisMonth}</p>
+                                <p className="text-xs text-muted-foreground">Angewendet (Monat)</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4 flex items-center gap-3">
+                            <Clock className="h-5 w-5 text-orange-500" />
+                            <div>
+                                <p className="text-sm font-bold">
+                                    {stats.oldestUnreviewed ? formatDateDE(stats.oldestUnreviewed) : '—'}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Älteste offene Prüfung</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             {/* Document category cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -215,10 +186,8 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                                 <span>{folder.de}</span>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-0 space-y-1 text-sm text-muted-foreground">
+                        <CardContent className="pt-0">
                             <p className="text-2xl font-bold text-foreground">{folder.count}</p>
-                            <p>{formatDateDE(folder.mostRecent)}</p>
-                            <p>{formatSize(folder.totalSize)}</p>
                         </CardContent>
                     </Card>
                 ))}
@@ -232,7 +201,7 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                         <Card
-                            className="cursor-pointer hover:shadow-md transition-shadow relative"
+                            className="cursor-pointer hover:shadow-md transition-shadow relative border-dashed border-muted-foreground/30 bg-muted/30"
                             onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
                         >
                             {!readOnly && folder.needsReview > 0 && (
@@ -246,10 +215,8 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                                     <span>{folder.de}</span>
                                 </CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-0 space-y-1 text-sm text-muted-foreground">
+                            <CardContent className="pt-0">
                                 <p className="text-2xl font-bold text-foreground">{folder.count}</p>
-                                <p>{formatDateDE(folder.mostRecent)}</p>
-                                <p>{formatSize(folder.totalSize)}</p>
                             </CardContent>
                         </Card>
                     </div>
