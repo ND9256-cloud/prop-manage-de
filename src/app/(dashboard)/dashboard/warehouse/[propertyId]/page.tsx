@@ -36,14 +36,19 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
     let insightLine: string | null = null;
     if (brain?.analysis) {
         const a = brain.analysis as Record<string, unknown>;
-        // Try to extract risks count and next action from the analysis JSON
-        const risks = a.offene_risiken ?? a.risks ?? a.open_risks;
-        const riskCount = Array.isArray(risks) ? risks.length : 0;
-        const nextAction = (a.naechste_massnahme ?? a.next_action ?? a.empfehlung ?? a.recommendation) as string | undefined;
+        // Count high-severity risks from risk_signals.high
+        const riskSignals = a.risk_signals as Record<string, unknown> | undefined;
+        const highRisks = Array.isArray(riskSignals?.high) ? riskSignals.high : [];
+        const riskCount = highRisks.length;
+        // First urgent or soon action item
+        const actionItems = a.action_items as Record<string, unknown> | undefined;
+        const urgentActions = Array.isArray(actionItems?.urgent) ? actionItems.urgent : [];
+        const soonActions = Array.isArray(actionItems?.soon) ? actionItems.soon : [];
+        const firstAction = [...urgentActions, ...soonActions][0] as { action?: string } | undefined;
         const parts: string[] = [];
         if (riskCount > 0) parts.push(`${riskCount} offene Risiken`);
-        if (typeof nextAction === 'string' && nextAction.trim()) {
-            parts.push(`Nächste Maßnahme: ${nextAction.trim()}`);
+        if (firstAction?.action?.trim()) {
+            parts.push(`Nächste Maßnahme: ${firstAction.action.trim()}`);
         }
         if (parts.length > 0) insightLine = parts.join(' · ');
     }
