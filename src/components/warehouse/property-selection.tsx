@@ -297,6 +297,15 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                 </div>
             )}
 
+            {/* Status bar */}
+            <div className="flex items-center justify-between rounded-lg bg-gray-100 dark:bg-gray-800/50 px-4 py-2 text-sm text-muted-foreground">
+                <span className="flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                    Alle Dokumente verarbeitet
+                </span>
+                <span>{stats.photos} Fotos im Archiv</span>
+            </div>
+
         </div>
     );
 }
