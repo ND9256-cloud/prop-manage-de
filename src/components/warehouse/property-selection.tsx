@@ -96,14 +96,10 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
                     const rows = propertyCards.map((p) => {
                         const brain = brainSummaries.find((b) => b.propertyId === p.id);
-                        const rentRoll = (brain?.analysis as Record<string, unknown>)?.rent_roll as {
-                            current_tenants?: number;
-                            monthly_gross_cold?: number;
-                            annual_gross_cold?: number;
-                        } | undefined;
-                        return { ...p, rentRoll };
+                        return { ...p, rentRoll: brain?.rentRoll };
                     });
 
+                    const totalUnits = rows.reduce((sum, r) => sum + (r.rentRoll?.current_tenants ?? 0), 0);
                     const totalMonthly = rows.reduce((sum, r) => sum + (r.rentRoll?.monthly_gross_cold ?? 0), 0);
                     const totalAnnual = rows.reduce((sum, r) => sum + (r.rentRoll?.annual_gross_cold ?? 0), 0);
 
@@ -142,7 +138,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                 <tfoot>
                                     <tr className="border-t bg-muted/50 font-semibold">
                                         <td className="px-4 py-2">Gesamt</td>
-                                        <td className="px-4 py-2" />
+                                        <td className="text-right px-4 py-2">{totalUnits || '–'}</td>
                                         <td className="text-right px-4 py-2">{fmt(totalMonthly)}</td>
                                         <td className="text-right px-4 py-2">{fmt(totalAnnual)}</td>
                                     </tr>

@@ -68,6 +68,12 @@ Antworte NUR mit validem JSON in dieser exakten 11-Abschnitt-Struktur:
     "concentration_risk": "niedrig / mittel / hoch",
     "notes": "..."
   },
+  "rent_roll": {
+    "current_tenants": 0,
+    "monthly_gross_cold": 0,
+    "annual_gross_cold": 0,
+    "tenants": [{"name": "...", "unit_ref": "...", "monthly_rent": 0}]
+  },
   "unit_analysis": {
     "units_identified": [{"ref": "...", "tenant": "...", "document_count": 0, "status": "..."}],
     "data_quality": "gut / lückenhaft / schlecht"
@@ -91,6 +97,7 @@ REGELN:
 - Alle Texte auf Deutsch
 - Beträge in Euro (als Zahl, nicht String)
 - Nur Fakten aus den Dokumenten — keine Annahmen
+- rent_roll: current_tenants = Anzahl aktiver Mieter, monthly_gross_cold = Summe aller Kaltmieten/Monat, annual_gross_cold = monthly_gross_cold × 12
 - suggested_views: Schlage 2-4 SQL-Views vor, die für diese Immobilie nützlich wären
 - Wenn Daten fehlen, schreibe "keine Daten" statt zu raten
 - Analysiere Muster über alle Dokumente hinweg`;

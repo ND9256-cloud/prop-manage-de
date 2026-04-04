@@ -51,11 +51,18 @@ export async function getLastVisitStats(): Promise<LastVisitStats> {
     };
 }
 
+export interface RentRoll {
+    current_tenants: number;
+    monthly_gross_cold: number;
+    annual_gross_cold: number;
+}
+
 export interface BrainSummary {
     propertyId: string;
     analysis: Record<string, unknown>;
     isStale: boolean;
     generatedAt: string;
+    rentRoll: RentRoll;
 }
 
 export async function getBrainSummaries(): Promise<BrainSummary[]> {
@@ -71,10 +78,58 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
 
     if (error || !data) return [];
 
-    return data.map((row: { property_id: string; analysis: Record<string, unknown>; is_stale: boolean; generated_at: string }) => ({
-        propertyId: row.property_id,
-        analysis: row.analysis,
-        isStale: row.is_stale,
-        generatedAt: row.generated_at,
-    }));
+    return data.map((row: { property_id: string; analysis: Record<string, unknown>; is_stale: boolean; generated_at: string }) => {
+        const analysis = row.analysis as Record<string, unknown>;
+        const rentRoll = extractRentRoll(analysis);
+        return {
+            propertyId: row.property_id,
+            analysis,
+            isStale: row.is_stale,
+            generatedAt: row.generated_at,
+            rentRoll,
+        };
+    });
+}
+
+function extractRentRoll(analysis: Record<string, unknown>): RentRoll {
+    // Prefer explicit rent_roll section (present after brain regeneration)
+    const rentRoll = analysis?.rent_roll as {
+        current_tenants?: number;
+        monthly_gross_cold?: number;
+        annual_gross_cold?: number;
+    } | undefined;
+
+    if (rentRoll && typeof rentRoll.current_tenants === 'number') {
+        return {
+            current_tenants: rentRoll.current_tenants,
+            monthly_gross_cold: rentRoll.monthly_gross_cold ?? 0,
+            annual_gross_cold: rentRoll.annual_gross_cold ?? (rentRoll.monthly_gross_cold ?? 0) * 12,
+        };
+    }
+
+    // Fallback: derive from tenant_overview + financial_analysis
+    const tenantOverview = analysis?.tenant_overview as { identified_tenants?: { status?: string }[] } | undefined;
+    const activeTenants = (tenantOverview?.identified_tenants ?? []).filter(
+        (t) => t.status === 'aktiv'
+    );
+
+    const financial = analysis?.financial_analysis as {
+        recurring_costs?: { amount?: number; frequency?: string }[];
+    } | undefined;
+
+    let monthlyTotal = 0;
+    for (const cost of financial?.recurring_costs ?? []) {
+        const amt = typeof cost.amount === 'number' ? cost.amount : 0;
+        if (cost.frequency === 'monatlich') {
+            monthlyTotal += amt;
+        } else if (cost.frequency === 'jährlich') {
+            monthlyTotal += amt / 12;
+        }
+    }
+
+    return {
+        current_tenants: activeTenants.length,
+        monthly_gross_cold: Math.round(monthlyTotal),
+        annual_gross_cold: Math.round(monthlyTotal * 12),
+    };
 }
