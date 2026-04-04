@@ -281,7 +281,6 @@ export function InboxTable({
                                 const isSelected = selected.has(doc.id);
                                 const catLabel = getCategoryLabel(doc.category);
                                 const displayName = doc.file_name;
-                                const showDisplayName = doc.display_name && doc.display_name !== doc.file_name;
 
                                 return (
                                     <TableRow
@@ -307,11 +306,6 @@ export function InboxTable({
                                             <p className="truncate text-sm font-medium text-foreground">
                                                 {displayName}
                                             </p>
-                                            {showDisplayName && (
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {doc.display_name}
-                                                </p>
-                                            )}
                                             {doc.summary && (
                                                 <p className="truncate text-xs text-muted-foreground/70 mt-0.5">
                                                     {doc.summary}
