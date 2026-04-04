@@ -14,6 +14,7 @@ import {
     Upload,
     X,
     FolderOpen,
+    ChevronRight,
 } from 'lucide-react';
 
 type Folder = {
@@ -167,58 +168,46 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 </div>
             )}
 
-            {/* Document category cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {/* Document category list */}
+            <div className="border rounded-lg divide-y">
                 {folders.filter((f) => f.count > 0 && f.key !== 'medien').map((folder) => (
-                    <Card
+                    <div
                         key={folder.key}
-                        className="cursor-pointer hover:shadow-md transition-shadow relative"
+                        className="flex items-center h-10 px-3 cursor-pointer hover:bg-muted/50 transition-colors"
                         onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
                     >
+                        <span className="text-base mr-2">{folder.icon}</span>
+                        <span className="text-sm font-medium flex-1 truncate">{folder.de}</span>
                         {!readOnly && folder.needsReview > 0 && (
-                            <Badge className="absolute top-3 right-3 bg-amber-500 text-white hover:bg-amber-600">
+                            <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs mr-2">
                                 {folder.needsReview}
                             </Badge>
                         )}
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base flex items-center gap-2 pr-8">
-                                <span className="text-lg">{folder.icon}</span>
-                                <span>{folder.de}</span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                            <p className="text-2xl font-bold text-foreground">{folder.count}</p>
-                        </CardContent>
-                    </Card>
+                        <span className="text-sm text-muted-foreground tabular-nums mr-2">{folder.count}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
                 ))}
             </div>
 
             {/* Fotos & Medien section */}
             {folders.filter((f) => f.key === 'medien' && f.count > 0).map((folder) => (
-                <div key={folder.key} className="space-y-3">
-                    <div className="border-t pt-4">
-                        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Fotos & Medien</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        <Card
-                            className="cursor-pointer hover:shadow-md transition-shadow relative border-dashed border-muted-foreground/30 bg-muted/30"
+                <div key={folder.key} className="space-y-2">
+                    <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Fotos & Medien</h3>
+                    <div className="border border-dashed rounded-lg divide-y">
+                        <div
+                            className="flex items-center h-10 px-3 cursor-pointer hover:bg-muted/50 transition-colors"
                             onClick={() => router.push(`/dashboard/warehouse/${property.id}/${folder.key}`)}
                         >
+                            <span className="text-base mr-2">{folder.icon}</span>
+                            <span className="text-sm font-medium flex-1 truncate">{folder.de}</span>
                             {!readOnly && folder.needsReview > 0 && (
-                                <Badge className="absolute top-3 right-3 bg-amber-500 text-white hover:bg-amber-600">
+                                <Badge className="bg-amber-500 text-white hover:bg-amber-600 text-xs mr-2">
                                     {folder.needsReview}
                                 </Badge>
                             )}
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-base flex items-center gap-2 pr-8">
-                                    <span className="text-lg">{folder.icon}</span>
-                                    <span>{folder.de}</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="pt-0">
-                                <p className="text-2xl font-bold text-foreground">{folder.count}</p>
-                            </CardContent>
-                        </Card>
+                            <span className="text-sm text-muted-foreground tabular-nums mr-2">{folder.count}</span>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
                     </div>
                 </div>
             ))}
