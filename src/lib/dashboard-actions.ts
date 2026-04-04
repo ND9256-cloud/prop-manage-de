@@ -92,50 +92,39 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
 }
 
 function extractRentRoll(analysis: Record<string, unknown>): RentRoll {
-    // Prefer explicit rent_roll section (present after brain regeneration)
     const rentRoll = analysis?.rent_roll as {
         current_tenants?: number | unknown[];
+        tenants?: unknown[];
         monthly_gross_cold?: number;
         annual_gross_cold?: number;
     } | undefined;
 
-    if (rentRoll && rentRoll.current_tenants != null) {
-        const tenants = Array.isArray(rentRoll.current_tenants)
-            ? rentRoll.current_tenants.length
-            : typeof rentRoll.current_tenants === 'number'
-              ? rentRoll.current_tenants
-              : 0;
-        const monthly = rentRoll.monthly_gross_cold ?? 0;
+    if (rentRoll) {
+        // Resolve tenant count: current_tenants can be a number or an array;
+        // fall back to tenants array length if current_tenants is missing or zero.
+        let tenantCount = 0;
+        if (Array.isArray(rentRoll.current_tenants)) {
+            tenantCount = rentRoll.current_tenants.length;
+        } else if (typeof rentRoll.current_tenants === 'number' && rentRoll.current_tenants > 0) {
+            tenantCount = rentRoll.current_tenants;
+        } else if (Array.isArray(rentRoll.tenants)) {
+            tenantCount = rentRoll.tenants.length;
+        }
+
+        const monthly = typeof rentRoll.monthly_gross_cold === 'number' ? rentRoll.monthly_gross_cold : 0;
+        const annual = typeof rentRoll.annual_gross_cold === 'number' ? rentRoll.annual_gross_cold : monthly * 12;
+
         return {
-            current_tenants: tenants,
+            current_tenants: tenantCount,
             monthly_gross_cold: monthly,
-            annual_gross_cold: rentRoll.annual_gross_cold ?? monthly * 12,
+            annual_gross_cold: annual,
         };
     }
 
-    // Fallback: derive from tenant_overview + financial_analysis
-    const tenantOverview = analysis?.tenant_overview as { identified_tenants?: { status?: string }[] } | undefined;
-    const activeTenants = (tenantOverview?.identified_tenants ?? []).filter(
-        (t) => t.status === 'aktiv'
-    );
-
-    const financial = analysis?.financial_analysis as {
-        recurring_costs?: { amount?: number; frequency?: string }[];
-    } | undefined;
-
-    let monthlyTotal = 0;
-    for (const cost of financial?.recurring_costs ?? []) {
-        const amt = typeof cost.amount === 'number' ? cost.amount : 0;
-        if (cost.frequency === 'monatlich') {
-            monthlyTotal += amt;
-        } else if (cost.frequency === 'jährlich') {
-            monthlyTotal += amt / 12;
-        }
-    }
-
+    // Fallback: no rent_roll section at all — return zeros
     return {
-        current_tenants: activeTenants.length,
-        monthly_gross_cold: Math.round(monthlyTotal),
-        annual_gross_cold: Math.round(monthlyTotal * 12),
+        current_tenants: 0,
+        monthly_gross_cold: 0,
+        annual_gross_cold: 0,
     };
 }
