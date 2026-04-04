@@ -1,14 +1,11 @@
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
-import { getInboxDocuments, getInboxStats, getProperties, getOpenReviewCount } from '@/lib/warehouse-actions';
+import { getInboxDocuments, getInboxStats, getProperties } from '@/lib/warehouse-actions';
 import { t } from '@/lib/i18n/warehouse';
 import { getOrgContext } from '@/lib/org';
-import { InboxStats } from './inbox-stats';
 import { InboxFilters } from './inbox-filters';
 import { InboxTable } from './inbox-table';
-import { SavedViews } from './saved-views';
 
 const PAGE_SIZE = 25;
 
@@ -23,18 +20,8 @@ export default async function InboxPage({ searchParams }: PageProps) {
     const ctx = await getOrgContext().catch(() => null);
     const readOnly = ctx?.role === 'viewer';
 
-    // Determine the active view
-    let view = params.view ? String(params.view) : undefined;
-
-    // Default view logic: if no view specified, check needs_review count
-    if (!view) {
-        const reviewCount = await getOpenReviewCount();
-        if (reviewCount > 0) {
-            // Redirect to needs_review view by default
-            redirect('/dashboard/warehouse/inbox?view=needs_review');
-        }
-        view = 'all';
-    }
+    // Default to "all" view
+    const view = params.view ? String(params.view) : 'all';
 
     const page = Math.max(1, parseInt(String(params.page ?? '1'), 10));
     const filters = {
@@ -44,7 +31,7 @@ export default async function InboxPage({ searchParams }: PageProps) {
         source: params.source ? String(params.source) : undefined,
         dateRange: params.dateRange ? String(params.dateRange) : undefined,
         search: params.search ? String(params.search) : undefined,
-        view, // Pass the saved view
+        view,
     };
 
     const [{ documents, total }, stats, properties] = await Promise.all([
@@ -61,6 +48,15 @@ export default async function InboxPage({ searchParams }: PageProps) {
                     <h1 className="text-xl font-semibold text-foreground">
                         {t.inbox.de}
                     </h1>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {stats.total} Dokumente
+                        {stats.needsReview > 0 && (
+                            <span className="text-amber-600"> · {stats.needsReview} Prüfung nötig</span>
+                        )}
+                        {stats.failed > 0 && (
+                            <span className="text-red-600"> · {stats.failed} fehlgeschlagen</span>
+                        )}
+                    </p>
                 </div>
                 <div className="flex gap-2">
                     {!readOnly && (
@@ -77,22 +73,6 @@ export default async function InboxPage({ searchParams }: PageProps) {
                     )}
                 </div>
             </div>
-
-            {/* Stats */}
-            <InboxStats
-                total={stats.total}
-                needsReview={stats.needsReview}
-                appliedThisMonth={stats.appliedThisMonth}
-                failed={stats.failed}
-            />
-
-            {/* Saved Views (pills) */}
-            <Suspense fallback={null}>
-                <SavedViews
-                    needsReviewCount={stats.needsReview}
-                    appliedMonthCount={stats.appliedThisMonth}
-                />
-            </Suspense>
 
             {/* Filters */}
             <Suspense fallback={null}>
