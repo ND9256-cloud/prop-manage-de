@@ -81,7 +81,7 @@ function InvoiceFields({ f }: { f: Record<string, unknown> }) {
     return (
         <>
             <FieldRow label="Anbieter" value={f.vendor_name as string} />
-            <FieldRow label="Betrag" value={f.amount ? `${f.amount} ${f.currency || 'EUR'}` : undefined} />
+            <FieldRow label="Betrag" value={f.amount ? `${parseFloat(String(f.amount).replace(',', '.')).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${f.currency || 'EUR'}` : undefined} />
             <FieldRow label="Datum" value={formatDateDE(f.invoice_date as string)} />
             <FieldRow label="Rechnungsnr." value={f.invoice_number as string} />
             <FieldRow label="Beschreibung" value={f.description as string} />

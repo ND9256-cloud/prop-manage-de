@@ -38,6 +38,12 @@ function fmtEur(n: number): string {
     return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
 }
 
+function fmtDateDE(iso: string): string {
+    const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}.${m[2]}.${m[1]}`;
+    return new Date(iso).toLocaleDateString('de-DE');
+}
+
 // ─── Props ────────────────────────────────────────────────────
 interface PropertyCostsProps {
     propertyId: string;
@@ -288,11 +294,11 @@ export function PropertyCosts({
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <span className="text-sm text-foreground" suppressHydrationWarning>
-                                                                {new Date(row.displayDate).toLocaleDateString('de-DE')}
+                                                                {fmtDateDE(row.displayDate)}
                                                             </span>
                                                         </TooltipTrigger>
                                                         <TooltipContent suppressHydrationWarning>
-                                                            {new Date(row.displayDate).toLocaleString('de-DE')}
+                                                            {fmtDateDE(row.displayDate)}
                                                             {row.invoiceDate
                                                                 ? ' (Rechnungsdatum)'
                                                                 : ' (Verbuchungsdatum)'}

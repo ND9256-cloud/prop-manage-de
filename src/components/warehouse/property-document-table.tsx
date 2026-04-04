@@ -259,7 +259,7 @@ export function PropertyDocumentTable({
                                         {doc.vendorName ?? '—'}
                                     </td>
                                     <td className="px-4 py-3 text-sm text-foreground font-mono whitespace-nowrap">
-                                        {doc.amount ? `€${parseFloat(String(doc.amount).replace(',', '.')).toFixed(2)}` : '—'}
+                                        {doc.amount ? parseFloat(String(doc.amount).replace(',', '.')).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '—'}
                                     </td>
                                     <td className="px-4 py-3 text-sm text-muted-foreground whitespace-nowrap">
                                         {doc.extractedDate

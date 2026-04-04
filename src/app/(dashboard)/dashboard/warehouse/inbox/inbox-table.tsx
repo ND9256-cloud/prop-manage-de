@@ -348,13 +348,15 @@ export function InboxTable({
 
                                         {/* Betrag */}
                                         <TableCell className="py-3 px-4 text-sm text-foreground font-mono whitespace-nowrap">
-                                            {doc.amount ? `€${parseFloat(String(doc.amount).replace(',', '.')).toFixed(2)}` : '—'}
+                                            {doc.amount ? parseFloat(String(doc.amount).replace(',', '.')).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '—'}
                                         </TableCell>
 
                                         {/* Datum (extracted) */}
                                         <TableCell className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
                                             {doc.extractedDate
-                                                ? new Date(doc.extractedDate).toLocaleDateString('de-DE')
+                                                ? (/^\d{4}-\d{2}-\d{2}/.test(doc.extractedDate)
+                                                    ? doc.extractedDate.slice(8, 10) + '.' + doc.extractedDate.slice(5, 7) + '.' + doc.extractedDate.slice(0, 4)
+                                                    : doc.extractedDate)
                                                 : '—'}
                                         </TableCell>
 

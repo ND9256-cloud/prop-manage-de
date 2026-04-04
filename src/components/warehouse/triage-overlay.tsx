@@ -37,6 +37,21 @@ interface TriageOverlayProps {
 }
 
 // ─── Inline editable field ─────────────────────────────────────
+function formatFieldDisplay(fieldName: string, value: string | null | undefined): string {
+    if (!value) return '';
+    // Format amount/currency fields as German number
+    if (['amount', 'rent_cold'].includes(fieldName)) {
+        const num = parseFloat(String(value).replace(/[^\d.,-]/g, '').replace(',', '.'));
+        if (!isNaN(num)) return num.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' EUR';
+    }
+    // Format date fields as DD.MM.YYYY
+    if (['invoice_date', 'lease_start', 'lease_end'].includes(fieldName)) {
+        const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return `${m[3]}.${m[2]}.${m[1]}`;
+    }
+    return String(value);
+}
+
 function EditableField({
     label,
     fieldName,
@@ -53,6 +68,7 @@ function EditableField({
     readOnly?: boolean;
 }) {
     const [local, setLocal] = useState(value ?? '');
+    const display = formatFieldDisplay(fieldName, value);
 
     return (
         <div className="space-y-1">
@@ -61,7 +77,7 @@ function EditableField({
                 {!readOnly && isDirty && <span className="ml-1 text-amber-500">•</span>}
             </p>
             {readOnly ? (
-                <p className="text-sm text-foreground px-2 py-1">{local || '—'}</p>
+                <p className="text-sm text-foreground px-2 py-1">{display || '—'}</p>
             ) : (
                 <input
                     className={`w-full text-sm text-foreground bg-transparent rounded px-2 py-1 hover:bg-muted focus:bg-background focus:border focus:border-border focus:outline-none focus:ring-1 focus:ring-ring transition-colors ${isDirty ? 'border-l-2 border-amber-400 pl-2' : ''}`}
