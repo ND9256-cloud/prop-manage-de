@@ -94,16 +94,22 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
 function extractRentRoll(analysis: Record<string, unknown>): RentRoll {
     // Prefer explicit rent_roll section (present after brain regeneration)
     const rentRoll = analysis?.rent_roll as {
-        current_tenants?: number;
+        current_tenants?: number | unknown[];
         monthly_gross_cold?: number;
         annual_gross_cold?: number;
     } | undefined;
 
-    if (rentRoll && typeof rentRoll.current_tenants === 'number') {
+    if (rentRoll && rentRoll.current_tenants != null) {
+        const tenants = Array.isArray(rentRoll.current_tenants)
+            ? rentRoll.current_tenants.length
+            : typeof rentRoll.current_tenants === 'number'
+              ? rentRoll.current_tenants
+              : 0;
+        const monthly = rentRoll.monthly_gross_cold ?? 0;
         return {
-            current_tenants: rentRoll.current_tenants,
-            monthly_gross_cold: rentRoll.monthly_gross_cold ?? 0,
-            annual_gross_cold: rentRoll.annual_gross_cold ?? (rentRoll.monthly_gross_cold ?? 0) * 12,
+            current_tenants: tenants,
+            monthly_gross_cold: monthly,
+            annual_gross_cold: rentRoll.annual_gross_cold ?? monthly * 12,
         };
     }
 
