@@ -77,6 +77,36 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                 </div>
             )}
 
+            {/* Portfolio KPI strip */}
+            {brainSummaries.length > 0 && (() => {
+                const objekte = propertyCards.length;
+                const einheiten = brainSummaries.reduce((sum, b) => sum + b.rentRoll.current_tenants, 0);
+                const mieteMonat = brainSummaries.reduce((sum, b) => sum + b.rentRoll.monthly_gross_cold, 0);
+                const totalUnitsFromAnalysis = brainSummaries.reduce((sum, b) => {
+                    const ua = (b.analysis as Record<string, unknown>)?.unit_analysis as { units_identified?: unknown[] } | undefined;
+                    return sum + (Array.isArray(ua?.units_identified) ? ua.units_identified.length : b.rentRoll.current_tenants);
+                }, 0);
+                const vermietungsquote = totalUnitsFromAnalysis > 0 ? Math.round((einheiten / totalUnitsFromAnalysis) * 100) : 0;
+
+                const kpis = [
+                    { label: 'Objekte', value: String(objekte) },
+                    { label: 'Einheiten', value: String(einheiten) },
+                    { label: 'Miete/Monat', value: mieteMonat.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }), green: true },
+                    { label: 'Vermietungsquote', value: `${vermietungsquote} %` },
+                ];
+
+                return (
+                    <div className="flex items-center divide-x divide-border rounded-lg border border-border bg-card px-2 py-3">
+                        {kpis.map((kpi) => (
+                            <div key={kpi.label} className="flex-1 text-center px-4">
+                                <div className={`text-lg font-semibold ${kpi.green ? 'text-green-600 dark:text-green-400' : ''}`}>{kpi.value}</div>
+                                <div className="text-xs text-muted-foreground">{kpi.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                );
+            })()}
+
             {/* Holdings table */}
             <div>
                 <h2 className="text-lg font-semibold mb-1">Immobilien</h2>
