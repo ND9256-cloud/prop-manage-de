@@ -4,14 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
     FileText,
-    AlertTriangle,
     Building2,
-
-    AlertCircle,
-    XCircle,
     Brain,
     ChevronDown,
 } from 'lucide-react';
@@ -56,7 +51,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
     const router = useRouter();
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
 
-    const isOperator = role === 'service_operator' || role === 'owner';
     const isViewer = role === 'viewer';
 
 
@@ -181,44 +175,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                     );
                 })()}
             </div>
-
-            {/* Attention section (operator only) */}
-            {isOperator && (stats.unknown > 0 || stats.failed > 0 || stats.needs_review > 0) && (
-                <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950">
-                    <CardContent className="p-4 space-y-2">
-                        <h3 className="text-sm font-semibold flex items-center gap-2">
-                            <AlertCircle className="h-4 w-4 text-amber-600" />
-                            Handlungsbedarf
-                        </h3>
-                        <div className="flex flex-wrap gap-3 text-sm">
-                            {stats.unknown > 0 && (
-                                <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
-                                    <AlertTriangle className="h-3.5 w-3.5" />
-                                    {stats.unknown} nicht klassifiziert
-                                </span>
-                            )}
-                            {stats.failed > 0 && (
-                                <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
-                                    <XCircle className="h-3.5 w-3.5" />
-                                    {stats.failed} fehlgeschlagen
-                                </span>
-                            )}
-                            {stats.needs_review > 0 && (
-                                <Button
-                                    variant="link"
-                                    className="h-auto p-0 text-sm text-amber-700 dark:text-amber-400"
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        router.push('/dashboard/warehouse/inbox');
-                                    }}
-                                >
-                                    {stats.needs_review} zur Prüfung
-                                </Button>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
 
             {/* Immobilien-Analyse section */}
             {brainSummaries.length > 0 && (() => {
