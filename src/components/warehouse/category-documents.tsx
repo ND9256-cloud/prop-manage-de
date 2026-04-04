@@ -57,13 +57,6 @@ type Props = {
     category: string;
 };
 
-function formatSize(bytes: number): string {
-    if (!bytes) return '\u2014';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
 function formatDateDE(iso: string | null): string {
     if (!iso) return '\u2014';
     // Parse YYYY-MM-DD directly to avoid timezone shift from new Date()
@@ -199,13 +192,6 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
         }
     }, [property.id, router]);
 
-    const isRetentionSoon = (iso: string | null) => {
-        if (!iso) return false;
-        const oneYear = new Date();
-        oneYear.setFullYear(oneYear.getFullYear() + 1);
-        return new Date(iso) < oneYear;
-    };
-
     return (
         <div className="space-y-4">
             {notification && (
@@ -300,9 +286,7 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                 <th className="text-right p-3 font-medium">Betrag</th>
                                 <th className="text-left p-3 font-medium">Typ</th>
                                 <th className="text-left p-3 font-medium">Status</th>
-                                <th className="text-right p-3 font-medium">Gr&ouml;&szlig;e</th>
-                                <th className="text-left p-3 font-medium">Aufbew.</th>
-                                <th className="text-left p-3 font-medium">Datum</th>
+<th className="text-left p-3 font-medium">Datum</th>
                                 <th className="text-center p-3 font-medium">Quelle</th>
                                 <th className="text-right p-3 font-medium">Aktionen</th>
                             </tr>
@@ -365,14 +349,6 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                         <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusBadge[doc.status] || statusBadge.queued}`}>
                                             {STATUS_LABELS[doc.status] ?? doc.status}
                                         </span>
-                                    </td>
-                                    {/* Size */}
-                                    <td className="p-3 text-right text-muted-foreground">
-                                        {formatSize(doc.file_size_bytes)}
-                                    </td>
-                                    {/* Retention */}
-                                    <td className={`p-3 ${isRetentionSoon(doc.retention_until) ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                        {formatDateDE(doc.retention_until)}
                                     </td>
                                     {/* Date */}
                                     <td className="p-3 text-muted-foreground">
