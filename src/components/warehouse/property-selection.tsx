@@ -207,8 +207,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
                             // Extract fields from brain analysis
                             const overview = analysis?.property_overview as { summary?: string } | undefined;
-                            const tenantData = analysis?.tenant_overview as { identified_tenants?: { name?: string; unit_ref?: string; rent_cold?: number }[] } | undefined;
-                            const tenants = tenantData?.identified_tenants ?? [];
                             const riskSignals = analysis?.risk_signals as { high?: string[] } | undefined;
                             const highRisks = riskSignals?.high ?? [];
                             const actionItems = analysis?.action_items as { urgent?: { action?: string; reason?: string; deadline?: string }[] } | undefined;
@@ -233,60 +231,31 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                             )}
                                         </div>
                                     </CardHeader>
-                                    <CardContent className="pt-0 space-y-3">
-                                        {/* Property status summary */}
+                                    <CardContent className="pt-0 space-y-2">
+                                        {/* Property status summary (2 lines max) */}
                                         {overview?.summary && (
-                                            <p className="text-sm text-muted-foreground line-clamp-3">
+                                            <p className="text-sm text-muted-foreground line-clamp-2">
                                                 {overview.summary}
                                             </p>
                                         )}
 
-                                        {/* Tenant list */}
-                                        {tenants.length > 0 && (
-                                            <div>
-                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Mieter</h4>
-                                                <ul className="text-sm space-y-0.5">
-                                                    {tenants.map((t, i) => (
-                                                        <li key={i} className="flex items-center gap-1 text-xs">
-                                                            <span className="text-muted-foreground">{t.unit_ref ?? '–'}</span>
-                                                            <span className="mx-0.5">–</span>
-                                                            <span>{t.name ?? 'Unbekannt'}</span>
-                                                            {t.rent_cold != null && (
-                                                                <>
-                                                                    <span className="mx-0.5">–</span>
-                                                                    <span className="font-medium">{t.rent_cold.toLocaleString('de-DE')} €</span>
-                                                                </>
-                                                            )}
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                        )}
-
-                                        {/* High risks (top 2, hidden for viewer) */}
+                                        {/* High risk line (hidden for viewer) */}
                                         {!isViewer && highRisks.length > 0 && (
-                                            <div>
-                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Risiken (hoch)</h4>
-                                                <ul className="text-sm space-y-0.5">
-                                                    {highRisks.slice(0, 2).map((risk, i) => (
-                                                        <li key={i} className="text-xs text-red-600 dark:text-red-400">
-                                                            {risk}
-                                                        </li>
-                                                    ))}
-                                                </ul>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 uppercase">
+                                                    Risiken Hoch
+                                                </Badge>
+                                                <span className="text-red-600 dark:text-red-400 line-clamp-1">{highRisks[0]}</span>
                                             </div>
                                         )}
 
                                         {/* First urgent action (hidden for viewer) */}
                                         {!isViewer && urgentActions.length > 0 && urgentActions[0]?.action && (
-                                            <div>
-                                                <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-1">Nächste Maßnahme</h4>
-                                                <div className="flex items-center gap-2 text-xs">
-                                                    <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                                                        Dringend
-                                                    </Badge>
-                                                    <span>{urgentActions[0].action}</span>
-                                                </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-orange-400 text-orange-600 bg-orange-50">
+                                                    Dringend
+                                                </Badge>
+                                                <span className="line-clamp-1">{urgentActions[0].action}</span>
                                             </div>
                                         )}
 
