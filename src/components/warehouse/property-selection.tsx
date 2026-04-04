@@ -8,7 +8,7 @@ import {
     FileText,
     AlertTriangle,
     Building2,
-    Camera,
+
     AlertCircle,
     XCircle,
     Brain,
@@ -77,21 +77,12 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                 </div>
             )}
 
-            {/* Portfolio bar */}
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Building2 className="h-4 w-4" />
-                <span className="font-medium text-foreground">{propertyCards.length}</span> Objekte
-                <span className="mx-1">&middot;</span>
-                <FileText className="h-4 w-4" />
-                <span className="font-medium text-foreground">{stats.total}</span> Dokumente
-                <span className="mx-1">&middot;</span>
-                <Camera className="h-4 w-4" />
-                <span className="font-medium text-foreground">{stats.photos}</span> Fotos
-            </div>
-
-            {/* Property cards grid */}
+            {/* Holdings table */}
             <div>
-                <h2 className="text-lg font-semibold mb-3">Immobilien</h2>
+                <h2 className="text-lg font-semibold mb-1">Immobilien</h2>
+                <p className="text-sm text-muted-foreground mb-3">
+                    {stats.total} Dokumente &middot; {stats.photos} Fotos
+                </p>
                 {propertyCards.length === 0 ? (
                     <Card>
                         <CardContent className="p-8 text-center text-muted-foreground">
@@ -99,80 +90,68 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                             <p>Keine Immobilien vorhanden.</p>
                         </CardContent>
                     </Card>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {propertyCards.map((p) => (
-                            <Card
-                                key={p.id}
-                                className="cursor-pointer hover:shadow-md transition-shadow"
-                                onClick={() => router.push(`/dashboard/warehouse/${p.id}`)}
-                            >
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base font-semibold">
-                                        {p.address}
-                                    </CardTitle>
-                                    {p.shortCode && (
-                                        <Badge variant="secondary" className="w-fit mt-1 text-xs">
-                                            {p.shortCode}
-                                        </Badge>
-                                    )}
-                                </CardHeader>
-                                <CardContent className="pt-0 space-y-2">
-                                    {/* Category rows */}
-                                    <div className="space-y-1 text-sm">
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Kosten</span>
-                                            <span className="font-medium">{p.buckets.kosten}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Verträge & Vers.</span>
-                                            <span className="font-medium">{p.buckets.versicherungen_vertraege}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Behörden</span>
-                                            <span className="font-medium">{p.buckets.behoerden}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Sonstiges</span>
-                                            <span className="font-medium">{p.buckets.sonstiges}</span>
-                                        </div>
-                                    </div>
+                ) : (() => {
+                    const fmt = (v: number | undefined) =>
+                        v != null ? v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '–';
 
-                                    {/* Operator badges */}
-                                    {role !== 'viewer' && (p.needsReview > 0 || p.failed > 0) && (
-                                        <div className="flex gap-2 pt-1">
-                                            {p.needsReview > 0 && (
-                                                <Badge variant="outline" className="text-amber-600 border-amber-300">
-                                                    {p.needsReview} zur Prüfung
-                                                </Badge>
-                                            )}
-                                            {p.failed > 0 && (
-                                                <Badge variant="outline" className="text-red-600 border-red-300">
-                                                    {p.failed} fehlgeschlagen
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    )}
+                    const rows = propertyCards.map((p) => {
+                        const brain = brainSummaries.find((b) => b.propertyId === p.id);
+                        const rentRoll = (brain?.analysis as Record<string, unknown>)?.rent_roll as {
+                            current_tenants?: number;
+                            monthly_gross_cold?: number;
+                            annual_gross_cold?: number;
+                        } | undefined;
+                        return { ...p, rentRoll };
+                    });
 
-                                    {/* Footer: total doc count */}
-                                    <div className="pt-2 border-t text-xs text-muted-foreground flex items-center gap-1.5">
-                                        <FileText className="h-3.5 w-3.5" />
-                                        {p.totalDocs} Dokumente
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                    const totalMonthly = rows.reduce((sum, r) => sum + (r.rentRoll?.monthly_gross_cold ?? 0), 0);
+                    const totalAnnual = rows.reduce((sum, r) => sum + (r.rentRoll?.annual_gross_cold ?? 0), 0);
+
+                    return (
+                        <div className="rounded-md border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b bg-muted/50">
+                                        <th className="text-left font-medium px-4 py-2">Objekt</th>
+                                        <th className="text-right font-medium px-4 py-2">Einheiten</th>
+                                        <th className="text-right font-medium px-4 py-2">Miete/Monat</th>
+                                        <th className="text-right font-medium px-4 py-2">Miete/Jahr</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((r) => (
+                                        <tr
+                                            key={r.id}
+                                            className="border-b last:border-0 cursor-pointer hover:bg-muted/50 transition-colors"
+                                            onClick={() => router.push(`/dashboard/warehouse/${r.id}`)}
+                                        >
+                                            <td className="px-4 py-2">
+                                                <span className="font-medium">{r.address}</span>
+                                                {r.shortCode && (
+                                                    <Badge variant="secondary" className="ml-2 text-xs">
+                                                        {r.shortCode}
+                                                    </Badge>
+                                                )}
+                                            </td>
+                                            <td className="text-right px-4 py-2">{r.rentRoll?.current_tenants ?? '–'}</td>
+                                            <td className="text-right px-4 py-2">{fmt(r.rentRoll?.monthly_gross_cold)}</td>
+                                            <td className="text-right px-4 py-2">{fmt(r.rentRoll?.annual_gross_cold)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                                <tfoot>
+                                    <tr className="border-t bg-muted/50 font-semibold">
+                                        <td className="px-4 py-2">Gesamt</td>
+                                        <td className="px-4 py-2" />
+                                        <td className="text-right px-4 py-2">{fmt(totalMonthly)}</td>
+                                        <td className="text-right px-4 py-2">{fmt(totalAnnual)}</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    );
+                })()}
             </div>
-
-            {/* Photo bar */}
-            {stats.photos > 0 && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground px-1">
-                    <Camera className="h-4 w-4" />
-                    <span>{stats.photos} Fotos im Archiv</span>
-                </div>
-            )}
 
             {/* Attention section (operator only) */}
             {isOperator && (stats.unknown > 0 || stats.failed > 0 || stats.needs_review > 0) && (
