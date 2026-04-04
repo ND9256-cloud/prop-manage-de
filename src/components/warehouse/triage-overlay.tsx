@@ -68,7 +68,8 @@ function EditableField({
     readOnly?: boolean;
 }) {
     const [local, setLocal] = useState(value ?? '');
-    const display = formatFieldDisplay(fieldName, value);
+    const [focused, setFocused] = useState(false);
+    const display = formatFieldDisplay(fieldName, isDirty ? local : value);
 
     return (
         <div className="space-y-1">
@@ -78,13 +79,21 @@ function EditableField({
             </p>
             {readOnly ? (
                 <p className="text-sm text-foreground px-2 py-1">{display || '—'}</p>
-            ) : (
+            ) : focused ? (
                 <input
                     className={`w-full text-sm text-foreground bg-transparent rounded px-2 py-1 hover:bg-muted focus:bg-background focus:border focus:border-border focus:outline-none focus:ring-1 focus:ring-ring transition-colors ${isDirty ? 'border-l-2 border-amber-400 pl-2' : ''}`}
                     value={local}
+                    autoFocus
                     onChange={(e) => setLocal(e.target.value)}
-                    onBlur={() => onEdit(fieldName, local)}
+                    onBlur={() => { setFocused(false); onEdit(fieldName, local); }}
                 />
+            ) : (
+                <p
+                    className={`w-full text-sm text-foreground bg-transparent rounded px-2 py-1 hover:bg-muted cursor-text transition-colors ${isDirty ? 'border-l-2 border-amber-400 pl-2' : ''}`}
+                    onClick={() => setFocused(true)}
+                >
+                    {display || '—'}
+                </p>
             )}
         </div>
     );
