@@ -235,6 +235,37 @@ async function callAnthropic(propertyName, propertyData) {
   };
 }
 
+// --- Validation ---
+
+const REQUIRED_FIELDS = [
+  { path: "rent_roll.monthly_gross_cold", type: "number" },
+  { path: "rent_roll.current_tenants", type: "number" },
+  { path: "rent_roll.tenants", type: "array" },
+  { path: "risk_signals.high", type: "array" },
+  { path: "action_items.urgent", type: "array" },
+  { path: "property_overview.summary", type: "string" },
+];
+
+function validateBrain(analysis) {
+  for (const { path, type } of REQUIRED_FIELDS) {
+    const parts = path.split(".");
+    let value = analysis;
+    for (const p of parts) {
+      value = value?.[p];
+    }
+    if (value === undefined || value === null) {
+      return `missing ${path}`;
+    }
+    if (type === "array" && !Array.isArray(value)) {
+      return `missing ${path} (expected array, got ${typeof value})`;
+    }
+    if (type !== "array" && typeof value !== type) {
+      return `missing ${path} (expected ${type}, got ${typeof value})`;
+    }
+  }
+  return null;
+}
+
 // --- Store ---
 
 async function storeBrain(propertyId, orgId, analysis, suggestedViews, documentCount) {
@@ -296,19 +327,34 @@ async function main() {
     console.log(`  ${data.documentCount} documents found`);
 
     try {
-      const { parsed, inputTokens, outputTokens, cost } = await callAnthropic(name, data);
+      let stored = false;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const { parsed, inputTokens, outputTokens, cost } = await callAnthropic(name, data);
 
-      const suggestedViews = parsed.suggested_views || [];
-      const analysis = { ...parsed };
-      delete analysis.suggested_views;
+        totalInput += inputTokens;
+        totalOutput += outputTokens;
+        totalCost += cost;
 
-      await storeBrain(propertyId, orgId, analysis, suggestedViews, data.documentCount);
+        const suggestedViews = parsed.suggested_views || [];
+        const analysis = { ...parsed };
+        delete analysis.suggested_views;
 
-      totalInput += inputTokens;
-      totalOutput += outputTokens;
-      totalCost += cost;
+        const validationError = validateBrain(analysis);
+        if (validationError) {
+          console.log(`  VALIDATION FAILED: ${validationError} (attempt ${attempt}/2)`);
+          if (attempt < 2) {
+            console.log("  Retrying...");
+            continue;
+          }
+          console.log("  Skipping — keeping existing brain.\n");
+          break;
+        }
 
-      console.log(`  Stored. Tokens: ${inputTokens} in / ${outputTokens} out ($${cost.toFixed(4)})\n`);
+        await storeBrain(propertyId, orgId, analysis, suggestedViews, data.documentCount);
+        stored = true;
+        console.log(`  Stored. Tokens: ${inputTokens} in / ${outputTokens} out ($${cost.toFixed(4)})\n`);
+        break;
+      }
     } catch (err) {
       console.error(`  ERROR: ${err.message}\n`);
     }
