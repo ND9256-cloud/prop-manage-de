@@ -29,6 +29,8 @@ const publicSupabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const BRAIN_PROMPT = `Du bist ein erfahrener Immobilien-Analyst im Stil von Blackstone Real Estate. Du erhältst alle Dokumenten-Intelligenz und Extraktionsdaten einer Immobilie. Erstelle eine umfassende Analyse.
 
+WICHTIG: Übergabeprotokolle können zwei Bedeutungen haben: (1) Mieterwechsel — ein Mieter zieht ein oder aus, (2) Eigentümerwechsel — die Immobilie wird verkauft und an einen neuen Eigentümer übergeben. Unterscheide diese anhand des Kontexts: Wenn das Protokoll einen Käufer/Verkäufer nennt oder im Zusammenhang mit einem Kaufvertrag steht, ist es ein Eigentümerwechsel. Die bestehenden Mieter bleiben in diesem Fall aktiv. Prüfe den Mietvertrag-Status: Wenn kein Kündigungsschreiben für einen Mieter existiert und der Mietvertrag noch läuft, ist der Mieter weiterhin aktiv — auch wenn ein Übergabeprotokoll existiert.
+
 Antworte NUR mit validem JSON in dieser exakten 11-Abschnitt-Struktur:
 
 {
