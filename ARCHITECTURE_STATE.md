@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-05 (brain validation, dashboard redesign, formatting). Update this file after every architectural change._
+_Last updated: 2026-04-06 (holdings table data flow fix, Alle Dokumente card). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -45,12 +45,15 @@ _Read this before writing any code or sending any task to Claude Code._
 - cost_class column on warehouse.documents set by pipeline via COST_CLASS_MAP, existing rows have NULL
 - HHS55 brain shows Weber rent as 900 not 1000 (original vs current rent)
 - Some Mietbeginn dates missing in brain output
+- Property table name is "Property" not "properties" — raw SQL queries must use quoted "Property" (e.g. FROM "Property")
 
 ### Live Features
 - Open taxonomy (120 German types), DOC_TYPE_MAP
 - Extraction (vendor 97%, amount 98% on cost docs)
-- Dashboard with KPI strip (Objekte, Einheiten, Miete/Monat, Vermietungsquote), holdings table with brain-sourced rent data
-- Immobilien-Analyse section with property selector and Mietübersicht tab
+- Dashboard Section 1: KPI strip (Objekte, Einheiten, Miete/Monat, Vermietungsquote)
+- Dashboard Section 2: Immobilienbestand holdings table with short_code, full address, Mietfläche, Miete/Monat, Miete/Jahr from brain + Property table (raw SQL uses quoted "Property")
+- Dashboard Section 3: Immobilien-Analyse with property selector and Mietübersicht tab
+- "Seit deinem letzten Besuch" orientation card on Alle Dokumente page (moved from dashboard)
 - Inbox (Alle Dokumente) with vendor/amount/date columns
 - Triage overlay with apply/quarantine, document intelligence summary in right panel
 - CI/CD (GitHub Actions)
