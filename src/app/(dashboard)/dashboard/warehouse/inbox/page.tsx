@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { Button } from '@/components/ui/button';
 import { Upload, Download } from 'lucide-react';
 import { getInboxDocuments, getInboxStats, getProperties } from '@/lib/warehouse-actions';
+import { getLastVisitStats } from '@/lib/dashboard-actions';
 import { t } from '@/lib/i18n/warehouse';
 import { getOrgContext } from '@/lib/org';
 import { InboxFilters } from './inbox-filters';
@@ -34,14 +35,33 @@ export default async function InboxPage({ searchParams }: PageProps) {
         view,
     };
 
-    const [{ documents, total }, stats, properties] = await Promise.all([
+    const [{ documents, total }, stats, properties, lastVisitStats] = await Promise.all([
         getInboxDocuments({ filters, page, pageSize: PAGE_SIZE }),
         getInboxStats(),
         getProperties(),
+        getLastVisitStats(),
     ]);
 
     return (
         <div className="space-y-6">
+            {/* Last visit orientation card */}
+            {lastVisitStats && (
+                <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+                    <span className="font-medium text-foreground">Seit deinem letzten Besuch</span>
+                    <span className="mx-2">&mdash;</span>
+                    {lastVisitStats.newDocs > 0 ? (
+                        <span>
+                            {lastVisitStats.newDocs} neue Dokumente
+                            {lastVisitStats.needsReview > 0 && (
+                                <> &middot; {lastVisitStats.needsReview} zur Prüfung</>
+                            )}
+                        </span>
+                    ) : (
+                        <span>Keine neuen Dokumente seit deinem letzten Besuch</span>
+                    )}
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between">
                 <div>

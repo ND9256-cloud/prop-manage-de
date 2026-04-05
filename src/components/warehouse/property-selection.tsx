@@ -10,7 +10,7 @@ import {
     Brain,
     ChevronDown,
 } from 'lucide-react';
-import type { BrainSummary, LastVisitStats } from '@/lib/dashboard-actions';
+import type { BrainSummary } from '@/lib/dashboard-actions';
 
 type PropertyCard = {
     id: string;
@@ -46,10 +46,9 @@ type Props = {
     propertyCards: PropertyCard[];
     role: string;
     brainSummaries?: BrainSummary[];
-    lastVisitStats?: LastVisitStats;
 };
 
-export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [], lastVisitStats }: Props) {
+export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [] }: Props) {
     const router = useRouter();
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
 
@@ -58,24 +57,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
     return (
         <div className="space-y-6">
-            {/* Last visit orientation card */}
-            {lastVisitStats && (
-                <div className="rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
-                    <span className="font-medium text-foreground">Seit deinem letzten Besuch</span>
-                    <span className="mx-2">&mdash;</span>
-                    {lastVisitStats.newDocs > 0 ? (
-                        <span>
-                            {lastVisitStats.newDocs} neue Dokumente
-                            {lastVisitStats.needsReview > 0 && (
-                                <> &middot; {lastVisitStats.needsReview} zur Prüfung</>
-                            )}
-                        </span>
-                    ) : (
-                        <span>Keine neuen Dokumente seit deinem letzten Besuch</span>
-                    )}
-                </div>
-            )}
-
             {/* Portfolio KPI strip */}
             {brainSummaries.length > 0 && (() => {
                 const objekte = propertyCards.length;
