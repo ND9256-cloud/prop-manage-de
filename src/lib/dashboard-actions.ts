@@ -86,7 +86,7 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
             .eq('is_current', true),
         prisma.$queryRaw<{ id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null; total_sqm: number | null }[]>`
             SELECT id, name, address, city, zip, short_code, total_sqm::float8 as total_sqm
-            FROM properties WHERE "organizationId" = ${ctx.orgId}::uuid
+            FROM "Property" WHERE "organizationId" = ${ctx.orgId}::uuid
         `.catch(() => [] as { id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null; total_sqm: number | null }[]),
     ]);
 
