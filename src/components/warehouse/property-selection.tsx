@@ -18,6 +18,7 @@ type PropertyCard = {
     address: string;
     city: string;
     shortCode: string | null;
+    totalSqm: number | null;
     totalDocs: number;
     needsReview: number;
     failed: number;
@@ -125,6 +126,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                     });
 
                     const totalUnits = rows.reduce((sum, r) => sum + (r.rentRoll?.current_tenants ?? 0), 0);
+                    const totalSqm = rows.reduce((sum, r) => sum + (r.totalSqm ?? 0), 0);
                     const totalMonthly = rows.reduce((sum, r) => sum + (r.rentRoll?.monthly_gross_cold ?? 0), 0);
                     const totalAnnual = rows.reduce((sum, r) => sum + (r.rentRoll?.annual_gross_cold ?? 0), 0);
 
@@ -135,6 +137,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                     <tr className="border-b bg-muted/50">
                                         <th className="text-left font-medium px-4 py-2">Objekt</th>
                                         <th className="text-right font-medium px-4 py-2">Einheiten</th>
+                                        <th className="text-right font-medium px-4 py-2">Mietfläche</th>
                                         <th className="text-right font-medium px-4 py-2">Miete/Monat</th>
                                         <th className="text-right font-medium px-4 py-2">Miete/Jahr</th>
                                     </tr>
@@ -158,6 +161,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                                 <div className="text-xs text-muted-foreground">{r.city}</div>
                                             </td>
                                             <td className="text-right px-4 py-2">{r.rentRoll?.current_tenants ?? '–'}</td>
+                                            <td className="text-right px-4 py-2">{r.totalSqm != null ? `${Math.round(r.totalSqm)} m²` : '–'}</td>
                                             <td className="text-right px-4 py-2">{fmt(r.rentRoll?.monthly_gross_cold)}</td>
                                             <td className="text-right px-4 py-2">{fmt(r.rentRoll?.annual_gross_cold)}</td>
                                         </tr>
@@ -167,6 +171,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                     <tr className="border-t bg-muted/50 font-semibold">
                                         <td className="px-4 py-2">Gesamt</td>
                                         <td className="text-right px-4 py-2">{totalUnits || '–'}</td>
+                                        <td className="text-right px-4 py-2">{totalSqm > 0 ? `${Math.round(totalSqm)} m²` : '–'}</td>
                                         <td className="text-right px-4 py-2">{fmt(totalMonthly)}</td>
                                         <td className="text-right px-4 py-2">{fmt(totalAnnual)}</td>
                                     </tr>
