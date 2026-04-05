@@ -7,11 +7,18 @@ require('dotenv').config({ path: '.env.local' });
  */
 
 import { runGoldenTests } from './pipeline-golden.test';
+import { runBrainContractTests } from './brain-contract.test';
 
 async function main() {
     console.log('=== Pipeline Golden File Tests ===\n');
 
-    const results = await runGoldenTests();
+    const goldenResults = await runGoldenTests();
+
+    console.log('\n=== Brain Contract Tests ===\n');
+
+    const brainResults = await runBrainContractTests();
+
+    const results = [...goldenResults, ...brainResults];
 
     let passed = 0;
     let failed = 0;
