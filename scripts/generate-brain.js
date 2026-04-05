@@ -266,6 +266,32 @@ function validateBrain(analysis) {
   return null;
 }
 
+// --- Regression check ---
+
+async function checkRegression(propertyId, newAnalysis) {
+  const { data: existing } = await supabase
+    .from("property_intelligence")
+    .select("analysis")
+    .eq("property_id", propertyId)
+    .eq("is_current", true)
+    .single();
+
+  if (!existing?.analysis?.rent_roll) return null;
+
+  const oldRoll = existing.analysis.rent_roll;
+  const newRoll = newAnalysis.rent_roll || {};
+
+  if (oldRoll.current_tenants > 0 && (newRoll.current_tenants || 0) === 0) {
+    return `New brain has fewer tenants than existing brain. Old: ${oldRoll.current_tenants}, New: 0. Keeping old brain.`;
+  }
+
+  if (oldRoll.monthly_gross_cold > 0 && (newRoll.monthly_gross_cold || 0) === 0) {
+    return `New brain has zero monthly_gross_cold vs existing ${oldRoll.monthly_gross_cold}. Keeping old brain.`;
+  }
+
+  return null;
+}
+
 // --- Store ---
 
 async function storeBrain(propertyId, orgId, analysis, suggestedViews, documentCount) {
@@ -347,6 +373,13 @@ async function main() {
             continue;
           }
           console.log("  Skipping — keeping existing brain.\n");
+          break;
+        }
+
+        const regressionWarning = await checkRegression(propertyId, analysis);
+        if (regressionWarning) {
+          console.log(`  WARNING: ${regressionWarning}`);
+          console.log("  Skipping insert.\n");
           break;
         }
 
