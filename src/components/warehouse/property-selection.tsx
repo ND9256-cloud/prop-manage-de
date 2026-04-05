@@ -17,6 +17,7 @@ type PropertyCard = {
     name: string;
     address: string;
     city: string;
+    zip: string;
     shortCode: string | null;
     totalSqm: number | null;
     totalDocs: number;
@@ -131,15 +132,8 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                             onClick={() => router.push(`/dashboard/warehouse/${r.id}`)}
                                         >
                                             <td className="px-4 py-2">
-                                                <div>
-                                                    <span className="font-medium">{r.address}</span>
-                                                    {r.shortCode && (
-                                                        <Badge variant="secondary" className="ml-2 text-xs">
-                                                            {r.shortCode}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">{r.city}</div>
+                                                <div className="font-semibold">{r.shortCode ?? r.name}</div>
+                                                <div className="text-xs text-muted-foreground">{r.address}, {r.zip} {r.city}</div>
                                             </td>
                                             <td className="text-right px-4 py-2">{r.rentRoll?.current_tenants ?? '–'}</td>
                                             <td className="text-right px-4 py-2">{r.totalSqm != null ? `${Math.round(r.totalSqm)} m²` : '–'}</td>
