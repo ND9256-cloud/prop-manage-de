@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-03 (sidebar redesign, brain, chat). Update this file after every architectural change._
+_Last updated: 2026-04-05 (brain validation, dashboard redesign, formatting). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -13,8 +13,8 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.review_tasks: low-confidence review queue
 - warehouse.apply_log: GoBD immutable audit trail
 - warehouse.document_chunks: EMPTY placeholder for RAG
-- warehouse.document_intelligence: 397 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled)
-- warehouse.property_intelligence: 2 rows — per-property AI analysis brain table (analysis jsonb, suggested_views jsonb, is_current=true pattern, staleness trigger from pipeline, RLS disabled)
+- warehouse.document_intelligence: 402 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled). Step 8b active in pipeline.
+- warehouse.property_intelligence: 2 rows (KO132, HHS55) — per-property AI analysis brain table. Blackstone 11-section format (analysis jsonb, suggested_views jsonb, is_current=true pattern). Staleness trigger active from pipeline. Brain prompt single source of truth in src/lib/brain-prompt.ts. RLS disabled.
 - warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
 
 ### public schema (Prisma)
@@ -43,22 +43,29 @@ _Read this before writing any code or sending any task to Claude Code._
 - Cost amounts include purchase prices
 - cost_class/umlagefaehig columns on document_intelligence only populated for new documents (397 existing rows have NULL)
 - cost_class column on warehouse.documents set by pipeline via COST_CLASS_MAP, existing rows have NULL
+- HHS55 brain shows Weber rent as 900 not 1000 (original vs current rent)
+- Some Mietbeginn dates missing in brain output
 
 ### Live Features
 - Open taxonomy (120 German types), DOC_TYPE_MAP
 - Extraction (vendor 97%, amount 98% on cost docs)
-- Dashboard with property cards, 4-category buckets
-- Inbox with vendor/amount/date columns
-- Triage overlay with apply/quarantine
-- CI/CD (GitHub Actions), 16 golden + 11 Playwright tests
+- Dashboard with KPI strip (Objekte, Einheiten, Miete/Monat, Vermietungsquote), holdings table with brain-sourced rent data
+- Immobilien-Analyse section with property selector and Mietübersicht tab
+- Inbox (Alle Dokumente) with vendor/amount/date columns
+- Triage overlay with apply/quarantine, document intelligence summary in right panel
+- CI/CD (GitHub Actions)
 - last_seen_at on memberships
 - Document intelligence (summaries, entity_name, unit_ref, cost_class, umlagefaehig in UI, German tags)
 - viewer_safe filtering on intelligence summaries
-- Proda-style icon-only sidebar with expand/collapse chevron toggle
-- Settings flyout with user info and logout
+- Proda-style icon-only sidebar with expand/collapse chevron toggle at top
+- Settings flyout with user info and logout (replaces settings page link)
 - Fixed shell layout (header + sidebar fixed, content area scrolls independently)
-- Immobilien-Analyse brain summary cards on dashboard
+- Brain insight line on property detail page
+- Compact folder list on property detail Dokumente tab
 - Property chat endpoint at /api/properties/[id]/chat
+- German number and date formatting (dots as thousands separators, dd.MM.yyyy dates)
+- Brain schema validation and diff protection in generate-brain.js
+- Brain contract tests validating property_intelligence JSON structure
 
 ### SQL Views (warehouse schema)
 - warehouse.v_cost_overview: cost aggregation by property, cost_class, year
@@ -67,6 +74,11 @@ _Read this before writing any code or sending any task to Claude Code._
 - warehouse.v_open_actions: documents with pending action signals
 - warehouse.v_property_summary: doc and photo counts per property
 - warehouse.v_unit_timeline: ⚠️ EXISTS but has permission issue (SELECT not granted)
+
+### Tests
+- 11 Playwright tests — all passing
+- 16 golden file tests — all passing
+- 2 brain contract tests — all passing
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
