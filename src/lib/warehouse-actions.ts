@@ -125,11 +125,32 @@ export async function getWarehouseOverview() {
         unknown: allDocs.filter(isUnknown).length,
     };
 
-    // Fetch all properties
+    // Fetch all properties (explicit select to avoid querying columns that may not exist in DB yet)
     const properties = await prisma.property.findMany({
         where: { organizationId: orgId },
         orderBy: { name: 'asc' },
+        select: {
+            id: true,
+            name: true,
+            address: true,
+            city: true,
+            type: true,
+            organizationId: true,
+        },
     });
+
+    // Fetch total_sqm and short_code separately via raw query (these columns may not exist yet)
+    let propertyExtras: Record<string, { short_code: string | null; total_sqm: number | null }> = {};
+    try {
+        const extras = await prisma.$queryRaw<{ id: string; short_code: string | null; total_sqm: number | null }[]>`
+            SELECT id, short_code, total_sqm::float8 as total_sqm FROM properties WHERE "organizationId" = ${orgId}::uuid
+        `;
+        for (const e of extras) {
+            propertyExtras[e.id] = { short_code: e.short_code, total_sqm: e.total_sqm };
+        }
+    } catch {
+        // Columns don't exist yet — proceed with nulls
+    }
 
     // Build per-property card data
     const propertyCards = properties.map(p => {
@@ -154,9 +175,9 @@ export async function getWarehouseOverview() {
             id: p.id,
             name: p.name,
             address: p.address,
-            city: p.city,
-            shortCode: (p as Record<string, unknown>).short_code as string | null,
-            totalSqm: (p as Record<string, unknown>).total_sqm != null ? Number((p as Record<string, unknown>).total_sqm) : null,
+            city: p.city ?? '',
+            shortCode: propertyExtras[p.id]?.short_code ?? null,
+            totalSqm: propertyExtras[p.id]?.total_sqm ?? null,
             totalDocs: propCountable.length,
             needsReview,
             failed,
@@ -191,9 +212,10 @@ export async function getPropertyWarehouseDetail(propertyId: string) {
 
     const db = warehouseDb(orgId);
 
-    // Fetch property
+    // Fetch property (explicit select to avoid querying columns that may not exist in DB yet)
     const property = await prisma.property.findFirst({
         where: { id: propertyId, organizationId: orgId },
+        select: { id: true, name: true, address: true, city: true, zip: true, country: true, type: true, organizationId: true, yearBuilt: true },
     });
     if (!property) return { error: 'Property not found', property: null, folders: [], stats: null, unassignedCount: 0 };
 
