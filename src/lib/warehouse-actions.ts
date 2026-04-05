@@ -154,6 +154,7 @@ export async function getWarehouseOverview() {
             id: p.id,
             name: p.name,
             address: p.address,
+            city: p.city,
             shortCode: (p as Record<string, unknown>).short_code as string | null,
             totalDocs: propCountable.length,
             needsReview,

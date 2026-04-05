@@ -16,6 +16,7 @@ type PropertyCard = {
     id: string;
     name: string;
     address: string;
+    city: string;
     shortCode: string | null;
     totalDocs: number;
     needsReview: number;
@@ -106,10 +107,7 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
             {/* Holdings table */}
             <div>
-                <h2 className="text-lg font-semibold mb-1">Immobilien</h2>
-                <p className="text-sm text-muted-foreground mb-3">
-                    {stats.total} Dokumente &middot; {stats.photos} Fotos
-                </p>
+                <h2 className="text-lg font-semibold mb-3">Immobilien</h2>
                 {propertyCards.length === 0 ? (
                     <Card>
                         <CardContent className="p-8 text-center text-muted-foreground">
@@ -149,12 +147,15 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                             onClick={() => router.push(`/dashboard/warehouse/${r.id}`)}
                                         >
                                             <td className="px-4 py-2">
-                                                <span className="font-medium">{r.address}</span>
-                                                {r.shortCode && (
-                                                    <Badge variant="secondary" className="ml-2 text-xs">
-                                                        {r.shortCode}
-                                                    </Badge>
-                                                )}
+                                                <div>
+                                                    <span className="font-medium">{r.address}</span>
+                                                    {r.shortCode && (
+                                                        <Badge variant="secondary" className="ml-2 text-xs">
+                                                            {r.shortCode}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">{r.city}</div>
                                             </td>
                                             <td className="text-right px-4 py-2">{r.rentRoll?.current_tenants ?? '–'}</td>
                                             <td className="text-right px-4 py-2">{fmt(r.rentRoll?.monthly_gross_cold)}</td>
