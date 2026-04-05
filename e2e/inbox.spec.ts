@@ -9,8 +9,8 @@ test.describe('Inbox', () => {
     // Header is visible
     await expect(page.getByRole('heading', { name: 'Alle Dokumente' })).toBeVisible();
 
-    // Stats cards are rendered
-    await expect(page.getByText('Gesamt', { exact: true })).toBeVisible();
+    // Stats line shows document count
+    await expect(page.getByText(/\d+ Dokumente/).first()).toBeVisible();
 
     // Table has at least one document row
     const rows = page.locator('table tbody tr');

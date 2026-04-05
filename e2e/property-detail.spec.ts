@@ -2,14 +2,14 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Property Detail', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to warehouse, click first property card to get to a detail page
+    // Navigate to warehouse, click first table row to get to a detail page
     await page.goto('/dashboard/warehouse');
-    const firstCard = page.locator('.grid .cursor-pointer').first();
-    await firstCard.click();
+    const firstRow = page.locator('table tbody tr').first();
+    await firstRow.click();
     await expect(page).toHaveURL(/\/dashboard\/warehouse\/[a-f0-9-]+/);
   });
 
-  test('property detail loads with category cards', async ({ page }) => {
+  test('property detail loads with category list', async ({ page }) => {
     // Property name heading is visible
     const heading = page.locator('h1, h2').first();
     await expect(heading).toBeVisible();
