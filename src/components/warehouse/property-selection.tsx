@@ -104,7 +104,15 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
                     const rows = propertyCards.map((p) => {
                         const brain = brainSummaries.find((b) => b.propertyId === p.id);
-                        return { ...p, rentRoll: brain?.rentRoll };
+                        return {
+                            ...p,
+                            rentRoll: brain?.rentRoll,
+                            shortCode: brain?.shortCode ?? p.shortCode,
+                            address: brain?.address || p.address,
+                            city: brain?.city || p.city,
+                            zip: brain?.zip || p.zip,
+                            totalSqm: brain?.totalSqm ?? p.totalSqm,
+                        };
                     });
 
                     const totalUnits = rows.reduce((sum, r) => sum + (r.rentRoll?.current_tenants ?? 0), 0);

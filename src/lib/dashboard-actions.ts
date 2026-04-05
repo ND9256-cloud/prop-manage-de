@@ -63,6 +63,12 @@ export interface BrainSummary {
     isStale: boolean;
     generatedAt: string;
     rentRoll: RentRoll;
+    shortCode: string | null;
+    address: string;
+    city: string;
+    zip: string;
+    totalSqm: number | null;
+    propertyName: string;
 }
 
 export async function getBrainSummaries(): Promise<BrainSummary[]> {
@@ -70,23 +76,41 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
     if (!ctx) return [];
 
     const db = warehouseDb(ctx.orgId);
-    const { data, error } = await db
-        .from('property_intelligence')
-        .select('property_id, analysis, is_stale, generated_at')
-        .eq('org_id', ctx.orgId)
-        .eq('is_current', true);
 
-    if (error || !data) return [];
+    // Fetch brain data and property metadata in parallel
+    const [brainResult, propertyExtras] = await Promise.all([
+        db
+            .from('property_intelligence')
+            .select('property_id, analysis, is_stale, generated_at')
+            .eq('org_id', ctx.orgId)
+            .eq('is_current', true),
+        prisma.$queryRaw<{ id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null; total_sqm: number | null }[]>`
+            SELECT id, name, address, city, zip, short_code, total_sqm::float8 as total_sqm
+            FROM properties WHERE "organizationId" = ${ctx.orgId}::uuid
+        `.catch(() => [] as { id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null; total_sqm: number | null }[]),
+    ]);
 
-    return data.map((row: { property_id: string; analysis: Record<string, unknown>; is_stale: boolean; generated_at: string }) => {
+    if (brainResult.error || !brainResult.data) return [];
+
+    // Build property lookup
+    const propMap = new Map(propertyExtras.map(p => [p.id, p]));
+
+    return brainResult.data.map((row: { property_id: string; analysis: Record<string, unknown>; is_stale: boolean; generated_at: string }) => {
         const analysis = row.analysis as Record<string, unknown>;
         const rentRoll = extractRentRoll(analysis);
+        const prop = propMap.get(row.property_id);
         return {
             propertyId: row.property_id,
             analysis,
             isStale: row.is_stale,
             generatedAt: row.generated_at,
             rentRoll,
+            shortCode: prop?.short_code ?? null,
+            address: prop?.address ?? '',
+            city: prop?.city ?? '',
+            zip: prop?.zip ?? '',
+            totalSqm: prop?.total_sqm ?? null,
+            propertyName: prop?.name ?? '',
         };
     });
 }
