@@ -1,19 +1,13 @@
 'use client';
 
-import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { uploadWarehouseDocument } from '@/lib/warehouse-actions';
 import {
-    FileText,
     AlertTriangle,
     CheckCircle2,
     Clock,
-    Upload,
-    X,
-    FolderOpen,
     ChevronRight,
 } from 'lucide-react';
 
@@ -59,79 +53,9 @@ function formatDateDE(iso: string | null): string {
 
 export default function PropertyFolders({ property, folders, stats, unassignedCount, readOnly, unitCount }: Props) {
     const router = useRouter();
-    const [dragging, setDragging] = useState(false);
-    const [showUpload, setShowUpload] = useState(false);
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
-    const [uploading, setUploading] = useState(false);
-    const [notification, setNotification] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
-
-    const onDragOver = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setDragging(true);
-    }, []);
-    const onDragLeave = useCallback(() => setDragging(false), []);
-    const onDrop = useCallback((e: React.DragEvent) => {
-        e.preventDefault();
-        setDragging(false);
-        const file = e.dataTransfer.files?.[0];
-        if (file) { setSelectedFile(file); setShowUpload(true); }
-    }, []);
-    const onFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) { setSelectedFile(file); setShowUpload(true); }
-    }, []);
-
-    const handleUpload = async () => {
-        if (!selectedFile) return;
-        setUploading(true);
-        try {
-            const formData = new FormData();
-            formData.append('file', selectedFile);
-            formData.append('propertyId', property.id);
-            const result = await uploadWarehouseDocument(formData);
-            if (result.error) {
-                setNotification({ msg: result.error, type: 'error' });
-            } else {
-                setNotification({ msg: `${selectedFile.name} wird verarbeitet...`, type: 'success' });
-                setTimeout(() => setNotification(null), 4000);
-                setShowUpload(false);
-                setSelectedFile(null);
-                router.refresh();
-            }
-        } finally {
-            setUploading(false);
-        }
-    };
 
     return (
         <div className="space-y-6">
-            {notification && (
-                <div className={`p-3 rounded-md text-sm font-medium ${notification.type === 'success'
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
-                    {notification.msg}
-                </div>
-            )}
-
-            {/* Upload button */}
-            <div className="flex justify-end">
-                <div>
-                    <Button
-                        variant="outline"
-                        onClick={() => document.getElementById('prop-file-upload')?.click()}
-                    >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Hochladen
-                    </Button>
-                    <input
-                        id="prop-file-upload"
-                        type="file"
-                        className="hidden"
-                        onChange={onFileSelect}
-                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
-                    />
-                </div>
-            </div>
 
             {/* Property stats row — only shown when there are items to review */}
             {stats.needsReview > 0 && !readOnly && (
@@ -239,55 +163,6 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 </Card>
             )}
 
-            {/* Drag & drop zone */}
-            <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${dragging
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-950'
-                        : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-                    }`}
-                onDragOver={onDragOver}
-                onDragLeave={onDragLeave}
-                onDrop={onDrop}
-                onClick={() => document.getElementById('prop-file-upload')?.click()}
-            >
-                <Upload className="mx-auto h-6 w-6 text-muted-foreground mb-1" />
-                <p className="text-sm font-medium">Dokument hochladen</p>
-            </div>
-
-            {/* Upload confirmation modal */}
-            {showUpload && selectedFile && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-                    <Card className="w-full max-w-md mx-4">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="text-lg">Dokument hochladen</CardTitle>
-                            <Button variant="ghost" size="sm" onClick={() => { setShowUpload(false); setSelectedFile(null); }}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="p-3 bg-muted rounded-md text-sm">
-                                <FileText className="inline h-4 w-4 mr-2" />
-                                {selectedFile.name}
-                            </div>
-                            <div className="p-3 bg-muted rounded-md text-sm flex items-center gap-2">
-                                <FolderOpen className="h-4 w-4" />
-                                <span className="font-medium">{property.address}</span>
-                                {property.shortCode && (
-                                    <Badge variant="secondary" className="text-xs">{property.shortCode}</Badge>
-                                )}
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                                <Button variant="outline" onClick={() => { setShowUpload(false); setSelectedFile(null); }}>
-                                    Abbrechen
-                                </Button>
-                                <Button onClick={handleUpload} disabled={uploading}>
-                                    {uploading ? 'Wird hochgeladen...' : 'Bestätigen'}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
         </div>
     );
 }

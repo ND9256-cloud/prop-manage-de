@@ -1,4 +1,4 @@
-import { getPropertyStats, getPropertyWarehouseDetail, getPropertyDocuments, getPropertyCosts, getAuditEvents, getAuditActors, getProperties, getPropertyDetails } from '@/lib/warehouse-actions';
+import { getPropertyStats, getPropertyWarehouseDetail, getPropertyCosts, getAuditEvents, getAuditActors, getProperties, getPropertyDetails } from '@/lib/warehouse-actions';
 import { getBrainSummaries } from '@/lib/dashboard-actions';
 import { AssetTabs } from '@/components/warehouse/asset-tabs';
 import { DokumenteTab } from '@/components/warehouse/dokumente-tab';
@@ -9,7 +9,7 @@ import { PropertyChat } from '@/components/warehouse/property-chat';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, FileText, AlertCircle, Building, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Lightbulb } from 'lucide-react';
 import { getOrgContext } from '@/lib/org';
 
 interface PageProps {
@@ -29,7 +29,7 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
     ]);
     if (statsError || !statsData) notFound();
 
-    const { property, totalDocs, needsReview, unitCount } = statsData;
+    const { property, unitCount } = statsData;
 
     // Extract brain insight for this property
     const brain = brainSummaries.find(b => b.propertyId === propertyId);
@@ -59,25 +59,9 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
 
     // Tab-specific data
     let foldersData = null;
-    let propertyDocs: Awaited<ReturnType<typeof getPropertyDocuments>> = { docs: [], total: 0 };
-    const docFilters = {
-        search: (sp.q as string) ?? '',
-        category: (sp.cat as string) ?? '',
-        status: (sp.docStatus as string) ?? '',
-        sort: (sp.sort as string) ?? 'newest',
-    };
 
     if (tab === 'dokumente') {
-        const [detail, docsResult] = await Promise.all([
-            getPropertyWarehouseDetail(propertyId),
-            getPropertyDocuments(propertyId, {
-                search: docFilters.search || undefined,
-                category: docFilters.category || undefined,
-                status: docFilters.status || undefined,
-                sort: (docFilters.sort as 'newest' | 'oldest') || 'newest',
-                page: sp.docPage ? Number(sp.docPage) : 1,
-            }),
-        ]);
+        const detail = await getPropertyWarehouseDetail(propertyId);
 
         if (!detail.error) {
             foldersData = {
@@ -87,7 +71,6 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                 unassignedCount: detail.unassignedCount,
             };
         }
-        propertyDocs = docsResult;
     }
 
     // Kosten tab data
@@ -154,23 +137,8 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
 
     return (
         <div className="w-full space-y-6">
-            {/* ── Breadcrumb ── */}
-            <nav className="flex items-center text-sm text-muted-foreground" aria-label="Breadcrumb">
-                <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
-                    Dokumentenarchiv
-                </Link>
-                <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
-                <Link href="/dashboard/warehouse" className="hover:text-foreground transition-colors">
-                    Immobilien
-                </Link>
-                <ChevronRight className="h-3.5 w-3.5 mx-1.5" />
-                <span className="text-foreground font-medium">
-                    {property.shortCode ?? property.name}
-                </span>
-            </nav>
-
             {/* ── Property header ── */}
-            <div className="space-y-2">
+            <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-semibold text-foreground">{property.name}</h1>
                     {property.shortCode && (
@@ -179,27 +147,13 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                         </Badge>
                     )}
                 </div>
-
-                {/* Stats row */}
-                <div className="flex items-center gap-6 pt-2">
-                    <div className="flex items-center gap-1.5 text-sm">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{totalDocs}</span>
-                        <span className="text-muted-foreground">Dokumente</span>
-                    </div>
-                    {!readOnly && (
-                        <div className={`flex items-center gap-1.5 text-sm ${needsReview > 0 ? 'text-amber-600' : ''}`}>
-                            <AlertCircle className="h-4 w-4" />
-                            <span className="font-medium">{needsReview}</span>
-                            <span>zu prüfen</span>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-1.5 text-sm">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">{unitCount}</span>
-                        <span className="text-muted-foreground">Einheiten</span>
-                    </div>
-                </div>
+                <Link
+                    href="/dashboard/warehouse"
+                    className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                    <ArrowLeft className="h-4 w-4" />
+                    Zurück
+                </Link>
             </div>
 
             {/* ── Brain insight line ── */}
@@ -218,10 +172,6 @@ export default async function PropertyWarehousePage({ params, searchParams }: Pa
                 <DokumenteTab
                     propertyId={propertyId}
                     foldersData={foldersData}
-                    docs={propertyDocs.docs}
-                    docsTotal={propertyDocs.total}
-                    docsPage={sp.docPage ? Number(sp.docPage) : 1}
-                    currentFilters={docFilters}
                     readOnly={readOnly}
                     unitCount={unitCount}
                 />
