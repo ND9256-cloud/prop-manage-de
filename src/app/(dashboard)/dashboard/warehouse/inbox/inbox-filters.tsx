@@ -22,9 +22,10 @@ interface Property {
 
 interface InboxFiltersProps {
     properties: Property[];
+    senders: string[];
 }
 
-export function InboxFilters({ properties }: InboxFiltersProps) {
+export function InboxFilters({ properties, senders }: InboxFiltersProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
 
@@ -52,6 +53,7 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
         searchParams.has('property') ||
         searchParams.has('docType') ||
         searchParams.has('source') ||
+        searchParams.has('sender') ||
         searchParams.has('dateRange') ||
         searchParams.has('search');
 
@@ -144,6 +146,26 @@ export function InboxFilters({ properties }: InboxFiltersProps) {
                     <SelectItem value="ui">Web Upload</SelectItem>
                 </SelectContent>
             </Select>
+
+            {/* Absender (Sender) */}
+            {senders.length > 0 && (
+                <Select
+                    value={searchParams.get('sender') ?? 'all'}
+                    onValueChange={(v) => updateParam('sender', v)}
+                >
+                    <SelectTrigger className="w-44">
+                        <SelectValue placeholder="Alle Absender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Alle Absender</SelectItem>
+                        {senders.map((s) => (
+                            <SelectItem key={s} value={s}>
+                                {s}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            )}
 
             {/* Date Range */}
             <Select

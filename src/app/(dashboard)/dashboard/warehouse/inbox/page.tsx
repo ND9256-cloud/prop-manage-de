@@ -35,12 +35,25 @@ export default async function InboxPage({ searchParams }: PageProps) {
         view,
     };
 
-    const [{ documents, total }, stats, properties, lastVisitStats] = await Promise.all([
+    const senderFilter = params.sender ? String(params.sender) : undefined;
+
+    const [{ documents: rawDocuments, total: rawTotal }, stats, properties, lastVisitStats] = await Promise.all([
         getInboxDocuments({ filters, page, pageSize: PAGE_SIZE }),
         getInboxStats(),
         getProperties(),
         getLastVisitStats(),
     ]);
+
+    // Extract unique vendor/sender names for the filter dropdown
+    const uniqueSenders = Array.from(
+        new Set(rawDocuments.map((d) => d.vendorName).filter(Boolean) as string[])
+    ).sort((a, b) => a.localeCompare(b, 'de'));
+
+    // Apply client-side sender filter (vendor name lives in extractions, not queryable at DB level)
+    const documents = senderFilter
+        ? rawDocuments.filter((d) => d.vendorName === senderFilter)
+        : rawDocuments;
+    const total = senderFilter ? documents.length : rawTotal;
 
     return (
         <div className="space-y-6">
@@ -102,6 +115,7 @@ export default async function InboxPage({ searchParams }: PageProps) {
                         name: p.name,
                         shortCode: p.shortCode,
                     }))}
+                    senders={uniqueSenders}
                 />
             </Suspense>
 

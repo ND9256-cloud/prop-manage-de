@@ -35,9 +35,8 @@ import { EmptyState } from '@/components/warehouse/ui/empty-state';
 import { LoadingRows } from '@/components/warehouse/ui/loading-rows';
 import { t } from '@/lib/i18n/warehouse';
 import { softDeleteDocument, type InboxDocument } from '@/lib/warehouse-actions';
-import { CATEGORIES } from '@/lib/warehouse-categories';
 
-type SortKey = 'document' | 'property' | 'category' | 'status' | 'confidence' | 'date';
+type SortKey = 'document' | 'property' | 'status' | 'confidence' | 'date';
 type SortDir = 'asc' | 'desc';
 
 interface InboxTableProps {
@@ -56,12 +55,6 @@ function formatDate(dateStr: string): string {
         month: '2-digit',
         year: 'numeric',
     });
-}
-
-function getCategoryLabel(key: string | null): { de: string; sub?: string } {
-    if (!key) return { de: '—' };
-    const cat = CATEGORIES.find((c) => c.key === key);
-    return { de: cat?.de ?? key };
 }
 
 function SortableHeader({
@@ -134,11 +127,6 @@ export function InboxTable({
                 case 'property': {
                     const av = (a.property_short_code ?? '').toLowerCase();
                     const bv = (b.property_short_code ?? '').toLowerCase();
-                    return av.localeCompare(bv, 'de') * dir;
-                }
-                case 'category': {
-                    const av = getCategoryLabel(a.category).de.toLowerCase();
-                    const bv = getCategoryLabel(b.category).de.toLowerCase();
                     return av.localeCompare(bv, 'de') * dir;
                 }
                 case 'status': {
@@ -259,7 +247,6 @@ export function InboxTable({
                             </TableHead>
                             <SortableHeader label={t.document.de.toUpperCase()} sortKey="document" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.property.de.toUpperCase()} sortKey="property" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                            <SortableHeader label={t.category.de.toUpperCase()} sortKey="category" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.status.de.toUpperCase()} sortKey="status" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ABSENDER</TableHead>
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground text-right">BETRAG</TableHead>
@@ -278,7 +265,6 @@ export function InboxTable({
                         <TableBody>
                             {sortedDocuments.map((doc) => {
                                 const isSelected = selected.has(doc.id);
-                                const catLabel = getCategoryLabel(doc.category);
                                 const displayName = doc.file_name;
 
                                 return (
@@ -316,11 +302,6 @@ export function InboxTable({
                                             ) : (
                                                 <span className="text-sm text-amber-600">—</span>
                                             )}
-                                        </TableCell>
-
-                                        {/* Category */}
-                                        <TableCell className="py-3 px-4">
-                                            <p className="text-sm text-foreground/80">{catLabel.de}</p>
                                         </TableCell>
 
                                         {/* Status */}
