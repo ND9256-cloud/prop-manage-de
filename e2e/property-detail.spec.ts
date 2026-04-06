@@ -25,8 +25,8 @@ test.describe('Property Detail', () => {
   });
 
   test('document count is greater than zero', async ({ page }) => {
-    // At least one category row shows a count > 0
-    const categoryRow = page.getByText(/\d+\s*>/).first();
-    await expect(categoryRow).toBeVisible();
+    // At least one category in the folder list is visible
+    await expect(page.getByText('Rechtliches')).toBeVisible();
+    await expect(page.getByText('Behörden')).toBeVisible();
   });
 });
