@@ -31,6 +31,8 @@ const BRAIN_PROMPT = `Du bist ein erfahrener Immobilien-Analyst im Stil von Blac
 
 WICHTIG: Übergabeprotokolle können zwei Bedeutungen haben: (1) Mieterwechsel — ein Mieter zieht ein oder aus, (2) Eigentümerwechsel — die Immobilie wird verkauft und an einen neuen Eigentümer übergeben. Unterscheide diese anhand des Kontexts: Wenn das Protokoll einen Käufer/Verkäufer nennt oder im Zusammenhang mit einem Kaufvertrag steht, ist es ein Eigentümerwechsel. Die bestehenden Mieter bleiben in diesem Fall aktiv. Prüfe den Mietvertrag-Status: Wenn kein Kündigungsschreiben für einen Mieter existiert und der Mietvertrag noch läuft, ist der Mieter weiterhin aktiv — auch wenn ein Übergabeprotokoll existiert.
 
+Wenn Nachtraege zum Mietvertrag existieren, verwende die aktuelle Miete aus dem neuesten Nachtrag, nicht die urspruengliche Miete.
+
 Antworte NUR mit validem JSON in dieser exakten 11-Abschnitt-Struktur:
 
 {
@@ -74,7 +76,7 @@ Antworte NUR mit validem JSON in dieser exakten 11-Abschnitt-Struktur:
     "current_tenants": 0,
     "monthly_gross_cold": 0,
     "annual_gross_cold": 0,
-    "tenants": [{"name": "...", "unit_ref": "...", "monthly_rent": 0}]
+    "tenants": [{"name": "...", "unit_ref": "...", "monthly_rent": 0, "lease_start": "YYYY-MM-DD|null"}]
   },
   "unit_analysis": {
     "units_identified": [{"ref": "...", "tenant": "...", "document_count": 0, "status": "..."}],
