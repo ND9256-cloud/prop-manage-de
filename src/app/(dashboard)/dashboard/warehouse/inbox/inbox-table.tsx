@@ -306,26 +306,14 @@ export function InboxTable({
                                             <p className="truncate text-sm font-medium text-foreground">
                                                 {displayName}
                                             </p>
-                                            {doc.summary && (
-                                                <p className="truncate text-xs text-muted-foreground/70 mt-0.5">
-                                                    {doc.summary}
-                                                </p>
-                                            )}
                                         </TableCell>
 
                                         {/* Property */}
                                         <TableCell className="py-3 px-4">
                                             {doc.property_short_code ? (
-                                                <div>
-                                                    <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
-                                                        {doc.property_short_code}
-                                                    </span>
-                                                    {doc.property_address && (
-                                                        <p className="mt-0.5 text-xs text-muted-foreground truncate max-w-[160px]">
-                                                            {doc.property_address}
-                                                        </p>
-                                                    )}
-                                                </div>
+                                                <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                                    {doc.property_short_code}
+                                                </span>
                                             ) : (
                                                 <span className="text-sm text-amber-600">—</span>
                                             )}
