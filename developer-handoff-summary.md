@@ -1,6 +1,6 @@
 # Developer Handoff Summary
 
-_Last updated: 2026-04-05_
+_Last updated: 2026-04-06_
 
 This document summarizes the current state of the property management SaaS for developer onboarding. Read ARCHITECTURE.md for conventions and ARCHITECTURE_STATE.md for live database/feature state.
 
@@ -31,37 +31,44 @@ This document summarizes the current state of the property management SaaS for d
 - **Chat endpoint**: `POST /api/properties/[id]/chat` — uses brain + document intelligence as context for property Q&A
 - **Contract tests**: `src/tests/brain-contract.test.ts` validates property_intelligence JSON structure against expected schema
 
-## Cost Classification
+## Cost Classification — DONE
 
 - `cost_class` (text) and `umlagefaehig` (boolean) on `warehouse.document_intelligence`
 - `cost_class` (text) on `warehouse.documents` — set by pipeline via COST_CLASS_MAP
 - Automatically populated by pipeline step 8b for new documents
-- Existing 397 rows have NULL (backfill scripts exist: `scripts/backfill-cost-class.js`)
+- Backfill complete across existing rows (`scripts/backfill-cost-class.js`)
 - SQL views aggregate costs: `warehouse.v_cost_overview` (by property, cost_class, year)
 
-## Dashboard Redesign
+## UI
 
-- **"Seit deinem letzten Besuch"** orientation card at top (uses `last_seen_at` from memberships)
-- **Portfolio KPI strip**: Objekte, Einheiten, Miete/Monat, Leerstand — reads from brain rent_roll data
-- **Immobilienbestand table**: Replaces property cards with a holdings table showing units, rent, vacancy per property
-- **Immobilien-Analyse panel**: Single interactive panel with property selector, key findings, and rent roll table — replaces side-by-side brain cards
-- **Status bar**: Green dot + "System läuft normal" at bottom
+**Shell/Navigation**
+- Proda-style sidebar: 60px icon-only collapsed by default, expands on hover/click with chevron toggle
+- Fixed shell: header and sidebar fixed, content scrolls independently
+- Settings flyout with user info and logout
+- All UI in German — no dual-language labels
 
-## UI/Navigation
+**Dashboard**
+- Portfolio KPI strip: Objekte, Einheiten, Miete/Monat, Leerstand (reads from brain rent_roll)
+- Holdings table (Immobilienbestand) showing `short_code` and address per property
+- Immobilien-Analyse panel with property selector, key findings, and rent roll table
+- Status bar: "System läuft normal" at bottom
 
-- **Proda-style sidebar**: 60px icon-only collapsed by default, expands to show labels on hover/click
-- **Chevron toggle** on sidebar-content border edge (top-aligned) for expand/collapse
-- **Fixed shell layout**: Header and sidebar fixed, content area scrolls independently
-- **Settings flyout** with user info and logout (replaces separate settings page)
-- **All UI in German** — no dual-language labels
-
-## Property Detail Page
-
+**Property Detail**
+- Zurück button back to dashboard
 - Meta bar: document count, review count, applied count
-- Brain insight line between meta bar and tabs (one-line AI summary)
-- Compact category list view (replaces folder cards)
+- Brain insight line (one-line AI summary) between meta bar and tabs
+- Compact folder/category list (replaces folder cards)
 - Tabs: Dokumente, Kosten, Stammdaten, Protokoll
-- Triage overlay with PDF preview, extraction fields, intelligence summary, apply/reject actions
+
+**Alle Dokumente**
+- "Seit deinem letzten Besuch" card at top (uses `last_seen_at` from memberships)
+- Absender filter in addition to property/type filters
+
+**Triage Overlay**
+- PDF preview with extraction fields
+- Intelligence summary section
+- Standardized German field labels across all doc types
+- Apply/reject actions
 
 ## SQL Views (warehouse schema)
 
@@ -88,7 +95,6 @@ This document summarizes the current state of the property management SaaS for d
 - viewer_safe incorrectly flags Mieteingänge summaries as false
 - unit_ref inconsistent across documents
 - Cost amounts include purchase prices
-- cost_class/umlagefaehig NULL on existing 397 intelligence rows
 - v_unit_timeline permission issue
 
 ## Deferred
