@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { STRUCTURED_PROMPTS } from "./extraction_schemas.ts";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -910,6 +911,8 @@ async function generateIntelligence(
             extracted_fields: extractedFields,
         });
 
+        const docTypeFragment = STRUCTURED_PROMPTS[classification.doc_type]?.() ?? "";
+
         const response = await fetch("https://api.anthropic.com/v1/messages", {
             method: "POST",
             headers: {
@@ -919,10 +922,10 @@ async function generateIntelligence(
             },
             body: JSON.stringify({
                 model: "claude-sonnet-4-20250514",
-                max_tokens: 600,
+                max_tokens: 1500,
                 messages: [{
                     role: "user",
-                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true,"cost_class":"betriebskosten|erwerbskosten|abrechnung|finanzierung|mieteingang|nicht_immobilien|nicht_zugeordnet","umlagefaehig":true|false|null}\n\ncost_class: Klassifiziere die Kostenart. nicht_zugeordnet wenn unklar.\numlagefaehig: true wenn Kosten nach BetrKV auf Mieter umlegbar (Grundsteuer, Wasser, Abwasser, Müllabfuhr, Versicherung, Schornsteinfeger, Winterdienst, Hausmeister, Gartenpflege, Aufzug, Gemeinschaftsstrom, Kabelanschluss). false wenn nicht umlegbar (Instandhaltung, Reparaturen, Verwaltungskosten). null wenn kein Kostendokument.\n\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
+                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true,"cost_class":"betriebskosten|erwerbskosten|abrechnung|finanzierung|mieteingang|nicht_immobilien|nicht_zugeordnet","umlagefaehig":true|false|null,"structured_fields":null}\n\ncost_class: Klassifiziere die Kostenart. nicht_zugeordnet wenn unklar.\numlagefaehig: true wenn Kosten nach BetrKV auf Mieter umlegbar (Grundsteuer, Wasser, Abwasser, Müllabfuhr, Versicherung, Schornsteinfeger, Winterdienst, Hausmeister, Gartenpflege, Aufzug, Gemeinschaftsstrom, Kabelanschluss). false wenn nicht umlegbar (Instandhaltung, Reparaturen, Verwaltungskosten). null wenn kein Kostendokument.\n${docTypeFragment ? "\n" + docTypeFragment + "\n" : ""}\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
                 }],
             }),
         });
@@ -941,6 +944,31 @@ async function generateIntelligence(
         }
 
         const intel = JSON.parse(match[0]);
+        const structuredFields = intel.structured_fields ?? null;
+
+        // Diff protection: don't overwrite richer structured_fields
+        const { data: existingRows } = await supabase
+            .schema("warehouse")
+            .from("document_intelligence")
+            .select("structured_fields")
+            .eq("document_id", job.document_id)
+            .eq("is_current", true)
+            .limit(1);
+
+        if (existingRows?.[0]?.structured_fields && structuredFields) {
+            const existingKeys = Object.keys(existingRows[0].structured_fields).filter(
+                (k) => existingRows[0].structured_fields[k] != null,
+            );
+            const newKeys = Object.keys(structuredFields).filter(
+                (k) => structuredFields[k] != null,
+            );
+            if (existingKeys.length > newKeys.length) {
+                console.warn(
+                    `generateIntelligence: existing structured_fields has ${existingKeys.length} populated keys vs ${newKeys.length} new — skipping insert to protect richer data`,
+                );
+                return;
+            }
+        }
 
         // Mark previous intelligence rows as not current
         await supabase
@@ -967,6 +995,7 @@ async function generateIntelligence(
                 viewer_safe: intel.viewer_safe ?? true,
                 cost_class: intel.cost_class ?? null,
                 umlagefaehig: intel.umlagefaehig ?? null,
+                structured_fields: structuredFields,
                 is_current: true,
             });
 
