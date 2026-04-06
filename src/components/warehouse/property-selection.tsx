@@ -239,25 +239,33 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                                                     <tr className="border-b bg-muted/50">
                                                         <th className="text-left font-medium px-3 py-1.5">Einheit</th>
                                                         <th className="text-left font-medium px-3 py-1.5">Mieter</th>
+                                                        <th className="text-right font-medium px-3 py-1.5">Mietfläche</th>
                                                         <th className="text-right font-medium px-3 py-1.5">Kaltmiete</th>
+                                                        <th className="text-right font-medium px-3 py-1.5">NK-Vorauszahlung</th>
                                                         <th className="text-left font-medium px-3 py-1.5">Mietbeginn</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    {tenants.map((t, i) => (
+                                                    {tenants.map((t, i) => {
+                                                        const area = (t as { area_sqm?: unknown }).area_sqm;
+                                                        const nk = (t as { nk_prepayment?: unknown }).nk_prepayment;
+                                                        return (
                                                         <tr key={i} className="border-b last:border-0">
                                                             <td className="px-3 py-1.5">{t.unit_ref ?? '–'}</td>
                                                             <td className="px-3 py-1.5">{t.name ?? '–'}</td>
+                                                            <td className="text-right px-3 py-1.5">{typeof area === 'number' ? `${area.toLocaleString('de-DE')} m²` : '–'}</td>
                                                             <td className="text-right px-3 py-1.5">{typeof t.monthly_rent === 'number' ? fmtEur(t.monthly_rent) : '–'}</td>
-                                                            <td className="px-3 py-1.5">{t.lease_start ?? '–'}</td>
+                                                            <td className="text-right px-3 py-1.5">{typeof nk === 'number' ? fmtEur(nk) : '–'}</td>
+                                                            <td className="px-3 py-1.5">{t.lease_start ? new Date(t.lease_start).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–'}</td>
                                                         </tr>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </tbody>
                                                 <tfoot>
                                                     <tr className="border-t bg-muted/50 font-semibold">
-                                                        <td className="px-3 py-1.5" colSpan={2}>Gesamt</td>
+                                                        <td className="px-3 py-1.5" colSpan={3}>Gesamt</td>
                                                         <td className="text-right px-3 py-1.5">{fmtEur(totalKaltmiete)}</td>
-                                                        <td />
+                                                        <td colSpan={2} />
                                                     </tr>
                                                 </tfoot>
                                             </table>
