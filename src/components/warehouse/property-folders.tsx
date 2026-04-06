@@ -136,32 +136,6 @@ export default function PropertyFolders({ property, folders, stats, unassignedCo
                 </div>
             ))}
 
-            {/* Unassigned documents warning */}
-            {unassignedCount > 0 && (
-                <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <AlertTriangle className="h-5 w-5 text-amber-600" />
-                            <div>
-                                <p className="font-medium text-amber-800 dark:text-amber-200">
-                                    ⚠️ Nicht kategorisiert
-                                </p>
-                                <p className="text-sm text-amber-700 dark:text-amber-300">
-                                    {unassignedCount} Dokument{unassignedCount !== 1 ? 'e' : ''} ohne Kategorie
-                                </p>
-                            </div>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push('/dashboard/warehouse/review')}
-                            className="border-amber-400 text-amber-800 hover:bg-amber-100"
-                        >
-                            Jetzt zuweisen
-                        </Button>
-                    </CardContent>
-                </Card>
-            )}
 
         </div>
     );
