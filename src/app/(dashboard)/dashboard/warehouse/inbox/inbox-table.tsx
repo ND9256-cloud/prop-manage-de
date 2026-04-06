@@ -265,7 +265,6 @@ export function InboxTable({
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground text-right">BETRAG</TableHead>
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DATUM</TableHead>
                             <SortableHeader label={t.confidence.de.toUpperCase()} sortKey="confidence" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
-                            <SortableHeader label={t.date.de.toUpperCase()} sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                                 {t.source.de.toUpperCase()}
                             </TableHead>
@@ -355,13 +354,6 @@ export function InboxTable({
                                             ) : (
                                                 <span className="text-sm text-muted-foreground">—</span>
                                             )}
-                                        </TableCell>
-
-                                        {/* Date */}
-                                        <TableCell className="py-3 px-4">
-                                            <span className="text-sm text-muted-foreground" suppressHydrationWarning>
-                                                {formatDate(doc.created_at)}
-                                            </span>
                                         </TableCell>
 
                                         {/* Source */}
