@@ -173,8 +173,6 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const fields = (extraction?.extracted_fields as Record<string, unknown>) ?? {};
 
     // Determine field layout from category (doc_type uses open German taxonomy)
-    const isInvoiceLike = category === 'kosten_rechnungen' || category === 'instandhaltung' || category === 'finanzen';
-    const isLeaseLike = category === 'vertraege';
 
     // Helper: check if extraction field has a non-empty value
     const hasValue = (v: unknown) => v != null && String(v).trim() !== '';
@@ -419,46 +417,46 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                         )}
                                     </div>
 
-                                    {isInvoiceLike ? (() => {
-                                        const invoiceFields = [
-                                            { label: 'Anbieter', fieldName: 'vendor_name', value: fields.vendor_name },
-                                            { label: 'Betrag', fieldName: 'amount', value: fields.amount },
-                                            { label: 'Datum', fieldName: 'invoice_date', value: fields.invoice_date },
-                                            { label: 'Rechnungsnr.', fieldName: 'invoice_number', value: fields.invoice_number },
-                                            { label: 'Kategorie', fieldName: 'category_hint', value: getCategoryHintLabel(fields.category_hint as string) },
-                                        ].filter(f => hasValue(f.value) || editedFields.has(f.fieldName));
-                                        return invoiceFields.length > 0 ? (
+                                    {(() => {
+                                        const FIELD_LABELS: Record<string, string> = {
+                                            vendor_name: 'Anbieter',
+                                            amount: 'Betrag',
+                                            invoice_date: 'Datum',
+                                            invoice_number: 'Rechnungsnr.',
+                                            description: 'Beschreibung',
+                                            currency: 'Währung',
+                                            tenant_first_name: 'Vorname Mieter',
+                                            tenant_last_name: 'Nachname Mieter',
+                                            tenant_email: 'E-Mail Mieter',
+                                            rent_cold: 'Kaltmiete',
+                                            rent_warm: 'Warmmiete',
+                                            deposit: 'Kaution',
+                                            lease_start: 'Mietbeginn',
+                                            lease_end: 'Mietende',
+                                            unit_ref: 'Einheit',
+                                            unit_hint: 'Einheit (Hinweis)',
+                                            address_hint: 'Adresshinweis',
+                                            key_dates: 'Wichtige Daten',
+                                            key_amounts: 'Wichtige Beträge',
+                                            summary: 'Zusammenfassung',
+                                            category_hint: 'Kategorie-Hinweis',
+                                            parties_mentioned: 'Beteiligte',
+                                            inspection_date: 'Besichtigungsdatum',
+                                            condition_summary: 'Zustandsbeschreibung',
+                                            damages: 'Schäden',
+                                            meter_readings: 'Zählerstände',
+                                        };
+                                        const labeledFields = Object.entries(fields)
+                                            .filter(([key, val]) => key in FIELD_LABELS && hasValue(val))
+                                            .map(([key, val]) => ({
+                                                label: FIELD_LABELS[key],
+                                                fieldName: key,
+                                                value: key === 'category_hint' ? getCategoryHintLabel(val as string) : val,
+                                            }));
+                                        return labeledFields.length > 0 ? (
                                             <div className="space-y-2">
-                                                {invoiceFields.map(f => (
-                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={f.value as string} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
-                                        );
-                                    })() : isLeaseLike ? (() => {
-                                        const leaseFields = [
-                                            { label: 'Mieter', fieldName: 'tenant_last_name', value: fields.tenant_last_name },
-                                            { label: 'Einheit', fieldName: 'unit_ref', value: fields.unit_ref },
-                                            { label: 'Kaltmiete', fieldName: 'rent_cold', value: fields.rent_cold },
-                                            { label: 'Beginn', fieldName: 'lease_start', value: fields.lease_start },
-                                            { label: 'Ende', fieldName: 'lease_end', value: fields.lease_end },
-                                        ].filter(f => hasValue(f.value) || editedFields.has(f.fieldName));
-                                        return leaseFields.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {leaseFields.map(f => (
-                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={f.value as string} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
-                                        );
-                                    })() : (() => {
-                                        const populatedFields = Object.entries(fields).filter(([, val]) => hasValue(val));
-                                        return populatedFields.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {populatedFields.map(([key, val]) => (
-                                                    <EditableField key={key} label={key} fieldName={key} value={String(val)} isDirty={editedFields.has(key)} onEdit={handleFieldEdit} readOnly={readOnly} />
+                                                {labeledFields.map(f => (
+                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={String(f.value)} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
                                                 ))}
                                             </div>
                                         ) : (
