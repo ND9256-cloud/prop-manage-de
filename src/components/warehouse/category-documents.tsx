@@ -246,7 +246,6 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DOKUMENT</TableHead>
-                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">KATEGORIE</TableHead>
                                 <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
                                 <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ABSENDER</TableHead>
                                 <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground text-right">BETRAG</TableHead>
@@ -255,8 +254,6 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         </TableHeader>
                         <TableBody>
                             {filtered.map(doc => {
-                                const catLabel = CATEGORIES.find(c => c.key === category);
-
                                 return (
                                     <TableRow
                                         key={doc.id}
@@ -295,11 +292,6 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                                                     )}
                                                 </div>
                                             )}
-                                        </TableCell>
-
-                                        {/* Category */}
-                                        <TableCell className="py-3 px-4">
-                                            <p className="text-sm text-foreground/80">{catLabel?.de ?? category}</p>
                                         </TableCell>
 
                                         {/* Status */}
