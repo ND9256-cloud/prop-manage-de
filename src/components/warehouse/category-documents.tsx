@@ -202,21 +202,14 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                 </div>
             )}
 
-            {/* Header with breadcrumb */}
+            {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/warehouse/${property.id}`)}>
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <button onClick={() => router.push('/dashboard/warehouse')} className="hover:text-foreground">Dashboard</button>
-                        <span>&rarr;</span>
-                        <button onClick={() => router.push(`/dashboard/warehouse/${property.id}`)} className="hover:text-foreground">
-                            {property.shortCode || property.address}
-                        </button>
-                        <span>&rarr;</span>
-                        <span className="text-foreground font-medium">{catInfo.de}</span>
-                    </div>
+                <div>
+                    <h1 className="text-xl font-bold flex items-center gap-2">
+                        <span>{catInfo.icon}</span>
+                        <span>{catInfo.de}</span>
+                    </h1>
+                    <p className="text-sm text-muted-foreground">{property.address}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => document.getElementById('cat-upload')?.click()}>
@@ -224,16 +217,11 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                         Hochladen
                     </Button>
                     <input id="cat-upload" type="file" className="hidden" onChange={onFileSelect} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" />
+                    <Button variant="ghost" size="sm" onClick={() => router.push(`/dashboard/warehouse/${property.id}`)}>
+                        <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                        Zurück
+                    </Button>
                 </div>
-            </div>
-
-            {/* Title */}
-            <div>
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                    <span>{catInfo.icon}</span>
-                    <span>{catInfo.de}</span>
-                </h1>
-                <p className="text-sm text-muted-foreground">{property.address}</p>
             </div>
 
             {/* Filter + Sort bar */}
