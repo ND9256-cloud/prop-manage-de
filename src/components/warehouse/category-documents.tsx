@@ -12,8 +12,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { renameDocument, softDeleteDocument, uploadWarehouseDocument } from '@/lib/warehouse-actions';
 import { CATEGORIES } from '@/lib/warehouse-categories';
+import { StatusBadge } from '@/components/warehouse/ui/status-badge';
 import { TriageOverlay } from '@/components/warehouse/triage-overlay';
 import {
     ArrowLeft,
@@ -74,39 +83,6 @@ function formatAmount(amount: string | null): string {
     if (isNaN(num)) return amount;
     return num.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
 }
-
-const docTypeBadge: Record<string, string> = {
-    invoice: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    lease: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    inspection_report: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-    other: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
-};
-
-const statusBadge: Record<string, string> = {
-    queued: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-    processing: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-    needs_review: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
-    applied: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-    failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    processing_failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-    apply_failed: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-    queued: 'Warteschlange',
-    processing: 'Verarbeitung',
-    needs_review: 'Pr\u00fcfung n\u00f6tig',
-    applied: 'Verbucht',
-    failed: 'Fehlgeschlagen',
-    processing_failed: 'Fehlgeschlagen',
-    apply_failed: 'Fehlgeschlagen',
-};
-
-const sourceIcon: Record<string, string> = {
-    email: '\u{1F4E7}',
-    telegram: '\u{1F4F1}',
-    ui: '\u{1F5A5}\uFE0F',
-};
 
 export default function CategoryDocuments({ documents: initialDocs, property, category }: Props) {
     const router = useRouter();
@@ -265,102 +241,91 @@ export default function CategoryDocuments({ documents: initialDocs, property, ca
                     </CardContent>
                 </Card>
             ) : (
-                <div className="border rounded-lg overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                            <tr>
-                                <th className="text-left p-3 font-medium">Dokument</th>
-                                <th className="text-left p-3 font-medium">Anbieter</th>
-                                <th className="text-right p-3 font-medium">Betrag</th>
-                                <th className="text-left p-3 font-medium">Typ</th>
-                                <th className="text-left p-3 font-medium">Status</th>
-<th className="text-left p-3 font-medium">Datum</th>
-                                <th className="text-center p-3 font-medium">Quelle</th>
-                                <th className="text-right p-3 font-medium">Aktionen</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map(doc => (
-                                <tr key={doc.id} className="border-t hover:bg-muted/30 group cursor-pointer" onClick={() => setTriageDocId(doc.id)}>
-                                    {/* Name */}
-                                    <td className="p-3 max-w-[280px]">
-                                        {editingId === doc.id ? (
-                                            <div className="flex items-center gap-1">
-                                                <Input
-                                                    value={editValue}
-                                                    onChange={e => setEditValue(e.target.value)}
-                                                    onKeyDown={e => {
-                                                        if (e.key === 'Enter') saveRename();
-                                                        if (e.key === 'Escape') setEditingId(null);
-                                                    }}
-                                                    className="h-7 text-sm"
-                                                    autoFocus
-                                                    onClick={e => e.stopPropagation()}
-                                                />
-                                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); saveRename(); }} className="h-7 w-7 p-0">
-                                                    <Check className="h-3.5 w-3.5 text-green-600" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingId(null); }} className="h-7 w-7 p-0">
-                                                    <X className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <div>
-                                                <p className="font-medium truncate">{doc.file_name}</p>
-                                                {(doc.entityName || doc.unitRef) && (
-                                                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                                        {[doc.entityName, doc.unitRef].filter(Boolean).join(' · ')}
-                                                    </p>
-                                                )}
-                                                {doc.summary && (
-                                                    <p className="text-xs text-muted-foreground/70 truncate mt-0.5">{doc.summary}</p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </td>
-                                    {/* Vendor */}
-                                    <td className="p-3 text-muted-foreground max-w-[160px]">
-                                        <span className="truncate block">{doc.vendorName || '\u2014'}</span>
-                                    </td>
-                                    {/* Amount */}
-                                    <td className="p-3 text-right font-medium tabular-nums">
-                                        {formatAmount(doc.amount)}
-                                    </td>
-                                    {/* Doc type */}
-                                    <td className="p-3">
-                                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${docTypeBadge[doc.doc_type || 'other'] || docTypeBadge.other}`}>
-                                            {doc.doc_type || 'other'}
-                                        </span>
-                                    </td>
-                                    {/* Status */}
-                                    <td className="p-3">
-                                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${statusBadge[doc.status] || statusBadge.queued}`}>
-                                            {STATUS_LABELS[doc.status] ?? doc.status}
-                                        </span>
-                                    </td>
-                                    {/* Date */}
-                                    <td className="p-3 text-muted-foreground">
-                                        {formatDateDE(doc.extractedDate ?? doc.created_at)}
-                                    </td>
-                                    {/* Source */}
-                                    <td className="p-3 text-center">
-                                        {sourceIcon[doc.source] || '\u{1F4C4}'}
-                                    </td>
-                                    {/* Actions */}
-                                    <td className="p-3 text-right">
-                                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0" title="Umbenennen" onClick={(e) => { e.stopPropagation(); startRename(doc); }}>
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700" title="L&ouml;schen" onClick={(e) => { e.stopPropagation(); setDeleteId(doc.id); }}>
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="rounded-lg border border-border bg-card">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DOKUMENT</TableHead>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">KATEGORIE</TableHead>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ABSENDER</TableHead>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground text-right">BETRAG</TableHead>
+                                <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DATUM</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {filtered.map(doc => {
+                                const catLabel = CATEGORIES.find(c => c.key === category);
+
+                                return (
+                                    <TableRow
+                                        key={doc.id}
+                                        className="group cursor-pointer hover:bg-muted/50"
+                                        onClick={() => setTriageDocId(doc.id)}
+                                    >
+                                        {/* Document */}
+                                        <TableCell className="py-3 px-4 max-w-xs">
+                                            {editingId === doc.id ? (
+                                                <div className="flex items-center gap-1">
+                                                    <Input
+                                                        value={editValue}
+                                                        onChange={e => setEditValue(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter') saveRename();
+                                                            if (e.key === 'Escape') setEditingId(null);
+                                                        }}
+                                                        className="h-7 text-sm"
+                                                        autoFocus
+                                                        onClick={e => e.stopPropagation()}
+                                                    />
+                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); saveRename(); }} className="h-7 w-7 p-0">
+                                                        <Check className="h-3.5 w-3.5 text-green-600" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setEditingId(null); }} className="h-7 w-7 p-0">
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div>
+                                                    <p className="truncate text-sm font-medium text-foreground">{doc.file_name}</p>
+                                                    {(doc.entityName || doc.unitRef) && (
+                                                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                                                            {[doc.entityName, doc.unitRef].filter(Boolean).join(' \u00b7 ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </TableCell>
+
+                                        {/* Category */}
+                                        <TableCell className="py-3 px-4">
+                                            <p className="text-sm text-foreground/80">{catLabel?.de ?? category}</p>
+                                        </TableCell>
+
+                                        {/* Status */}
+                                        <TableCell className="py-3 px-4">
+                                            <StatusBadge status={doc.status} />
+                                        </TableCell>
+
+                                        {/* Absender */}
+                                        <TableCell className="py-3 px-4 text-sm text-foreground truncate max-w-[180px]">
+                                            {doc.vendorName ?? '\u2014'}
+                                        </TableCell>
+
+                                        {/* Betrag */}
+                                        <TableCell className="py-3 px-4 text-sm text-foreground font-mono whitespace-nowrap text-right">
+                                            {formatAmount(doc.amount)}
+                                        </TableCell>
+
+                                        {/* Datum */}
+                                        <TableCell className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap" suppressHydrationWarning>
+                                            {formatDateDE(doc.extractedDate ?? doc.created_at)}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
                 </div>
             )}
 

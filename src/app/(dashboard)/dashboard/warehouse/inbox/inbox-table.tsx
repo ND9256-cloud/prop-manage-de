@@ -262,7 +262,7 @@ export function InboxTable({
                             <SortableHeader label={t.category.de.toUpperCase()} sortKey="category" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.status.de.toUpperCase()} sortKey="status" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ABSENDER</TableHead>
-                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">BETRAG</TableHead>
+                            <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground text-right">BETRAG</TableHead>
                             <TableHead className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DATUM</TableHead>
                             <SortableHeader label={t.confidence.de.toUpperCase()} sortKey="confidence" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
                             <SortableHeader label={t.date.de.toUpperCase()} sortKey="date" activeSortKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -335,7 +335,7 @@ export function InboxTable({
                                         </TableCell>
 
                                         {/* Betrag */}
-                                        <TableCell className="py-3 px-4 text-sm text-foreground font-mono whitespace-nowrap">
+                                        <TableCell className="py-3 px-4 text-sm text-foreground font-mono whitespace-nowrap text-right">
                                             {doc.amount ? parseFloat(String(doc.amount).replace(',', '.')).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }) : '—'}
                                         </TableCell>
 
