@@ -34,7 +34,10 @@ export async function getOrgMembers(): Promise<OrgMember[]> {
     const ctx = await getOrgContextAdmin();
 
     const memberships = await prisma.membership.findMany({
-        where: { orgId: ctx.orgId },
+        where: {
+            orgId: ctx.orgId,
+            user: { isSynthetic: false },
+        },
         include: {
             user: { select: { email: true, name: true } },
         },
@@ -54,11 +57,18 @@ export async function getOrgMembers(): Promise<OrgMember[]> {
 export async function getOrgPendingInvitations(): Promise<PendingInvitation[]> {
     const ctx = await getOrgContextAdmin();
 
+    // Exclude invitations sent to synthetic user emails
+    const syntheticEmails = (await prisma.user.findMany({
+        where: { isSynthetic: true },
+        select: { email: true },
+    })).map((u) => u.email);
+
     const invitations = await prisma.invitation.findMany({
         where: {
             orgId: ctx.orgId,
             acceptedAt: null,
             expiresAt: { gt: new Date() },
+            ...(syntheticEmails.length > 0 ? { email: { notIn: syntheticEmails } } : {}),
         },
         orderBy: { createdAt: 'desc' },
     });

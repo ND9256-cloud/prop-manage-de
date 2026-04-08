@@ -14,6 +14,7 @@ export default async function WarehousePage() {
             propertyCards={propertyCards}
             role={role}
             brainSummaries={brainSummaries}
+            appVersion={process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown'}
         />
     );
 }

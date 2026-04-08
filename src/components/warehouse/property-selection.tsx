@@ -47,9 +47,10 @@ type Props = {
     propertyCards: PropertyCard[];
     role: string;
     brainSummaries?: BrainSummary[];
+    appVersion?: string;
 };
 
-export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [] }: Props) {
+export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [], appVersion = 'unknown' }: Props) {
     const router = useRouter();
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
 
@@ -57,7 +58,12 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
 
     return (
-        <div className="space-y-6">
+        <div
+            className="space-y-6"
+            data-testid="warehouse-properties-loaded"
+            data-property-count={propertyCards.length}
+            data-app-version={appVersion}
+        >
             {/* Portfolio KPI strip */}
             {brainSummaries.length > 0 && (() => {
                 const objekte = propertyCards.length;

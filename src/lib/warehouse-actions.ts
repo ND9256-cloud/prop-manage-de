@@ -1726,6 +1726,7 @@ export async function getAuditEvents({
     page,
     pageSize = 50,
     propertyId,
+    includeSynthetic = false,
 }: {
     types?: string[];
     actorId?: string;
@@ -1735,6 +1736,7 @@ export async function getAuditEvents({
     page: number;
     pageSize?: number;
     propertyId?: string;
+    includeSynthetic?: boolean;
 }): Promise<{ events: AuditEvent[]; total: number }> {
     const { orgId } = await getOrgContext();
 
@@ -1746,6 +1748,18 @@ export async function getAuditEvents({
         .select('*', { count: 'exact' })
         .eq('org_id', orgId)
         .order('created_at', { ascending: false });
+
+    // Filter out synthetic actors by default
+    if (!includeSynthetic) {
+        const syntheticUsers = await prisma.user.findMany({
+            where: { isSynthetic: true },
+            select: { id: true },
+        });
+        const syntheticIds = syntheticUsers.map((u) => u.id);
+        if (syntheticIds.length > 0) {
+            q = q.not('actor_user_id', 'in', `(${syntheticIds.join(',')})`);
+        }
+    }
 
     // Property-scoped filter
     if (propertyId) {
@@ -1792,16 +1806,30 @@ export async function getAuditEvents({
     return { events, total: count ?? 0 };
 }
 
-export async function getAuditActors(): Promise<{ id: string; email: string }[]> {
+export async function getAuditActors({ includeSynthetic = false }: { includeSynthetic?: boolean } = {}): Promise<{ id: string; email: string }[]> {
     const { orgId } = await getOrgContext();
 
     const db = warehouseDb(orgId);
     const shared = db.admin.schema('shared');
 
-    const { data, error } = await shared.from('audit_log')
+    let q = shared.from('audit_log')
         .select('actor_user_id, actor_email')
         .eq('org_id', orgId)
         .not('actor_email', 'is', null);
+
+    // Filter out synthetic actors by default
+    if (!includeSynthetic) {
+        const syntheticUsers = await prisma.user.findMany({
+            where: { isSynthetic: true },
+            select: { id: true },
+        });
+        const syntheticIds = syntheticUsers.map((u) => u.id);
+        if (syntheticIds.length > 0) {
+            q = q.not('actor_user_id', 'in', `(${syntheticIds.join(',')})`);
+        }
+    }
+
+    const { data, error } = await q;
 
     if (error || !data) return [];
 
