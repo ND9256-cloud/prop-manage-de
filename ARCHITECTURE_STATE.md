@@ -83,9 +83,6 @@ _Read this before writing any code or sending any task to Claude Code._
 - 16 golden file tests — all passing
 - 2 brain contract tests — all passing
 
-### In flight
-- Synthetic monitoring (Playwright + launchd + Discord) — finish before starting Tier 0 block.
-
 ## Tier 0 — Foundational Integrity Gates (BLOCKING customer #1)
 
 1. **Multi-tenant CI gate** — eslint or grep rule failing the build on any prisma mutation (create/update/delete/upsert/updateMany/deleteMany) that does not include org_id in the where clause or data payload. Status: not started.
@@ -93,6 +90,12 @@ _Read this before writing any code or sending any task to Claude Code._
 3. **ARCHITECTURE_STATE.md CI gate** — fail the build on commits touching supabase/migrations/, supabase/functions/process-document/, src/lib/*-actions.ts, or src/app/ routes without a same-commit update to this file. Status: not started.
 4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer, not just the UI layer. Status: not started. Note: lifted from deferred list, GoBD is the product.
 5. **Backup-restore drill** — one-time restore of Supabase Pro backup into a separate project, verify documents and database came back, document steps in scripts/restore-drill.md. Then quarterly. Status: not started. Note: lifted from deferred list.
+
+These five items form one work block. They must all be complete before customer #1 onboarding. No other operational hardening work proceeds until this block is complete, with one exception: synthetic monitoring (currently in flight) finishes first as the in-flight item.
+
+## In flight
+
+- Synthetic monitoring (Playwright + launchd + Discord) — finish before starting Tier 0 block. Spec in progress, ChatGPT critique pending.
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
