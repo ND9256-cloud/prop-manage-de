@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-06 (holdings table data flow fix, Alle Dokumente card). Update this file after every architectural change._
+_Last updated: 2026-04-08 (reordered hardening priorities, Tier 0 gates). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -83,6 +83,19 @@ _Read this before writing any code or sending any task to Claude Code._
 - 16 golden file tests — all passing
 - 2 brain contract tests — all passing
 
+### In flight
+- Synthetic monitoring (Playwright + launchd + Discord) — finish before starting Tier 0 block.
+
+## Tier 0 — Foundational Integrity Gates (BEFORE CUSTOMER #1)
+
+**⛔ BLOCKING customer #1 onboarding. All five gates must pass before any paying tenant is onboarded.**
+
+1. **Multi-tenant CI gate** — eslint or grep rule failing build on unguarded Prisma mutations missing org_id scope.
+2. **Migration discipline** — supabase db push only, no manual SQL; drift-detection script comparing prod schema to migrations directory in CI.
+3. **ARCHITECTURE_STATE.md CI gate** — fail build on commits touching supabase/migrations/, supabase/functions/process-document/, src/lib/*-actions.ts, or src/app/ routes without same-commit update to this file.
+4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer.
+5. **Backup-restore drill** — one-time restore of Supabase Pro backup into separate project, verify documents and database came back, document the steps.
+
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
 - Auto-apply learning, vendor normalization
@@ -91,6 +104,6 @@ _Read this before writing any code or sending any task to Claude Code._
 - IBAN, due_date, payment_status extraction
 - purchase_price/purchase_date on Property
 - Dark mode, mobile, i18n
-- GoBD correction flow
+- GoBD correction flow (beyond soft-delete)
 
 Rule: If this file doesnt list it, assume it doesnt exist.
