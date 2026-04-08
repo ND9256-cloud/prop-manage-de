@@ -86,15 +86,13 @@ _Read this before writing any code or sending any task to Claude Code._
 ### In flight
 - Synthetic monitoring (Playwright + launchd + Discord) — finish before starting Tier 0 block.
 
-## Tier 0 — Foundational Integrity Gates (BEFORE CUSTOMER #1)
+## Tier 0 — Foundational Integrity Gates (BLOCKING customer #1)
 
-**⛔ BLOCKING customer #1 onboarding. All five gates must pass before any paying tenant is onboarded.**
-
-1. **Multi-tenant CI gate** — eslint or grep rule failing build on unguarded Prisma mutations missing org_id scope.
-2. **Migration discipline** — supabase db push only, no manual SQL; drift-detection script comparing prod schema to migrations directory in CI.
-3. **ARCHITECTURE_STATE.md CI gate** — fail build on commits touching supabase/migrations/, supabase/functions/process-document/, src/lib/*-actions.ts, or src/app/ routes without same-commit update to this file.
-4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer.
-5. **Backup-restore drill** — one-time restore of Supabase Pro backup into separate project, verify documents and database came back, document the steps.
+1. **Multi-tenant CI gate** — eslint or grep rule failing the build on any prisma mutation (create/update/delete/upsert/updateMany/deleteMany) that does not include org_id in the where clause or data payload. Status: not started.
+2. **Migration discipline** — supabase db push only, no manual SQL via the editor; CI script that diffs prod schema against supabase/migrations/ and fails the build on drift. Status: not started. Context: migration history was previously empty and prior migrations were applied manually, this gate prevents recurrence.
+3. **ARCHITECTURE_STATE.md CI gate** — fail the build on commits touching supabase/migrations/, supabase/functions/process-document/, src/lib/*-actions.ts, or src/app/ routes without a same-commit update to this file. Status: not started.
+4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer, not just the UI layer. Status: not started. Note: lifted from deferred list, GoBD is the product.
+5. **Backup-restore drill** — one-time restore of Supabase Pro backup into a separate project, verify documents and database came back, document steps in scripts/restore-drill.md. Then quarterly. Status: not started. Note: lifted from deferred list.
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
