@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-08 (reordered hardening priorities, Tier 0 gates). Update this file after every architectural change._
+_Last updated: 2026-04-10 (synthetic monitoring moved to live). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -69,6 +69,21 @@ _Read this before writing any code or sending any task to Claude Code._
 - German number and date formatting (dots as thousands separators, dd.MM.yyyy dates)
 - Brain schema validation and diff protection in generate-brain.js
 - Brain contract tests validating property_intelligence JSON structure
+- **Synthetic monitoring (Playwright + launchd + Discord)**
+  - Files: `~/scripts/synthetic/` (scheduler.mjs, checks/tier-a.mjs, lib/), `src/app/api/synthetic/ping/route.ts`, `~/.synthetic-monitor.env` on Mac Mini. Scheduler runs from `start-agents.sh`.
+  - SLO: 10-minute detection of site-down for end users.
+  - Non-goals: no pipeline correctness testing, no screenshots, no multi-region, does not replace CI tests.
+  - Caching decision (Option 1): endpoint uses `force-dynamic` and `no-store` headers — no caching.
+  - **INVARIANT** — synthetic-ready DOM contract on `/dashboard/warehouse`: `data-testid="warehouse-properties-loaded"` with `data-property-count` and `data-app-version` attributes. Any dashboard redesign must preserve these.
+  - Credentials: Apple Passwords entry "Synthetic Monitor — prop-manage-de prod org viewer", primary copy in `~/.synthetic-monitor.env`.
+  - Accepted SPOF: entire alert path depends on `discord-bridge.js` being alive.
+  - Typed notification system: schema validator and `TYPE_CONFIG` in `discord-bridge.js`, used by orchestrator and synthetic monitor. Canonical schema documented in bridge file.
+  - Follow-ups (revisit at customer #1):
+    1. Replace `### SUMMARY:` convention with structured output from Claude Code CLI.
+    2. Fix orchestrator emitting `task_completed` embeds when Claude Code reports failure in body but exits 0.
+    3. Supabase probe in connectivity check not loading SUPABASE_URL correctly — Google probe still works as fallback.
+    4. Revisit single-tier alerting at customer #1.
+    5. Bridge-death SPOF needs heartbeat-from-bridge mechanism.
 
 ### SQL Views (warehouse schema)
 - warehouse.v_cost_overview: cost aggregation by property, cost_class, year
@@ -91,11 +106,11 @@ _Read this before writing any code or sending any task to Claude Code._
 4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer, not just the UI layer. Status: not started. Note: lifted from deferred list, GoBD is the product.
 5. **Backup-restore drill** — one-time restore of Supabase Pro backup into a separate project, verify documents and database came back, document steps in scripts/restore-drill.md. Then quarterly. Status: not started. Note: lifted from deferred list.
 
-These five items form one work block. They must all be complete before customer #1 onboarding. No other operational hardening work proceeds until this block is complete, with one exception: synthetic monitoring (currently in flight) finishes first as the in-flight item.
+These five items form one work block. They must all be complete before customer #1 onboarding. No other operational hardening work proceeds until this block is complete.
 
 ## In flight
 
-- Synthetic monitoring (Playwright + launchd + Discord) — finish before starting Tier 0 block. Spec in progress, ChatGPT critique pending.
+(none)
 
 ### Designed but NOT implemented
 - Full-text search, cost aggregation API
