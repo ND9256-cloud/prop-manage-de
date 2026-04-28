@@ -1,0 +1,37 @@
+// Test schema for meta-test fixtures
+// This is NOT the real schema — it's a minimal fixture for testing the gate.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// @global
+model Organization {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+}
+
+/// @tenant-scoped
+model Property {
+  id             String @id @default(uuid()) @db.Uuid
+  name           String
+  organizationId String @db.Uuid
+  units          Unit[]
+}
+
+/// @tenant-scoped-via: propertyId
+model Unit {
+  id         String   @id @default(uuid()) @db.Uuid
+  unitNumber String
+  propertyId String   @db.Uuid
+  property   Property @relation(fields: [propertyId], references: [id])
+}
+
+model UnannotatedModel {
+  id   String @id @default(uuid()) @db.Uuid
+  name String
+}

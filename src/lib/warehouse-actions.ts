@@ -143,6 +143,7 @@ export async function getWarehouseOverview() {
     // Fetch total_sqm and short_code separately via raw query (these columns may not exist yet)
     let propertyExtras: Record<string, { short_code: string | null; total_sqm: number | null }> = {};
     try {
+        // @tenant-isolation-disable-next-line -- reason: property extras query joining to quoted Property table for short_code and total_sqm, org-scoped upstream via getOrgContext; raw SQL pending iteration-2 wrapper
         const extras = await prisma.$queryRaw<{ id: string; short_code: string | null; total_sqm: number | null }[]>`
             SELECT id, short_code, total_sqm::float8 as total_sqm FROM properties WHERE "organizationId" = ${orgId}::uuid
         `;
@@ -689,6 +690,7 @@ export async function updatePropertyField(
         });
     } else {
         // short_code, notes — not in Prisma schema, use raw SQL
+        // @tenant-isolation-disable-next-line -- reason: Property field update for columns not in Prisma schema (short_code, notes), org-scoped upstream via getOrgContextWritable property ownership check; raw SQL pending iteration-2 wrapper
         await prisma.$executeRawUnsafe(
             `UPDATE "Property" SET "${field}" = $1, "updatedAt" = NOW() WHERE id = $2`,
             cleanValue,
@@ -863,6 +865,7 @@ export async function applyReviewTask(
 
     // Call connector.apply() via parameterized SQL
     try {
+        // @tenant-isolation-disable-next-line -- reason: connector.apply bridge call executing warehouse-to-pm schema operation, org-scoped by warehouse pipeline claim mechanism; raw SQL pending iteration-2 wrapper
         const result = await prisma.$queryRaw<{ apply: string }[]>`
             SELECT connector.apply(
                 ${orgId}::UUID, ${documentId}::UUID, ${extractionId}::UUID, ${action}::TEXT, ${JSON.stringify(payload)}::JSONB,

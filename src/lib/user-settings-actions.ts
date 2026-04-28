@@ -306,6 +306,7 @@ async function logTeamAudit(
     metadata: Record<string, unknown>
 ) {
     try {
+        // @tenant-isolation-disable-next-line -- reason: shared.audit_log insert for team management events, cross-tenant audit table by design, orgId passed as column value not as filter; raw SQL pending iteration-2 wrapper
         await prisma.$executeRawUnsafe(
             `INSERT INTO shared.audit_log (org_id, actor_user_id, actor_email, event_type, metadata)
              VALUES ($1::uuid, $2::uuid, $3, $4, $5::jsonb)`,

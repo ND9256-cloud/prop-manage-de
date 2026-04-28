@@ -1,0 +1,38 @@
+name: Tenant Isolation Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/functions/**'
+      - 'prisma/**'
+      - 'tools/tenant-isolation-lint/**'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'supabase/functions/**'
+      - 'prisma/**'
+      - 'tools/tenant-isolation-lint/**'
+
+jobs:
+  tenant-isolation:
+    name: Tenant Isolation Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install tsx
+        run: npm install -g tsx
+
+      - name: Run meta-tests
+        run: npx tsx tools/tenant-isolation-lint/run-tests.ts
+
+      - name: Run tenant isolation lint
+        run: npx tsx tools/tenant-isolation-lint/index.ts

@@ -46,6 +46,7 @@ enum MembershipRole {
 
 
 // Organization (Tenant) - The Property Management Company
+/// @global
 model Organization {
   id        String   @id @default(uuid()) @db.Uuid
   name      String
@@ -65,6 +66,7 @@ model Organization {
 
 // User - System users (Admins, Managers, Accountants)
 // Tenants have their own profile linked here purely for auth if they log in
+/// @tenant-scoped — organizationId nullable, gate still requires filter
 model User {
   id             String   @id @default(uuid()) @db.Uuid
   email          String   @unique
@@ -84,6 +86,7 @@ model User {
 }
 
 // Property - A physical building or complex
+/// @tenant-scoped
 model Property {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   // E.g. "Sunset Apartments" or "Musterstraße 123"
@@ -110,6 +113,7 @@ model Property {
 }
 
 // Unit - A rentable space within a property
+/// @tenant-scoped-via: propertyId
 model Unit {
   id           String  @id @default(uuid()) @db.Uuid
   unitNumber   String  // E.g. "Top 12", "Apt 4B"
@@ -132,6 +136,7 @@ model Unit {
 
 // Person - A repository of people (Tenants, Vendors contacts, etc.)
 // Separated from User because they might not have login access initially
+/// @tenant-scoped
 model Person {
   id        String   @id @default(uuid()) @db.Uuid
   firstName String
@@ -150,6 +155,7 @@ model Person {
 }
 
 // Lease (Tenancy) - The contract
+/// @tenant-scoped-via: unitId
 model Lease {
   id        String      @id @default(uuid()) @db.Uuid
   startDate DateTime
@@ -193,6 +199,7 @@ model Lease {
 
 
 // VPI (Verbraucherpreisindex) – Consumer Price Index from Destatis
+/// @global
 model VpiIndex {
   id    String @id @default(uuid()) @db.Uuid
   year  Int
@@ -207,6 +214,7 @@ model VpiIndex {
 }
 
 // ServiceProvider - Utilities, insurance, taxes linked to a property
+/// @tenant-scoped-via: propertyId
 model ServiceProvider {
   id             String   @id @default(uuid()) @db.Uuid
   name           String   // e.g. "Stadtwerke München"
@@ -228,6 +236,7 @@ model ServiceProvider {
 }
 
 // Bank Connection - A link to a bank via Enable Banking
+/// @tenant-scoped
 model BankConnection {
   id              String   @id @default(uuid()) @db.Uuid
   aspspName       String   // e.g. "Deutsche Kreditbank (DKB)"
@@ -247,6 +256,7 @@ model BankConnection {
 }
 
 // Bank Account - An individual bank account within a connection
+/// @tenant-scoped
 model BankAccount {
   id               String   @id @default(uuid()) @db.Uuid
   externalId       String   @unique // Enable Banking account ID
@@ -266,6 +276,7 @@ model BankAccount {
 }
 
 // Bank Transaction - Individual booking entries (Buchungsjournal)
+/// @tenant-scoped-via: bankAccountId
 model BankTransaction {
   id                   String   @id @default(uuid()) @db.Uuid
   entryReference       String?  // Bank's transaction ID (for dedup)
@@ -300,6 +311,7 @@ model BankTransaction {
 }
 
 // Membership — links User to Organization with a role
+/// @tenant-scoped
 model Membership {
   id        String         @id @default(uuid()) @db.Uuid
   userId    String         @db.Uuid
@@ -316,6 +328,7 @@ model Membership {
 }
 
 // Invitation — pending invite to join an organization
+/// @tenant-scoped
 model Invitation {
   id          String         @id @default(uuid()) @db.Uuid
   orgId       String         @db.Uuid

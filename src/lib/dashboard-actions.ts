@@ -22,6 +22,7 @@ export async function getLastVisitStats(): Promise<LastVisitStats> {
     const lastSeen = membership?.lastSeenAt;
 
     // Update last_seen_at to now (force, no throttle)
+    // @tenant-isolation-disable-next-line -- reason: dashboard last_seen_at timestamp update via executeRaw for membership tracking, org-scoped upstream via getOrgContext session; raw SQL pending iteration-2 wrapper
     await prisma.$executeRaw`
         UPDATE memberships SET last_seen_at = now()
         WHERE "userId" = ${ctx.userId}::uuid AND "orgId" = ${ctx.orgId}::uuid
@@ -84,6 +85,7 @@ export async function getBrainSummaries(): Promise<BrainSummary[]> {
             .select('property_id, analysis, is_stale, generated_at')
             .eq('org_id', ctx.orgId)
             .eq('is_current', true),
+        // @tenant-isolation-disable-next-line -- reason: holdings table query using quoted Property table name for Prisma model name mismatch, org-scoped upstream via getOrgContext session; raw SQL pending iteration-2 wrapper
         prisma.$queryRaw<{ id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null; total_sqm: number | null }[]>`
             SELECT id, name, address, city, zip, short_code, total_sqm::float8 as total_sqm
             FROM "Property" WHERE "organizationId" = ${ctx.orgId}::uuid

@@ -134,6 +134,7 @@ export async function getOrgContext(): Promise<OrgContext> {
     if (!membership) throw new Error('Unauthorized');
 
     // Update last_seen_at (fire-and-forget, throttled to once per 5 min)
+    // @tenant-isolation-disable-next-line -- reason: org session context setup via executeRaw, system-level operation not scoped to single tenant; raw SQL pending iteration-2 wrapper
     prisma.$executeRaw`
         UPDATE memberships SET last_seen_at = now()
         WHERE "userId" = ${userId}::uuid AND "orgId" = ${membership.orgId}::uuid

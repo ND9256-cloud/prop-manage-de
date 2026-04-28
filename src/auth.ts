@@ -8,6 +8,7 @@ import bcrypt from 'bcryptjs';
 
 async function getUser(email: string) {
     try {
+        // @tenant-isolation-disable-next-line -- reason: NextAuth credentials login requires user lookup by email before org context is known, cross-tenant by authentication design
         const user = await prisma.user.findUnique({ where: { email } });
         return user;
     } catch (error) {
