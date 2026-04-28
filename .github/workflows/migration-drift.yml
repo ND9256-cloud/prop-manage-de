@@ -1,0 +1,52 @@
+name: Migration Drift Check
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'prisma/schema.prisma'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/**'
+      - 'prisma/schema.prisma'
+
+jobs:
+  migration-drift:
+    name: Migration Drift Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link project
+        run: supabase link --project-ref vatsmyvkeuxkcwemmxau
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Check migration drift
+        run: |
+          OUTPUT=$(supabase migration list 2>&1)
+          echo "$OUTPUT"
+          
+          # Check for any row where Local and Remote don't match
+          # A mismatch shows as empty space in one column
+          if echo "$OUTPUT" | grep -E '^\s*\|[^|]+\|' | grep -E '^\s+\||\|\s+\|'; then
+            echo ""
+            echo "❌ Migration drift detected. Local and Remote are out of sync."
+            echo "Run 'supabase migration list' locally to inspect."
+            echo "Apply pending migrations with 'supabase db push'."
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ No migration drift. Local and Remote are in sync."
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
