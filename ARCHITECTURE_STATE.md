@@ -1,6 +1,6 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-04-28 (tenant isolation CI gate added to live). Update this file after every architectural change._
+_Last updated: 2026-05-03 (migration discipline added to live). Update this file after every architectural change._
 _Read this before writing any code or sending any task to Claude Code._
 
 ## Database Tables — What Exists
@@ -84,6 +84,7 @@ _Read this before writing any code or sending any task to Claude Code._
     3. Supabase probe in connectivity check not loading SUPABASE_URL correctly — Google probe still works as fallback.
     4. Revisit single-tier alerting at customer #1.
     5. Bridge-death SPOF needs heartbeat-from-bridge mechanism.
+- **Migration discipline** (commit 53f9aa2). Supabase CLI linked, 26 migrations tracked and synced. `supabase db push` is the only approved method for schema changes — no manual SQL via dashboard. CI drift detection via GitHub Actions on every PR touching migrations or schema. GitHub secret `SUPABASE_ACCESS_TOKEN` authenticates the check.
 - **Tenant isolation CI gate** (commit b8e3da3). Runs on every PR via GitHub Actions. 13 models annotated, meta-rule requires annotation on every model. 8 exceptions with call-site-specific reasons. Raw SQL banned in app code, existing callers annotated pending iteration-2 wrappers. Meta-test suite at `tools/tenant-isolation-lint/__fixtures__/`. Exceptions tracked in `tenant-isolation-exceptions.md` with CI diff enforcement.
   - Follow-ups:
     1. Tenant isolation iteration 2: raw SQL wrappers. DoD: wrappers exist, all queryRaw exceptions migrated, zero raw SQL annotations remaining.
@@ -105,7 +106,7 @@ _Read this before writing any code or sending any task to Claude Code._
 ## Tier 0 — Foundational Integrity Gates (BLOCKING customer #1)
 
 1. **Multi-tenant CI gate** — ✅ DONE (commit b8e3da3). Implemented as tenant-isolation-lint custom rule, not eslint. See Live Features entry for details.
-2. **Migration discipline** — supabase db push only, no manual SQL via the editor; CI script that diffs prod schema against supabase/migrations/ and fails the build on drift. Status: not started. Context: migration history was previously empty and prior migrations were applied manually, this gate prevents recurrence.
+2. **Migration discipline** — ✅ DONE (commit 53f9aa2). supabase db push only, no manual SQL via the editor; CI drift detection on every PR touching migrations or schema. See Live Features entry for details.
 3. **ARCHITECTURE_STATE.md CI gate** — fail the build on commits touching supabase/migrations/, supabase/functions/process-document/, src/lib/*-actions.ts, or src/app/ routes without a same-commit update to this file. Status: not started.
 4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer, not just the UI layer. Status: not started. Note: lifted from deferred list, GoBD is the product.
 5. **Backup-restore drill** — one-time restore of Supabase Pro backup into a separate project, verify documents and database came back, document steps in scripts/restore-drill.md. Then quarterly. Status: not started. Note: lifted from deferred list.
