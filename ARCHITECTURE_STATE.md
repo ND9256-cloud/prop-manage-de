@@ -1,143 +1,301 @@
 # ARCHITECTURE_STATE.md — Living State Document
 
-_Last updated: 2026-05-03 (ARCHITECTURE_STATE.md CI gate added to live). Update this file after every architectural change._
+_Last updated: May 3, 2026 — Full rewrite after Tier 0 completion._
+_If this file doesn't list it, assume it doesn't exist._
 _Read this before writing any code or sending any task to Claude Code._
 
-## Database Tables — What Exists
+---
 
-### warehouse schema
-- warehouse.documents: 634 rows (626 applied, 6 failed, 2 quarantined) — has cost_class column (text)
-- warehouse.document_extractions: ~410 rows (is_current=true per doc, JSONB extracted_fields)
-- warehouse.processing_jobs: job queue, pg_cron every minute
-- warehouse.suggested_matches: entity matching results
-- warehouse.review_tasks: low-confidence review queue
-- warehouse.apply_log: GoBD immutable audit trail
-- warehouse.document_chunks: EMPTY placeholder for RAG
-- warehouse.document_intelligence: 402 rows — summaries, tags, entity refs, action signals, cost_class, umlagefaehig per document (is_current=true pattern, RLS enabled). Step 8b active in pipeline.
-- warehouse.property_intelligence: 2 rows (KO132, HHS55) — per-property AI analysis brain table. Blackstone 11-section format (analysis jsonb, suggested_views jsonb, is_current=true pattern). Staleness trigger active from pipeline. Brain prompt single source of truth in src/lib/brain-prompt.ts. RLS disabled.
-- warehouse.document_intelligence_runs: DOES NOT EXIST — must be created
+## Product
 
-### public schema (Prisma)
-- Organization: 1 org
-- User: 1 user (admin@demo.com)
-- Membership: 1 row (owner role, has last_seen_at)
-- Property: 2 properties (KO132, HHS55)
-- Unit/Person/Lease/BankConnection/BankAccount/BankTransaction: schema exists, no data
+**PropManager DE** — German property management document warehouse SaaS.
+GoBD-compliant document intelligence: automated intake, extraction, classification, and per-property "brain" surfacing structured insights.
 
-### Pipeline (10 functions, all active)
-1. claimJob 2. fetchDocument 3. extractText 4. classifyDocument
-5. extractFields 5b. categorize 6. storeExtraction 7. matchEntities
-8. routeByConfidence 8b. generateIntelligence (includes cost_class + umlagefaehig, flags property_intelligence stale) 9. completeJob
+**Live URL:** https://prop-manage-de.vercel.app
+**Repo:** github.com/ND9256-cloud/prop-manage-de
+**Stack:** Next.js App Router, Tailwind v4, shadcn/ui (new-york, neutral), Prisma, Supabase, NextAuth v5, Vercel
+**Infrastructure:** Mac Mini M4 (Tailscale), Discord control plane, pg_cron auto-processing
 
-### Files that DO NOT exist
-- src/lib/document-intelligence-schema.ts (was in Antigravity, never on Mac Mini)
-- Intelligence runs migration SQL
+---
 
-### Known Issues
-- connector.apply() fails for angebot/vollmacht/informationsmaterial doc_types
-- 6 failed documents (HEIC, large PDFs)
-- Vendor name duplication (83 extracted, ~50 real)
-- Audit log property_id column: FIXED
-- viewer_safe incorrectly flags Mieteingänge summaries as false
-- unit_ref inconsistent across documents
-- Cost amounts include purchase prices
-- cost_class/umlagefaehig columns on document_intelligence only populated for new documents (397 existing rows have NULL)
-- cost_class column on warehouse.documents set by pipeline via COST_CLASS_MAP, existing rows have NULL
-- HHS55 brain shows Weber rent as 900 not 1000 (original vs current rent)
-- Some Mietbeginn dates missing in brain output
-- Property table name is "Property" not "properties" — raw SQL queries must use quoted "Property" (e.g. FROM "Property")
+## Properties (Live Data)
 
-### Live Features
-- Open taxonomy (120 German types), DOC_TYPE_MAP
-- Extraction (vendor 97%, amount 98% on cost docs)
-- Dashboard Section 1: KPI strip (Objekte, Einheiten, Miete/Monat, Vermietungsquote)
-- Dashboard Section 2: Immobilienbestand holdings table with short_code, full address, Mietfläche, Miete/Monat, Miete/Jahr from brain + Property table (raw SQL uses quoted "Property")
-- Dashboard Section 3: Immobilien-Analyse with property selector and Mietübersicht tab
-- "Seit deinem letzten Besuch" orientation card on Alle Dokumente page (moved from dashboard)
-- Inbox (Alle Dokumente) with vendor/amount/date columns
-- Triage overlay with apply/quarantine, document intelligence summary in right panel
-- CI/CD (GitHub Actions)
-- last_seen_at on memberships
-- Document intelligence (summaries, entity_name, unit_ref, cost_class, umlagefaehig in UI, German tags)
-- viewer_safe filtering on intelligence summaries
-- Proda-style icon-only sidebar with expand/collapse chevron toggle at top
-- Settings flyout with user info and logout (replaces settings page link)
-- Fixed shell layout (header + sidebar fixed, content area scrolls independently)
-- Brain insight line on property detail page
-- Compact folder list on property detail Dokumente tab
-- Property chat endpoint at /api/properties/[id]/chat
-- German number and date formatting (dots as thousands separators, dd.MM.yyyy dates)
-- Brain schema validation and diff protection in generate-brain.js
-- Brain contract tests validating property_intelligence JSON structure
-- **Synthetic monitoring (Playwright + launchd + Discord)**
-  - Files: `~/scripts/synthetic/` (scheduler.mjs, checks/tier-a.mjs, lib/), `src/app/api/synthetic/ping/route.ts`, `~/.synthetic-monitor.env` on Mac Mini. Scheduler runs from `start-agents.sh`.
-  - SLO: 10-minute detection of site-down for end users.
-  - Non-goals: no pipeline correctness testing, no screenshots, no multi-region, does not replace CI tests.
-  - Caching decision (Option 1): endpoint uses `force-dynamic` and `no-store` headers — no caching.
-  - **INVARIANT** — synthetic-ready DOM contract on `/dashboard/warehouse`: `data-testid="warehouse-properties-loaded"` with `data-property-count` and `data-app-version` attributes. Any dashboard redesign must preserve these.
-  - Credentials: Apple Passwords entry "Synthetic Monitor — prop-manage-de prod org viewer", primary copy in `~/.synthetic-monitor.env`.
-  - Accepted SPOF: entire alert path depends on `discord-bridge.js` being alive.
-  - Typed notification system: schema validator and `TYPE_CONFIG` in `discord-bridge.js`, used by orchestrator and synthetic monitor. Canonical schema documented in bridge file.
-  - Follow-ups (revisit at customer #1):
-    1. Replace `### SUMMARY:` convention with structured output from Claude Code CLI.
-    2. Fix orchestrator emitting `task_completed` embeds when Claude Code reports failure in body but exits 0.
-    3. Supabase probe in connectivity check not loading SUPABASE_URL correctly — Google probe still works as fallback.
-    4. Revisit single-tier alerting at customer #1.
-    5. Bridge-death SPOF needs heartbeat-from-bridge mechanism.
-- **Migration discipline** (commit 53f9aa2). Supabase CLI linked, 26 migrations tracked and synced. `supabase db push` is the only approved method for schema changes — no manual SQL via dashboard. CI drift detection via GitHub Actions on every PR touching migrations or schema. GitHub secret `SUPABASE_ACCESS_TOKEN` authenticates the check.
-- **ARCHITECTURE_STATE.md CI gate** (commit 175ca58). PRs touching migrations, pipeline, server actions, routes, schema, CI workflows, or lint gates must also update ARCHITECTURE_STATE.md or the build fails. Hard fail, no override — the friction is the feature.
-- **Tenant isolation CI gate** (commit b8e3da3). Runs on every PR via GitHub Actions. 13 models annotated, meta-rule requires annotation on every model. 8 exceptions with call-site-specific reasons. Raw SQL banned in app code, existing callers annotated pending iteration-2 wrappers. Meta-test suite at `tools/tenant-isolation-lint/__fixtures__/`. Exceptions tracked in `tenant-isolation-exceptions.md` with CI diff enforcement.
-  - Follow-ups:
-    1. Tenant isolation iteration 2: raw SQL wrappers. DoD: wrappers exist, all queryRaw exceptions migrated, zero raw SQL annotations remaining.
-    2. Separate gate: schema constraint audit for unique declarations missing organizationId.
+| Property | Short Code | Address | Units | Tenants | Rent/Month |
+|----------|-----------|---------|-------|---------|------------|
+| Schauenburg | KO132 | Korbacher Straße 132 | 3 (EG, 1.OG, DG) | Julija Paul €575, Lena Everding €650, Saniye Kuru €470 | €1,695 |
+| Kassel | HHS55 | Heinrich-Heine-Straße 55/55a | 2 (1.OG, DG) | Weber GmbH €1,000, Familie Hofmann €900 | €1,900 |
+
+**Total:** 5 units, €3,595/month, 100% Vermietungsquote
+**Org ID:** 310131df-d6ed-4007-83c2-ac69a7e9df42
+
+---
+
+## Database Schema
+
+### warehouse schema (Supabase, 26 tracked migrations)
+- **warehouse.documents** — 634 rows (626 applied, 6 failed, 2 quarantined). Has cost_class, retention_until, deleted_at, deleted_by columns. Hard DELETE blocked by Postgres trigger (GoBD).
+- **warehouse.document_extractions** — ~411 rows (is_current=true per doc, JSONB extracted_fields). Vendor 97%, amount 98% fill rate on cost docs.
+- **warehouse.document_intelligence** — 402 rows. Summaries, tags, entity refs, action signals, cost_class, umlagefaehig, viewer_safe. Step 8b active (Sonnet). is_current=true pattern, RLS enabled.
+- **warehouse.property_intelligence** — 2 rows (KO132, HHS55). Blackstone 11-section brain format. Staleness trigger active from pipeline. Brain prompt in src/lib/brain-prompt.ts.
+- **warehouse.processing_jobs** — job queue, pg_cron every minute.
+- **warehouse.suggested_matches** — entity matching results.
+- **warehouse.review_tasks** — low-confidence review queue.
+- **warehouse.apply_log** — GoBD immutable audit trail.
+- **warehouse.document_chunks** — EMPTY placeholder for future RAG.
+- **warehouse.document_intelligence_runs** — DOES NOT EXIST.
+
+### public schema (Prisma, 13 models)
+All models annotated with tenant-scoping (enforced by CI gate):
+
+| Model | Annotation | Org Column / FK |
+|-------|-----------|-----------------|
+| Organization | @global | — |
+| VpiIndex | @global | — |
+| User | @tenant-scoped | organizationId (nullable) |
+| Property | @tenant-scoped | organizationId |
+| Person | @tenant-scoped | organizationId |
+| BankConnection | @tenant-scoped | organizationId |
+| BankAccount | @tenant-scoped | organizationId |
+| Membership | @tenant-scoped | orgId |
+| Invitation | @tenant-scoped | orgId |
+| Unit | @tenant-scoped-via | propertyId |
+| Lease | @tenant-scoped-via | unitId |
+| ServiceProvider | @tenant-scoped-via | propertyId |
+| BankTransaction | @tenant-scoped-via | bankAccountId |
+
+**Data state:** Organization (1), User (2 — admin + synthetic monitor), Property (2), Membership (2). All other Prisma tables are empty (no real lease/transaction data yet).
 
 ### SQL Views (warehouse schema)
-- warehouse.v_cost_overview: cost aggregation by property, cost_class, year
-- warehouse.v_vendor_summary: vendor aggregation by property
-- warehouse.v_insurance_status: applied insurance documents with intelligence
-- warehouse.v_open_actions: documents with pending action signals
-- warehouse.v_property_summary: doc and photo counts per property
-- warehouse.v_unit_timeline: ⚠️ EXISTS but has permission issue (SELECT not granted)
+- v_cost_overview, v_vendor_summary, v_insurance_status, v_open_actions, v_property_summary — all active
+- v_unit_timeline — EXISTS but has permission issue (SELECT not granted)
 
-### Tests
-- 11 Playwright tests — all passing
-- 16 golden file tests — all passing
-- 2 brain contract tests — all passing
+---
 
-## Tier 0 — Foundational Integrity Gates (BLOCKING customer #1)
+## Pipeline (Supabase Edge Function, 10 active steps)
 
-1. **Multi-tenant CI gate** — ✅ DONE (commit b8e3da3). Implemented as tenant-isolation-lint custom rule, not eslint. See Live Features entry for details.
-2. **Migration discipline** — ✅ DONE (commit 53f9aa2). supabase db push only, no manual SQL via the editor; CI drift detection on every PR touching migrations or schema. See Live Features entry for details.
-3. **ARCHITECTURE_STATE.md CI gate** — ✅ DONE (commit 175ca58). PRs touching migrations, pipeline, server actions, routes, schema, CI workflows, or lint gates must also update ARCHITECTURE_STATE.md or the build fails. See Live Features entry for details.
-4. **GoBD soft-delete and retention** — applied (Verbucht) documents must support soft-delete with retention period enforcement at the data layer, not just the UI layer. Status: not started. Note: lifted from deferred list, GoBD is the product.
-5. **Backup-restore drill** — one-time restore of Supabase Pro backup into a separate project, verify documents and database came back, document steps in scripts/restore-drill.md. Then quarterly. Status: not started. Note: lifted from deferred list.
+1. claimJob  2. fetchDocument  3. extractText  4. classifyDocument
+5. extractFields  5b. categorize  6. storeExtraction  7. matchEntities
+8. routeByConfidence  8b. generateIntelligence (Sonnet, includes cost_class + umlagefaehig, flags property_intelligence stale)  9. completeJob
 
-These five items form one work block. They must all be complete before customer #1 onboarding. No other operational hardening work proceeds until this block is complete.
+Open taxonomy: 120 German doc types. DOC_TYPE_MAP maps to 4 display categories (Kosten, Versicherungen & Verträge, Behörden, Sonstiges).
+Self-operates via pg_cron every minute. Stuck job recovery every 5 minutes.
 
-## In flight
+---
 
-(none)
+## Tier 0 — Foundational Integrity Gates (ALL COMPLETE)
 
-### Designed but NOT implemented
-- Full-text search, cost aggregation API
-- Auto-apply learning, vendor normalization
+All five gates shipped May 2026. These were blocking customer #1.
 
-### Deferred
-- IBAN, due_date, payment_status extraction
-- purchase_price/purchase_date on Property
-- Dark mode, mobile, i18n
-- GoBD correction flow (beyond soft-delete)
+### 1. Multi-Tenant CI Gate (commit b8e3da3)
+- Runs on every PR via GitHub Actions. Branch protection active.
+- 13 Prisma models annotated (@tenant-scoped / @tenant-scoped-via / @global).
+- Meta-rule: every new model must declare tenancy or CI fails.
+- 8 exceptions annotated with call-site-specific ≥20-char reasons.
+- Raw SQL ($queryRaw, $executeRaw) banned in app code. Existing 7 callers annotated as exceptions.
+- Meta-test suite at tools/tenant-isolation-lint/__fixtures__/.
+- Exceptions tracked in tenant-isolation-exceptions.md with CI diff enforcement.
+- Schema parser: line-oriented text parser, no @prisma/internals dependency.
+- Approved wrappers: getOrgContext(), getOrgContextWritable(), getOrgContextAdmin(), getOrgId(), getOrgIdOrThrow(), warehouseDb().
+- Architectural preference: direct organizationId columns over indirect @tenant-scoped-via for new tables.
+- Config: tools/tenant-isolation-lint/config.ts (single file, all policy definitions).
 
-Rule: If this file doesnt list it, assume it doesnt exist.
+### 2. Migration Discipline (commit 53f9aa2)
+- Supabase CLI initialized and linked to production.
+- 26 migrations tracked and synced (Local = Remote).
+- `supabase db push` is the only approved method for schema changes — no manual SQL via dashboard.
+- CI drift detection via GitHub Actions on every PR touching migrations or schema. Branch protection active.
+- GitHub secret: SUPABASE_ACCESS_TOKEN for CI authentication.
 
-### GoBD Soft-Delete (commit pending)
-- warehouse.documents has deleted_at, deleted_by columns
-- Postgres trigger blocks hard DELETE on warehouse.documents
-- softDeleteDocument() enforces retention_until before allowing deletion
-- Audit trail: deleted_at timestamp + deleted_by userId on every soft delete
-- Prisma tables (Property, Lease, BankTransaction) deferred to iteration 2 — no real data yet
+### 3. ARCHITECTURE_STATE.md CI Gate (commit 175ca58)
+- PRs touching migrations, pipeline, server actions, routes, schema, CI workflows, or lint gates must also update this file or the build fails.
+- Hard fail, no override — the friction is the feature.
+- Trigger paths: supabase/migrations/*, supabase/functions/process-document/*, src/lib/*-actions.ts, src/app/*, prisma/schema.prisma, tools/tenant-isolation-lint/*, .github/workflows/*
 
-### Backup-Restore Drill (May 3, 2026)
-- PASSED: pg_dump + pg_restore verified, 634 docs + 402 intelligence + 411 extractions recovered
-- Recovery procedure documented in scripts/restore-drill.md
-- Cadence: quarterly, next August 2026
+### 4. GoBD Soft-Delete + Retention (commit 76e1849)
+- warehouse.documents has deleted_at (timestamptz) and deleted_by (uuid) columns.
+- Postgres trigger blocks hard DELETE on warehouse.documents — any attempt raises an exception.
+- softDeleteDocument() enforces retention_until before allowing deletion. Returns error with expiry date if retention period hasn't expired.
+- Retention calculation: 30 years for legal (rechtliches), 10 years from invoice date for cost docs, 10 years default.
+- Audit trail: deleted_at timestamp + deleted_by userId on every soft delete.
+- Prisma tables (Property, Lease, BankTransaction) deferred — no real data yet.
+
+### 5. Backup-Restore Drill (commit b28f78f)
+- PASSED May 3, 2026. pg_dump (4.7MB) → pg_restore into separate Supabase project.
+- Verified: 634 documents, 402 intelligence rows, 411 extraction rows — all match production.
+- 318 restore errors (all Supabase system extensions, zero data loss).
+- Recovery procedure documented in scripts/restore-drill.md.
+- Cadence: quarterly (next drill: August 2026).
+
+---
+
+## Synthetic Monitoring (LIVE, commit 76f18379)
+
+Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in repo.
+
+- **Tier A:** HTTP ping to /api/synthetic/ping every 5 minutes. Validates JSON shape + freshness (checked_at within 60s). Catches: Vercel down, build broken, env vars missing.
+- **Tier B:** Playwright headless login as synthetic viewer user every 15 minutes. Asserts data-testid="warehouse-properties-loaded" DOM contract on /dashboard/warehouse. Catches: auth broken, RLS broken, dashboard regressions.
+- **Alert discipline:** 2 consecutive completed failures before alerting. One alert per incident. Recovery message on pass. No success spam.
+- **Connectivity self-check:** Two-of-two probes (Google generate_204 + Supabase host). Suppresses alerts when Mac Mini's own internet is down.
+- **Heartbeat deadman:** Scheduler writes heartbeat every 60s. Orchestrator detects stale heartbeat (>20 min) and alerts.
+- **Pause file:** touch ~/.agent-hub/synthetic-paused to suppress during deploys.
+- **Synthetic user:** synthetic-monitor@prop-manage-de.internal, viewer role, is_synthetic=true. Filtered from getOrgMembers, getOrgPendingInvitations, audit display. Credentials in Apple Passwords + ~/.synthetic-monitor.env (mode 0600).
+
+**INVARIANT:** data-testid="warehouse-properties-loaded" with data-property-count and data-app-version on /dashboard/warehouse. Any dashboard redesign must preserve these attributes.
+
+**Accepted SPOF:** Entire alert path depends on discord-bridge.js being alive.
+
+---
+
+## Typed Notification System (LIVE, shipped with synthetic monitoring)
+
+- discord-bridge.js handles JSON notifications with schema validation via TYPE_CONFIG.
+- Types: task_completed, task_failed, task_decision_needed, synthetic_failure, synthetic_recovery, synthetic_heartbeat_stale, synthetic_heartbeat_recovered, playwright_drift, test_notification.
+- Each type has color, icon, label. Embeds show title + summary + structured fields + action links.
+- Orchestrator auto-injects `### SUMMARY:` convention into every Claude Code task.
+- Schema validator rejects malformed notifications (missing channel/type/title/summary, short reasons, etc.).
+- `!test-notification` command in Discord to verify the notification path.
+- `!status` command shows orchestrator + synthetic monitor heartbeat status.
+
+---
+
+## UI (Live Features)
+
+- **Dashboard:** KPI strip (Objekte, Einheiten, Miete/Monat, Vermietungsquote) + Immobilienbestand holdings table + Immobilien-Analyse with property selector and Mietübersicht tab.
+- **Inbox (Alle Dokumente):** Document list with vendor/amount/date columns. Triage overlay with apply/quarantine. Document intelligence summary in right panel. "Seit deinem letzten Besuch" orientation card.
+- **Property detail:** Compact folder list on Dokumente tab. Brain insight line.
+- **Team management:** /dashboard/settings/users — member list, invitations, role management.
+- **Shell:** Proda-style icon-only sidebar with expand/collapse chevron. Settings flyout with user info and logout. Fixed layout (header + sidebar fixed, content scrolls).
+- **Property chat:** /api/properties/[id]/chat endpoint.
+- **Formatting:** German numbers (dots as thousands separators), dd.MM.yyyy dates.
+
+### Design Principles
+- German-only UI (English loanwords retained: Dashboard, Inbox, Export, Upload, Download, CSV, PDF, E-Mail).
+- Fidelity content/structure with Apple Health aesthetics.
+- Silence is calm: no green "Alles OK" badges, no alerts unless actionable.
+- Dashboard is a router, not a destination.
+
+---
+
+## Roles & Access
+
+| Role | Access | Notes |
+|------|--------|-------|
+| service_operator | Full ops access | Nils — data processor |
+| owner | Org admin | Rarely used initially |
+| manager | Future internal staff | Not active |
+| viewer | Read-only property owner | Customer-facing |
+
+- Middleware: viewers → /dashboard/warehouse, managers blocked from /settings.
+- UI controls hidden for viewers (upload, apply, quarantine, export, settings).
+- All mutations use getOrgContextWritable() or getOrgContextAdmin().
+
+---
+
+## Auth & Security
+
+- NextAuth v5 Credentials (bcrypt).
+- Org context: getOrgContext(), getOrgContextWritable(), getOrgContextAdmin() in src/lib/org.ts.
+- Cookie-based active org with auto-fallback (x-active-org, x-active-role).
+- warehouseDb(orgId) wrapper for warehouse queries — injects org_id predicate.
+- Wrong-org errors return 'Not found' (never 'Unauthorized').
+- updateMany/deleteMany with count check everywhere.
+- is_synthetic boolean on User for filtering synthetic monitor from UI.
+
+---
+
+## Infrastructure
+
+- **Mac Mini M4** (Tailscale IP 100.86.27.51, user: federico): orchestrator, discord-bridge, synthetic scheduler. All launched via ~/scripts/start-agents.sh.
+- **Discord:** #nils (control), #pipeline (alerts), #build (codex), #status (system online).
+- **Supabase Pro:** Database + storage + Edge Functions. CLI linked, migrations tracked.
+- **Vercel:** Auto-deploy from main. Synthetic ping endpoint with force-dynamic.
+- **GitHub Actions:** 3 CI gates (tenant isolation, migration drift, architecture state).
+
+---
+
+## Tests
+
+| Suite | Count | Status |
+|-------|-------|--------|
+| Playwright e2e | 11 | ✅ Passing |
+| Golden file tests | 16 | ✅ Passing |
+| Brain contract tests | 2 | ✅ Passing |
+| Tenant isolation meta-tests | 18 | ✅ Passing |
+
+---
+
+## Known Issues (Non-Blocking)
+
+- connector.apply() fails for angebot/vollmacht/informationsmaterial doc_types.
+- 6 failed documents (HEIC, large PDFs).
+- Vendor name duplication (83 extracted, ~50 real — needs normalization table).
+- Cost amounts include purchase prices (€519k Kaufvertrag mixed with operating costs).
+- viewer_safe incorrectly flags Mieteingänge summaries as false.
+- unit_ref inconsistent across documents.
+- cost_class/umlagefaehig NULL on 397 existing intelligence rows (only new docs populated).
+- HHS55 brain shows Weber rent as 900 not 1000.
+- Some Mietbeginn dates missing in brain output.
+- v_unit_timeline permission issue.
+- Supabase probe in connectivity check not loading SUPABASE_URL (Google fallback works).
+- Orchestrator emits task_completed when Claude Code exits 0 despite body-reported failure.
+- SUMMARY convention is string-parsing hack (replace with structured output at customer #1).
+
+---
+
+## Follow-Ups (Tracked, Not Blocking)
+
+### Iteration 2 — Tenant Isolation
+- Raw SQL wrappers: tenantSafeQuery, tenantSafeExecute, tenantSafeQueryVia. DoD: wrappers exist, all $queryRaw exceptions migrated, zero raw SQL annotations remaining.
+- Schema constraint audit gate: @@unique declarations missing organizationId.
+- Prisma table soft-delete: Property, Lease, BankTransaction get deleted_at/deleted_by when they have real data.
+
+### After Tier 0 (Priority Order)
+- Pre-commit tsc + lint
+- verify-brain.js invariants with brain-diff-on-regeneration
+- Structured JSON logging with trace_id
+- Anthropic spend cap (immediate 5 min) + daily cost report (deferred)
+- Fixture-on-prompt-change
+
+### Deferred Features (Build When Needed)
+- Extraction schemas v2: deploy Edge Function, Phase 1 test on grundbuchauszug docs.
+- Auto-apply learning (after 50+ reviewed docs).
+- Vendor normalization table.
+- IBAN extraction, due_date + payment_status.
+- Full-text search (ocr_text exists, needs tsvector index + UI).
+- Cost aggregation API.
+- Insurance active/expired tracking.
+- Rent roll current state.
+- Vacancy detection.
+- Phase 2 i18n (next-intl, DE/EN).
+- GoBD correction flow (Stornieren & neu verbuchen).
+- Shared document table primitives.
+- Research wiki (Karpathy pattern, post-customer-1).
+
+### Deferred UI/UX
+- Global search in header.
+- Persistent Upload in sidebar.
+- Add Property UI button.
+- Export button.
+- Timeline view for Protokoll.
+- Sidebar section grouping with labels.
+- Breadcrumb icons.
+
+### Deferred SaaS Hardening (Post-Customer-1)
+- Observability dashboard.
+- Anomaly alerting baselines.
+- Per-customer metrics.
+- Job replay.
+- Feature flags.
+- Code health reports.
+
+---
+
+## Key Rules
+
+1. **No backend without frontend to consume it.** Don't build APIs, columns, or indexes until a UI exists to use them.
+2. **Discord task rule:** Every task adding a new data field to UI must specify: (1) database table/column, (2) server action query, (3) component that renders it.
+3. **Spec → ChatGPT critique → Claude Code implementation.** Claude (chat) writes the spec, ChatGPT critiques, Claude Code implements via Discord.
+4. **Claude Code self-verification is unreliable** for "write from scratch" tasks. Always verify by running the code, not by reading completion reports.
+5. **Silence is calm.** No green badges, no alerts unless actionable.
+6. **Architectural preference:** Direct organizationId columns over indirect @tenant-scoped-via for new tables.
+7. **Password/secret scripts** leak into SSH history and chat logs. Rethink before first hire.
