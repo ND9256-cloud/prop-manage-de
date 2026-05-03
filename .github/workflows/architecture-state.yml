@@ -1,0 +1,87 @@
+name: Architecture State Check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+
+jobs:
+  architecture-state:
+    name: Architecture State Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if state file update is required
+        run: |
+          # Get list of changed files in this PR
+          CHANGED=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1)
+          echo "Changed files:"
+          echo "$CHANGED"
+          echo ""
+
+          # Paths that require ARCHITECTURE_STATE.md to be updated
+          REQUIRES_UPDATE=false
+          TRIGGER_FILES=""
+
+          while IFS= read -r file; do
+            case "$file" in
+              supabase/migrations/*)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (migration)"
+                ;;
+              supabase/functions/process-document/*)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (pipeline)"
+                ;;
+              src/lib/*-actions.ts)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (server action)"
+                ;;
+              src/app/*)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (route/page)"
+                ;;
+              prisma/schema.prisma)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (schema)"
+                ;;
+              tools/tenant-isolation-lint/*)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (CI gate)"
+                ;;
+              .github/workflows/*)
+                REQUIRES_UPDATE=true
+                TRIGGER_FILES="$TRIGGER_FILES\n  - $file (CI workflow)"
+                ;;
+            esac
+          done <<< "$CHANGED"
+
+          if [ "$REQUIRES_UPDATE" = false ]; then
+            echo "✅ No architectural paths changed. State file update not required."
+            exit 0
+          fi
+
+          # Check if ARCHITECTURE_STATE.md was also changed
+          if echo "$CHANGED" | grep -q "ARCHITECTURE_STATE.md"; then
+            echo "✅ Architectural paths changed and ARCHITECTURE_STATE.md was updated."
+            echo -e "Trigger files:$TRIGGER_FILES"
+            exit 0
+          fi
+
+          echo "❌ Architectural paths changed but ARCHITECTURE_STATE.md was NOT updated."
+          echo ""
+          echo -e "Files that triggered this check:$TRIGGER_FILES"
+          echo ""
+          echo "ARCHITECTURE_STATE.md is the source of truth for what exists in this system."
+          echo "Add a line describing what changed, even if it's minor:"
+          echo "  - New migration: describe what it does"
+          echo "  - Server action change: note the function and what changed"
+          echo "  - New route: add it to the routes section"
+          echo "  - Schema change: update the model listing"
+          echo ""
+          echo "If this is truly a no-op change (whitespace, comments only), add a"
+          echo "one-line note: 'Minor: <description>, no architectural change.'"
+          exit 1
