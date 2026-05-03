@@ -17,6 +17,9 @@ jobs:
   migration-drift:
     name: Migration Drift Check
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -27,27 +30,16 @@ jobs:
 
       - name: Link project
         run: supabase link --project-ref vatsmyvkeuxkcwemmxau
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
-      - name: Show migration status
-        run: supabase migration list
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Check for pending migrations
         run: |
-          OUTPUT=$(supabase db push --dry-run 2>&1) || true
+          supabase migration list
+          OUTPUT=$(supabase db push --dry-run 2>&1)
           echo "$OUTPUT"
-          if echo "$OUTPUT" | grep -qi "would apply"; then
+          if echo "$OUTPUT" | grep -qi "would apply\|pending"; then
             echo ""
-            echo "❌ Pending migrations found. Run 'supabase db push' locally to apply."
+            echo "❌ Pending migrations found. Run 'supabase db push' locally."
             exit 1
           fi
           echo ""
           echo "✅ All migrations applied. No drift detected."
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
