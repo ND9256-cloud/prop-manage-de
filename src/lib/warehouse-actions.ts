@@ -1130,15 +1130,42 @@ export async function renameDocument(documentId: string, newDisplayName: string)
 }
 
 export async function softDeleteDocument(documentId: string) {
-    const orgId = await getOrgIdWritable();
-    if (!orgId) return { error: 'Not authenticated' };
+    const ctx = await getOrgContextWritable();
+    if (!ctx) return { error: 'Not authenticated' };
 
-    const db = warehouseDb(orgId);
+    const db = warehouseDb(ctx.orgId);
 
-    // Soft delete only — GoBD compliance: never hard delete
+    // Fetch document to check retention before deleting
+    const { data: doc, error: fetchError } = await db.from('documents')
+        .select('id, status, retention_until')
+        .eq('org_id', ctx.orgId)
+        .eq('id', documentId)
+        .single();
+
+    if (fetchError || !doc) return { error: 'Document not found' };
+    if (doc.status === 'deleted') return { error: 'Document is already deleted' };
+
+    // GoBD retention enforcement: block if retention period not expired
+    if (doc.retention_until) {
+        const retentionDate = new Date(doc.retention_until);
+        if (retentionDate > new Date()) {
+            const years = Math.ceil((retentionDate.getTime() - Date.now()) / (365.25 * 24 * 60 * 60 * 1000));
+            return {
+                error: `Cannot delete: GoBD retention period has not expired. Document must be retained until ${retentionDate.toISOString().split('T')[0]} (approximately ${years} more year${years === 1 ? '' : 's'}).`
+            };
+        }
+    }
+
+    // Soft delete with audit trail
+    const now = new Date().toISOString();
     const { error } = await db.from('documents')
-        .update({ status: 'deleted', updated_at: new Date().toISOString() })
-        .eq('org_id', orgId)
+        .update({
+            status: 'deleted',
+            deleted_at: now,
+            deleted_by: ctx.userId,
+            updated_at: now,
+        })
+        .eq('org_id', ctx.orgId)
         .eq('id', documentId);
 
     if (error) return { error: error.message };

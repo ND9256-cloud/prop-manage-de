@@ -129,3 +129,10 @@ These five items form one work block. They must all be complete before customer 
 - GoBD correction flow (beyond soft-delete)
 
 Rule: If this file doesnt list it, assume it doesnt exist.
+
+### GoBD Soft-Delete (commit pending)
+- warehouse.documents has deleted_at, deleted_by columns
+- Postgres trigger blocks hard DELETE on warehouse.documents
+- softDeleteDocument() enforces retention_until before allowing deletion
+- Audit trail: deleted_at timestamp + deleted_by userId on every soft delete
+- Prisma tables (Property, Lease, BankTransaction) deferred to iteration 2 — no real data yet
