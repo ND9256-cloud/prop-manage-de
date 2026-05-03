@@ -136,3 +136,8 @@ Rule: If this file doesnt list it, assume it doesnt exist.
 - softDeleteDocument() enforces retention_until before allowing deletion
 - Audit trail: deleted_at timestamp + deleted_by userId on every soft delete
 - Prisma tables (Property, Lease, BankTransaction) deferred to iteration 2 — no real data yet
+
+### Backup-Restore Drill (May 3, 2026)
+- PASSED: pg_dump + pg_restore verified, 634 docs + 402 intelligence + 411 extractions recovered
+- Recovery procedure documented in scripts/restore-drill.md
+- Cadence: quarterly, next August 2026
