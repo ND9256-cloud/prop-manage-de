@@ -1,3 +1,4 @@
+// @ts-nocheck
 // __fixtures__/violations.ts
 // Every pattern here MUST produce at least one violation.
 

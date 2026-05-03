@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/db';
 import { warehouseDb } from '@/lib/warehouse/db';
 import { CATEGORIES } from '@/lib/warehouse-categories';
-import { getOrgId, getOrgContext, getOrgIdWritable } from '@/lib/org';
+import { getOrgId, getOrgContext, getOrgIdWritable, getOrgContextWritable } from '@/lib/org';
 import { revalidatePath } from 'next/cache';
 
 export interface InboxDocument {

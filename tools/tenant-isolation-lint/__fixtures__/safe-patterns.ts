@@ -1,3 +1,4 @@
+// @ts-nocheck
 // __fixtures__/safe-patterns.ts
 // These patterns MUST produce zero violations from the gate.
 
