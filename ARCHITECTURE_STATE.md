@@ -213,6 +213,15 @@ Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in 
 
 ---
 
+## v2 Domain Knowledge Layer
+
+- `domain_knowledge/` directory exists at repo root
+- 5 stub files present (one per launch-slice doc type): mietvertrag, wohnungsuebergabeprotokoll, mieterhoehung, mietvertragsnachtrag, kuendigung
+- Front-matter Zod validator in `src/tests/domain-knowledge.test.ts`
+- Validator currently runs manually (`npx tsx -r dotenv/config src/tests/domain-knowledge.test.ts`); CI integration is part of Task 0.2
+
+---
+
 ## Tests
 
 | Suite | Count | Status |

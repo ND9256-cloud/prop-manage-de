@@ -1,0 +1,77 @@
+# Meta-schema for domain_knowledge/*.md front-matter
+#
+# This file is documentation. Runtime validation uses the Zod schema
+# in src/tests/domain-knowledge.test.ts, which mirrors this definition.
+
+fields:
+  doc_type:
+    type: string
+    required: true
+    description: Must match filename without .md extension
+
+  default_claim_kind:
+    type: enum
+    values: [assertion, snapshot, event, reference]
+    required: true
+
+  last_updated:
+    type: string
+    format: ISO 8601 date
+    required: true
+
+  legal_grounding:
+    type: array
+    items:
+      statute: string
+      description: string
+    required: false
+    default: []
+
+  fields_governed:
+    type: array
+    items: string
+    required: false
+    default: []
+
+  normalization_rules:
+    type: array
+    items:
+      id: string
+      field: string
+      description: string
+    required: false
+    default: []
+
+  gotchas:
+    type: array
+    items:
+      id: string
+      description: string
+      behavior: object  # optional
+      real_failure_reference: string  # optional
+    required: false
+    default: []
+
+  adversarial_fixtures_required:
+    type: array
+    items: string
+    required: false
+    default: []
+
+  closes:
+    type: array
+    items:
+      target_predicate: string
+      target_subject_pattern: string
+      close_mode:
+        type: enum
+        values:
+          - close_overlapping_only
+          - close_overlapping_and_future
+          - close_overlapping_and_supersede_future
+      when: string
+      valid_to_source: string
+      match_requirements: object
+      blocker_check: array  # optional
+    required: false
+    default: []
