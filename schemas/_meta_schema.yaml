@@ -1,0 +1,46 @@
+# Meta-schema for per-doc-type extraction schemas.
+# This file is documentation. Runtime validation uses a Zod schema
+# in scripts/validate-schemas.ts that mirrors this structure.
+
+# --- Top-level fields ---
+
+# doc_type: string, required
+#   Must match the parent directory name (schemas/<doc_type>/schema.yaml).
+
+# schema_version: string, required
+#   Format: YYYY-MM-DD-vN (e.g., 2026-05-08-v1).
+
+# claim_kind: enum, required
+#   One of: assertion | snapshot | event | reference
+
+# domain_knowledge_ref: string, required
+#   Must point to an existing file (domain_knowledge/<doc_type>.md).
+
+# prompt_fragment_template: string, required
+#   Multiline allowed. Template for extraction prompt generation.
+
+# fields: array, required
+#   Must contain at least one field entry.
+
+# --- Field entry structure ---
+
+# Each entry in `fields` has:
+#
+#   id: string, required, snake_case
+#   german_label: string, required (display label for triage UI)
+#   severity: enum, required — critical | important | nice_to_have
+#   requiredness: enum, required — required | conditional | optional
+#   condition: string, required only when requiredness == "conditional"
+#     Boolean expression referencing other field ids.
+#   type: enum, required
+#     One of: string | number | boolean | date | money | enum | enum_extensible | structured | structured_array
+#   enum_values: array of strings, required only when type is enum or enum_extensible
+#   item_schema: array of {field, type, required}, required only when type is structured or structured_array
+#   verifier_refs: array of strings, optional, default []
+#   normalization_rule_ref: string, optional
+#     Must match an id in the corresponding domain knowledge normalization_rules array.
+#   description: string, optional (multiline allowed)
+#   used_in_resolvers: boolean, optional, default false
+#   customer_visible: boolean, optional, default true
+#   classification_hints: string, optional (multiline allowed)
+#     Only meaningful for fields whose id ends in _typ or matches a known classification field.

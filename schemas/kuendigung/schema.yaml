@@ -1,0 +1,16 @@
+doc_type: kuendigung
+schema_version: "2026-05-08-v1"
+claim_kind: event
+domain_knowledge_ref: domain_knowledge/kuendigung.md
+prompt_fragment_template: |
+  TODO: populated in Task 2.4
+fields:
+  - id: doc_type_marker
+    german_label: "Dokumenttyp-Marker (Stub)"
+    severity: nice_to_have
+    requiredness: optional
+    type: string
+    description: |
+      Placeholder field so the stub validates against the meta-schema's
+      "fields must contain at least one entry" rule. Replaced with real
+      fields in the per-doc-type tasks.

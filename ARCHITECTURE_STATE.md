@@ -220,6 +220,14 @@ Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in 
 - Front-matter Zod validator in `src/tests/domain-knowledge.test.ts`
 - Validator currently runs manually (`npx tsx -r dotenv/config src/tests/domain-knowledge.test.ts`); CI integration is part of Task 0.2
 
+## v2 Schemas Layer
+
+- `schemas/` directory exists at repo root with 5 doc-type subdirectories: mietvertrag, wohnungsuebergabeprotokoll, mieterhoehung, mietvertragsnachtrag, kuendigung
+- Each has a stub `schema.yaml` validating against the meta-schema (`schemas/_meta_schema.yaml`)
+- Validator at `scripts/validate-schemas.ts` (importable + CLI)
+- Test at `src/tests/schemas.test.ts` runs the validator
+- Cross-validation against domain knowledge: claim_kind match, fields_governed coverage, normalization_rule_ref integrity. Currently soft because stubs have empty arrays — becomes load-bearing in Phase 1+.
+
 ---
 
 ## Tests
