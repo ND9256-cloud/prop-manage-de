@@ -228,6 +228,14 @@ Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in 
 - Test at `src/tests/schemas.test.ts` runs the validator
 - Cross-validation against domain knowledge: claim_kind match, fields_governed coverage, normalization_rule_ref integrity. Currently soft because stubs have empty arrays — becomes load-bearing in Phase 1+.
 
+## v2 Generator (Phase 1 Outputs)
+
+- `schemas/<doc_type>/generated/` directories exist for all 5 launch-slice doc types (mietvertrag, wohnungsuebergabeprotokoll, mieterhoehung, mietvertragsnachtrag, kuendigung)
+- Three generated files per doc type: `prompt_fragment.ts` (Deno-compatible), `field_labels.json`, `envelope_validator.ts` (Deno-compatible, hand-written validation, no Zod)
+- Generator at `scripts/gen-schemas.ts` (CLI: `npm run gen:schemas`, check mode: `npm run gen:schemas:check`)
+- CI gate at `.github/workflows/generated-files-fresh.yml` enforces that generated files stay in sync with source schemas
+- Phase 2 outputs (JSON Schema, Zod schemas) and Phase 3 outputs (TypeScript types, eval rubric, emitter stubs) are deferred per architecture §7.2 — added when consumers exist
+
 ---
 
 ## Tests
