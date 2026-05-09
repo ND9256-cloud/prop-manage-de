@@ -20,7 +20,7 @@ const NormalizationRule = z.object({
 const Gotcha = z.object({
   id: z.string(),
   description: z.string(),
-  behavior: z.record(z.unknown()).optional(),
+  behavior: z.record(z.string(), z.unknown()).optional(),
   real_failure_reference: z.string().optional(),
 });
 
@@ -36,7 +36,7 @@ const CloseEntry = z.object({
   close_mode: CloseMode,
   when: z.string(),
   valid_to_source: z.string(),
-  match_requirements: z.record(z.unknown()),
+  match_requirements: z.record(z.string(), z.unknown()),
   blocker_check: z.array(z.unknown()).optional(),
 });
 
