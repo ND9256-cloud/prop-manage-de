@@ -370,3 +370,15 @@ model Invitation {
 //   // warehouse.derivation_records — tenant-scoped via property_id FK to Property
 //   // Accessed via warehouseDb() service-role client, not Prisma.
 // }
+
+// =============================================================================
+// Warehouse v2 Extraction Envelope — SQL-only table (NOT managed by Prisma).
+// This stub exists solely for the tenant-isolation lint gate.
+// Actual schema is in supabase/migrations/20260510090000_v2_extraction_envelope.sql.
+// =============================================================================
+
+// /// @tenant-scoped-via: source_document_id
+// model WarehouseDocumentExtractionV2 {
+//   // warehouse.document_extractions_v2 — tenant-scoped via source_document_id → documents.property_id → Property
+//   // Accessed via warehouseDb() service-role client, not Prisma.
+// }

@@ -225,6 +225,19 @@ Three new tables in `warehouse.*` schema: `claims`, `claim_closures`, `derivatio
 
 ---
 
+## v2 Extraction Envelope (Task 0.5)
+
+New table `warehouse.document_extractions_v2` — the v2 extraction envelope that stores document-level extraction results in structured envelope format per architecture §3.1/§3.3/§3.4.
+- **Append-only with one exception:** Postgres triggers block UPDATE on all columns except `human_review_status` (mutable to support the triage workflow). DELETE blocked entirely (GoBD compliance).
+- **Indexes:** `(source_document_id, created_at DESC)` for latest-extraction queries, `extraction_run_id` for replay, `schema_version` for re-emission candidates, `doc_type` for eval slicing, partial index on `human_review_status` where not `'not_reviewed'`.
+- **Tenant isolation:** `@tenant-scoped-via source_document_id` (FK chain: document_extractions_v2.source_document_id → documents.id → Property.id). RLS enabled with org isolation policy.
+- **Migration:** `supabase/migrations/20260510090000_v2_extraction_envelope.sql` + `20260510090001_v2_extraction_envelope_grants.sql`
+- **Integration test:** `src/tests/v2-extraction-envelope-migration.test.ts` (12 assertions: CHECK constraints, immutability triggers, human_review_status mutability, GoBD delete block, index queries)
+- **Status:** Schema live, no code yet writes envelopes (Phase 1 emitters do that).
+- **Note:** Legacy `warehouse.document_extractions` (Haiku Step 5) untouched; both paths coexist during transition window per architecture §11.
+
+---
+
 ## v2 Domain Knowledge Layer
 
 - `domain_knowledge/` directory exists at repo root
