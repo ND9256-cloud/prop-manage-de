@@ -324,3 +324,7 @@ Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in 
 5. **Silence is calm.** No green badges, no alerts unless actionable.
 6. **Architectural preference:** Direct organizationId columns over indirect @tenant-scoped-via for new tables.
 7. **Password/secret scripts** leak into SSH history and chat logs. Rethink before first hire.
+
+## CI workflow path filters removed (2026-05-10)
+
+Removed `paths:` filters from `migration-drift.yml` and `tenant-isolation.yml`. Both workflows now run on every PR and every push to main. Reason: branch protection requires these checks to pass, but path filters meant they never reported status on PRs that didn't touch the filtered paths, leaving such PRs blocked indefinitely in "Expected — Waiting for status to be reported." Trade-off: ~30s additional CI compute per PR. Acceptable.

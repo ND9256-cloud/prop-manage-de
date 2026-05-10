@@ -4,14 +4,8 @@ on:
   workflow_dispatch:
   pull_request:
     branches: [main]
-    paths:
-      - 'supabase/migrations/**'
-      - 'prisma/schema.prisma'
   push:
     branches: [main]
-    paths:
-      - 'supabase/migrations/**'
-      - 'prisma/schema.prisma'
 
 jobs:
   migration-drift:
