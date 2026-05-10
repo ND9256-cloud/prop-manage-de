@@ -1,20 +1,11 @@
 name: Tenant Isolation Gate
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'supabase/functions/**'
-      - 'prisma/**'
-      - 'tools/tenant-isolation-lint/**'
   push:
     branches: [main]
-    paths:
-      - 'src/**'
-      - 'supabase/functions/**'
-      - 'prisma/**'
-      - 'tools/tenant-isolation-lint/**'
 
 jobs:
   tenant-isolation:
