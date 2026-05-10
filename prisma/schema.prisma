@@ -346,3 +346,27 @@ model Invitation {
   @@unique([emailNorm, orgId])
   @@map("invitations")
 }
+
+// =============================================================================
+// Warehouse v2 Claim Store — SQL-only tables (NOT managed by Prisma).
+// These stubs exist solely for the tenant-isolation lint gate.
+// Actual schema is in supabase/migrations/20260510080000_v2_claim_store.sql.
+// =============================================================================
+
+// /// @tenant-scoped-via: propertyId
+// model WarehouseClaim {
+//   // warehouse.claims — tenant-scoped via property_id FK to Property
+//   // Accessed via warehouseDb() service-role client, not Prisma.
+// }
+
+// /// @tenant-scoped-via: target_claim_id.property_id (transitive)
+// model WarehouseClaimClosure {
+//   // warehouse.claim_closures — tenant-scoped via target_claim_id → claims.property_id
+//   // Accessed via warehouseDb() service-role client, not Prisma.
+// }
+
+// /// @tenant-scoped-via: propertyId
+// model WarehouseDerivationRecord {
+//   // warehouse.derivation_records — tenant-scoped via property_id FK to Property
+//   // Accessed via warehouseDb() service-role client, not Prisma.
+// }
