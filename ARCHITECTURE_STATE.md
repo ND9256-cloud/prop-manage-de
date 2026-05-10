@@ -213,6 +213,18 @@ Files: ~/scripts/synthetic/ on Mac Mini, src/app/api/synthetic/ping/route.ts in 
 
 ---
 
+## v2 Claim Store (Task 0.4)
+
+Three new tables in `warehouse.*` schema: `claims`, `claim_closures`, `derivation_records`.
+- **Append-only by design:** Postgres triggers block UPDATE (except one-way supersession on claims.valid_to/superseded_at/superseded_by_claim_id) and block all DELETE (GoBD compliance).
+- **Indexes:** Composite on `(property_id, subject, predicate, valid_from)`, partial index on open claims (`WHERE valid_to IS NULL`), GIN on `derivation_records.input_claim_ids`, plus source_document, closures target, derivation output/property.
+- **Tenant isolation:** All three tables annotated `@tenant-scoped-via property_id` (directly or transitively via target_claim_id). RLS enabled with org isolation policies.
+- **Migration:** `supabase/migrations/20260510080000_v2_claim_store.sql`
+- **Integration test:** `src/tests/v2-claim-store-migration.test.ts` (13 assertions: constraints, triggers, immutability)
+- **Status:** Schema live, no code yet writes claims (Phase 1 emitters do that).
+
+---
+
 ## v2 Domain Knowledge Layer
 
 - `domain_knowledge/` directory exists at repo root
