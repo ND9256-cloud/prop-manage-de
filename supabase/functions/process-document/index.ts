@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { STRUCTURED_PROMPTS } from "./extraction_schemas.ts";
+import { hasV2Schema } from "../../../schemas/index.ts";
+import { PROMPT_FRAGMENT as MIETVERTRAG_PROMPT, SCHEMA_VERSION as MIETVERTRAG_SCHEMA_VERSION } from "../../../schemas/mietvertrag/generated/prompt_fragment.ts";
+import { validateEnvelope as validateMietvertragEnvelope } from "../../../schemas/mietvertrag/generated/envelope_validator.ts";
+import { VERIFIERS } from "./verifiers/index.ts";
+import type { FieldSpec, FieldEnvelope } from "./verifiers/index.ts";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -70,6 +75,40 @@ const COST_CLASS_MAP: Record<string, string> = {
     darlehensvertrag:               "finanzierung",
     kreditangebot:                  "finanzierung",
     grundschuld:                    "finanzierung",
+};
+
+// ─── v2 schema prompt + validator registry ──────────────────────
+
+interface V2Config {
+    prompt: string;
+    schemaVersion: string;
+    validate: (data: unknown) => void;
+    fieldSpecs: Record<string, FieldSpec>;
+}
+
+const V2_PROMPTS: Record<string, V2Config> = {
+    mietvertrag: {
+        prompt: MIETVERTRAG_PROMPT,
+        schemaVersion: MIETVERTRAG_SCHEMA_VERSION,
+        validate: validateMietvertragEnvelope,
+        fieldSpecs: {
+            kaltmiete: { id: "kaltmiete", type: "money" },
+            unit_ref: { id: "unit_ref", type: "enum", enum_values: ["EG", "1.OG", "2.OG", "3.OG", "4.OG", "DG", "Keller", "Souterrain"] },
+            tenant_identity: { id: "tenant_identity", type: "structured" },
+            mietbeginn: { id: "mietbeginn", type: "date" },
+            mietende: { id: "mietende", type: "date" },
+        },
+    },
+};
+
+// Map field_id → verifier_refs (from schema.yaml)
+const V2_VERIFIER_REFS: Record<string, Record<string, string[]>> = {
+    mietvertrag: {
+        kaltmiete: ["monetary-verbatim"],
+        unit_ref: ["enum"],
+        mietbeginn: ["date-format"],
+        mietende: ["date-format"],
+    },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -388,6 +427,13 @@ async function extractFields(
     job: Job,
     // deno-lint-ignore no-explicit-any
 ): Promise<Record<string, any>> {
+    // v2 path: skip Haiku entirely. No legacy extraction is written.
+    // The v2 envelope will be written by Step 8b instead.
+    if (hasV2Schema(classification.doc_type)) {
+        console.log(`extractFields: skipping Haiku for v2 doc_type "${classification.doc_type}"`);
+        return { _v2_skipped: true, confidence_score: 0, missing_fields: [] };
+    }
+
     // deno-lint-ignore no-explicit-any
     let extractedFields: Record<string, any> = { confidence_score: 0, missing_fields: ["parse_error"] };
 
@@ -888,6 +934,191 @@ async function routeByConfidence(
     return finalStatus;
 }
 
+// ─── 8b-v2. generateV2Envelope (FATAL on failure) ───────────
+
+async function generateV2Envelope(
+    supabase: SupabaseClient,
+    job: Job,
+    doc: Doc,
+    classification: Classification,
+): Promise<void> {
+    const docType = classification.doc_type;
+    const v2Config = V2_PROMPTS[docType];
+    if (!v2Config) {
+        throw new Error(`generateV2Envelope: no V2_PROMPTS config for doc_type "${docType}"`);
+    }
+
+    const ocrText = (doc.ocr_text ?? "").slice(0, 6000);
+    if (!ocrText) {
+        throw new Error("generateV2Envelope: no ocr_text available — cannot extract v2 envelope");
+    }
+
+    const extractionRunId = crypto.randomUUID();
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
+
+    // Build prompt: system instruction + schema prompt fragment + document text
+    const fullPrompt = `Du bist ein präziser Dokumentenanalyse-Assistent für deutsche Hausverwaltung.
+Analysiere das folgende Dokument und extrahiere die angeforderten Felder.
+Antworte NUR mit validem JSON. Kein Markdown, keine Erklärung.
+
+Das JSON muss ein Objekt sein, dessen Schlüssel die Feld-IDs sind.
+Jedes Feld ist ein Objekt mit: raw_value, normalized_value, evidence (Array von {quote, page, bbox}), confidence ("high"|"medium"|"low"), absence_state, validation_status ("valid"), severity.
+
+${v2Config.prompt}
+
+Dokumenttext:
+${ocrText}`;
+
+    // Call Sonnet
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+            "x-api-key": anthropicKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        body: JSON.stringify({
+            model: "claude-sonnet-4-20250514",
+            max_tokens: 3000,
+            messages: [{
+                role: "user",
+                content: fullPrompt,
+            }],
+        }),
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        throw new Error(`generateV2Envelope: Sonnet API error ${response.status}: ${body}`);
+    }
+
+    const result = await response.json();
+    const text = result.content?.[0]?.text || "";
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) {
+        console.error(`generateV2Envelope: raw response: ${text.slice(0, 500)}`);
+        throw new Error("generateV2Envelope: Sonnet returned non-JSON response");
+    }
+
+    // deno-lint-ignore no-explicit-any
+    let envelope: Record<string, any>;
+    try {
+        envelope = JSON.parse(match[0]);
+    } catch (parseErr) {
+        throw new Error(`generateV2Envelope: JSON parse failed: ${(parseErr as Error).message}`);
+    }
+
+    // Validate envelope shape
+    try {
+        v2Config.validate(envelope);
+    } catch (validationErr) {
+        console.error(`generateV2Envelope: envelope validation failed:`, (validationErr as Error).message);
+        throw new Error(`generateV2Envelope: envelope validation failed: ${(validationErr as Error).message}`);
+    }
+
+    // Run verifiers per field
+    const verifierRefs = V2_VERIFIER_REFS[docType] ?? {};
+    for (const [fieldId, refs] of Object.entries(verifierRefs)) {
+        const fieldEnvelope = envelope[fieldId] as FieldEnvelope | undefined;
+        if (!fieldEnvelope || fieldEnvelope.absence_state !== "present") continue;
+
+        const fieldSpec = v2Config.fieldSpecs[fieldId];
+        if (!fieldSpec) continue;
+
+        for (const ref of refs) {
+            const verifier = VERIFIERS[ref];
+            if (!verifier) {
+                console.warn(`generateV2Envelope: unknown verifier ref "${ref}" for field "${fieldId}"`);
+                continue;
+            }
+
+            try {
+                const vResult = verifier({
+                    ocr_text: ocrText,
+                    field_spec: fieldSpec,
+                    field_envelope: fieldEnvelope,
+                });
+
+                if (!vResult.passes) {
+                    console.warn(
+                        `generateV2Envelope: verifier "${ref}" failed for field "${fieldId}": ${vResult.reason}`
+                    );
+                    // Downgrade the field per architecture §10.2
+                    fieldEnvelope.validation_status = ref === "monetary-verbatim"
+                        ? "failed_verifier"
+                        : "failed_format";
+                    fieldEnvelope.confidence = "low";
+                    // Override absence_state based on failure type
+                    if (ref === "monetary-verbatim") {
+                        fieldEnvelope.absence_state = "contradicted";
+                    } else {
+                        fieldEnvelope.absence_state = "ambiguous";
+                    }
+                    fieldEnvelope.verifier_failure = { ref, reason: vResult.reason };
+                }
+            } catch (verifierErr) {
+                throw new Error(
+                    `generateV2Envelope: verifier "${ref}" threw on field "${fieldId}": ${(verifierErr as Error).message}`
+                );
+            }
+        }
+    }
+
+    // Build lifecycle from fields (Phase 1: minimal)
+    const mietbeginn = envelope.mietbeginn?.normalized_value ?? null;
+    const mietende = envelope.mietende?.normalized_value ?? null;
+    const lifecycle = {
+        issue_date: mietbeginn,
+        effective_date: mietbeginn,
+        signed_date: null,
+        expiry_date: (mietende && envelope.mietende?.absence_state === "present") ? mietende : null,
+        document_status: "active",
+        supersedes_document_id: null,
+        amended_by_document_id: null,
+        lifecycle_evidence: null,
+    };
+
+    // Write to warehouse.document_extractions_v2
+    const { error: insertError } = await supabase
+        .schema("warehouse")
+        .from("document_extractions_v2")
+        .insert({
+            source_document_id: job.document_id,
+            doc_type: docType,
+            schema_version: v2Config.schemaVersion,
+            prompt_version: v2Config.schemaVersion,
+            model: "claude-sonnet-4-20250514",
+            extraction_run_id: extractionRunId,
+            fields: envelope,
+            lifecycle: lifecycle,
+            human_review_status: "not_reviewed",
+        });
+
+    if (insertError) {
+        throw new Error(`generateV2Envelope: insert to document_extractions_v2 failed: ${insertError.message}`);
+    }
+
+    // Flag property brain as stale
+    if (job.property_id) {
+        const { error: staleError } = await supabase
+            .schema("warehouse")
+            .from("property_intelligence")
+            .update({ is_stale: true })
+            .eq("property_id", job.property_id)
+            .eq("is_current", true);
+
+        if (staleError) {
+            console.error(`generateV2Envelope: staleness flag failed: ${staleError.message}`);
+            // Non-fatal: brain staleness is a convenience, not a correctness concern
+        }
+    }
+
+    console.log(
+        `generateV2Envelope complete: v2 envelope written for ${docType} ` +
+        `(extraction_run_id=${extractionRunId}, schema_version=${v2Config.schemaVersion})`
+    );
+}
+
 // ─── 8b. generateIntelligence (NON-FATAL) ────────────────────
 
 async function generateIntelligence(
@@ -1070,23 +1301,55 @@ serve(async (req: Request) => {
         // 4. Classify document type
         const classification = await classifyDocument(supabase, extractedText, doc, job);
 
-        // 5. Extract structured fields
+        // 5. Extract structured fields (skipped for v2 doc types)
         const fields = await extractFields(supabase, extractedText, classification, job);
+        const isV2 = hasV2Schema(classification.doc_type);
 
-        // 6. Categorize, name, retention
+        // 6. Categorize, name, retention (runs for both paths)
         await categorize(supabase, fields, classification, job.org_id, doc);
 
-        // 7. Store extraction
-        const extractionId = await storeExtraction(supabase, job, fields);
+        let finalStatus = "needs_review";
 
-        // 8. Match entities
-        const allMatches = await matchEntities(supabase, job, classification, fields, extractionId);
+        if (isV2) {
+            // ── v2 path: Sonnet envelope → document_extractions_v2 ──
+            // Step 7/8/9 legacy skipped. Step 8b-v2 replaces them.
+            // FATAL on failure — do NOT fall back to legacy extraction.
+            await generateV2Envelope(supabase, job, doc, classification);
 
-        // 9. Route by confidence
-        const finalStatus = await routeByConfidence(supabase, job, classification, fields, extractionId, allMatches);
+            // Route v2 documents to needs_review (triage UI dual-read is Task 1.6)
+            await supabase
+                .schema("warehouse")
+                .from("documents")
+                .update({ status: "needs_review", updated_at: new Date().toISOString() })
+                .eq("id", job.document_id);
 
-        // 9b. Generate intelligence (non-fatal)
-        await generateIntelligence(supabase, job, doc, classification, fields);
+            await supabase
+                .schema("warehouse")
+                .from("review_tasks")
+                .insert({
+                    document_id: job.document_id,
+                    org_id: job.org_id,
+                    reason: "v2 extraction — review envelope",
+                    reason_code: "v2_extraction",
+                    status: "open",
+                });
+
+            finalStatus = "needs_review";
+        } else {
+            // ── Legacy path: unchanged for non-v2 doc types ──
+
+            // 7. Store extraction
+            const extractionId = await storeExtraction(supabase, job, fields);
+
+            // 8. Match entities
+            const allMatches = await matchEntities(supabase, job, classification, fields, extractionId);
+
+            // 9. Route by confidence
+            finalStatus = await routeByConfidence(supabase, job, classification, fields, extractionId, allMatches);
+
+            // 9b. Generate intelligence (non-fatal)
+            await generateIntelligence(supabase, job, doc, classification, fields);
+        }
 
         // 10. Complete job
         await completeJob(supabase, job);
@@ -1097,9 +1360,7 @@ serve(async (req: Request) => {
                 job_id: job.id,
                 document_id: job.document_id,
                 doc_type: classification.doc_type,
-                confidence: allMatches.length > 0
-                    ? Math.min(...allMatches.map((m: { confidence_score?: number }) => m.confidence_score ?? 0))
-                    : (fields.confidence_score ?? 0),
+                path: isV2 ? "v2_envelope" : "legacy",
                 status: finalStatus,
             }),
             { status: 200, headers: { "Content-Type": "application/json" } }
