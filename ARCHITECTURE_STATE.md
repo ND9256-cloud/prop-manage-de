@@ -353,3 +353,19 @@ New table `warehouse.document_extractions_v2` — the v2 extraction envelope tha
 ## CI workflow path filters removed (2026-05-10)
 
 Removed `paths:` filters from `migration-drift.yml` and `tenant-isolation.yml`. Both workflows now run on every PR and every push to main. Reason: branch protection requires these checks to pass, but path filters meant they never reported status on PRs that didn't touch the filtered paths, leaving such PRs blocked indefinitely in "Expected — Waiting for status to be reported." Trade-off: ~30s additional CI compute per PR. Acceptable.
+
+## v2 Deterministic Verifiers (Task 1.3)
+
+`supabase/functions/process-document/verifiers/` directory created with three pure-function verifiers backing the verifier_refs declared in `schemas/mietvertrag/schema.yaml`:
+
+- `monetary-verbatim` — extracted monetary value must appear verbatim in OCR text (German thousands-separator, plain, US-style accepted)
+- `enum` — normalized_value must match field_spec.enum_values
+- `date-format` — ISO 8601 single-value calendar date (rejects comma-separated multi-value strings; round-trips against `new Date()` to catch invalid calendar dates like 2024-02-31)
+
+All verifiers are pure functions per architecture §10. No LLM calls, no model-specific code paths.
+
+Model-agnosticism enforced by `src/tests/verifiers-no-model-identifiers.test.ts` per architecture §9.3: scans all verifier source files for forbidden tokens (sonnet, haiku, opus, gpt, gemini, claude, llama, mistral). Fails CI if any match.
+
+15 unit-test assertions covering positive and negative cases per verifier including absence_state skip behavior.
+
+Status: verifiers live in code, not yet wired into the pipeline. Wiring happens in Task 1.5 (Step 8b refactor — runs verifiers on every extracted field, populates `validation_status` in the envelope).
