@@ -71,11 +71,15 @@ All models annotated with tenant-scoping (enforced by CI gate):
 
 ---
 
-## Pipeline (Supabase Edge Function, 10 active steps)
+## Pipeline (Supabase Edge Function, dual-path)
 
-1. claimJob  2. fetchDocument  3. extractText  4. classifyDocument
-5. extractFields  5b. categorize  6. storeExtraction  7. matchEntities
-8. routeByConfidence  8b. generateIntelligence (Sonnet, includes cost_class + umlagefaehig, flags property_intelligence stale)  9. completeJob
+Shared steps: 1. claimJob  2. fetchDocument  3. extractText  4. classifyDocument  5b. categorize  10. completeJob
+
+**Legacy path** (doc types without v2 schema — ~116 types):
+5. extractFields (Haiku)  6. storeExtraction  7. matchEntities  8. routeByConfidence  8b. generateIntelligence (Sonnet)
+
+**v2 path** (doc types in `V2_SCHEMA_DOC_TYPES` — currently: mietvertrag):
+5. extractFields → skipped  8b-v2. generateV2Envelope (Sonnet + schema prompt + verifiers → `document_extractions_v2`)
 
 Open taxonomy: 120 German doc types. DOC_TYPE_MAP maps to 4 display categories (Kosten, Versicherungen & Verträge, Behörden, Sonstiges).
 Self-operates via pg_cron every minute. Stuck job recovery every 5 minutes.
@@ -233,8 +237,7 @@ New table `warehouse.document_extractions_v2` — the v2 extraction envelope tha
 - **Tenant isolation:** `@tenant-scoped-via source_document_id` (FK chain: document_extractions_v2.source_document_id → documents.id → Property.id). RLS enabled with org isolation policy.
 - **Migration:** `supabase/migrations/20260510090000_v2_extraction_envelope.sql` + `20260510090001_v2_extraction_envelope_grants.sql`
 - **Integration test:** `src/tests/v2-extraction-envelope-migration.test.ts` (12 assertions: CHECK constraints, immutability triggers, human_review_status mutability, GoBD delete block, index queries)
-- **Status:** Schema live, no code yet writes envelopes (Phase 1 emitters do that).
-- **Note:** Legacy `warehouse.document_extractions` (Haiku Step 5) untouched; both paths coexist during transition window per architecture §11.
+- **Status:** Schema live, v2 pipeline path writes envelopes for mietvertrag doc_type (Task 1.5). Legacy `warehouse.document_extractions` (Haiku Step 5) untouched; both paths coexist during transition window per architecture §11.
 
 ---
 
@@ -368,4 +371,19 @@ Model-agnosticism enforced by `src/tests/verifiers-no-model-identifiers.test.ts`
 
 15 unit-test assertions covering positive and negative cases per verifier including absence_state skip behavior.
 
-Status: verifiers live in code, not yet wired into the pipeline. Wiring happens in Task 1.5 (Step 8b refactor — runs verifiers on every extracted field, populates `validation_status` in the envelope).
+Status: verifiers live in code, wired into the v2 pipeline path (Task 1.5). Verifiers run on every v2 envelope field with `absence_state == "present"` and matching `verifier_refs`. Failures downgrade `confidence` to `"low"`, set `validation_status` to `"failed_verifier"` or `"failed_format"`, and override `absence_state` to `"contradicted"` (semantic failure) or `"ambiguous"` (structural failure).
+
+## v2 Dual-Path Pipeline (Task 1.5)
+
+The `process-document` Edge Function now branches on a v2 schema registry:
+
+- **Registry:** `schemas/index.ts` exports `V2_SCHEMA_DOC_TYPES = new Set(["mietvertrag"])` and `hasV2Schema(docType)`. Hand-maintained — adding a doc type requires an explicit edit, not auto-discovered from directory structure.
+- **v2 path (doc types IN registry — currently only `mietvertrag`):**
+  - Step 5 (Haiku extractFields): **skipped** — no Haiku API call, no legacy extraction written.
+  - Step 8b-v2 (Sonnet generateV2Envelope): runs Sonnet with the schema's `prompt_fragment` template, parses JSON envelope, validates via `envelope_validator.ts`, runs deterministic verifiers per `verifier_refs`, writes to `warehouse.document_extractions_v2`. **FATAL on failure** — does not fall back to legacy extraction.
+  - Steps 7 (storeExtraction), 8 (matchEntities), 9 (routeByConfidence): skipped for v2. Document routed to `needs_review`.
+  - Step 8b legacy (generateIntelligence): **not called** for v2 docs — no `document_intelligence` row written.
+- **Legacy path (doc types NOT in registry — ~116 doc types):** pipeline runs exactly as before. Step 5 (Haiku) → legacy `document_extractions`. Step 8b (Sonnet) → `document_intelligence`. No v2 envelope written.
+- **Lifecycle (Phase 1):** minimal — `issue_date`/`effective_date` from `mietbeginn`, `expiry_date` from `mietende` if present, `document_status: "active"`. Fuller lifecycle analysis deferred to Phase 2.
+- **Triage UI:** not yet updated — Task 1.6 adds dual-read (v2 envelope first, legacy fallback).
+- **Edge Function deployment:** manual (`supabase functions deploy process-document`) — not auto-deployed by git push.
