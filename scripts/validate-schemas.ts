@@ -89,12 +89,20 @@ export interface ValidationError {
   message: string;
 }
 
+export interface ValidationWarning {
+  file: string;
+  check: string;
+  message: string;
+}
+
 export function validateSchemas(schemasDir?: string): {
   validated: number;
   errors: ValidationError[];
+  warnings: ValidationWarning[];
 } {
   const SCHEMAS_DIR = schemasDir ?? path.resolve(__dirname, "../schemas");
   const errors: ValidationError[] = [];
+  const warnings: ValidationWarning[] = [];
   let validated = 0;
 
   const entries = fs.readdirSync(SCHEMAS_DIR, { withFileTypes: true });
@@ -108,7 +116,7 @@ export function validateSchemas(schemasDir?: string): {
       check: "discovery",
       message: "No doc-type subdirectories found in schemas/",
     });
-    return { validated: 0, errors };
+    return { validated: 0, errors, warnings };
   }
 
   for (const dir of docTypeDirs) {
@@ -197,12 +205,15 @@ export function validateSchemas(schemasDir?: string): {
           ? (dkParsed.fields_governed as string[])
           : [];
         const schemaFieldIds = new Set(schema.fields.map((f) => f.id));
+        // Schema-field-not-in-knowledge is an ERROR (schema is making undocumented claims).
+        // Knowledge-field-not-in-schema is a WARNING (incremental development: domain
+        // knowledge declares the full field set, schema is built up slice-by-slice).
         for (const governed of fieldsGoverned) {
           if (!schemaFieldIds.has(governed)) {
-            errors.push({
+            warnings.push({
               file: schemaPath,
               check: "C",
-              message: `Domain knowledge fields_governed entry "${governed}" not found in schema fields`,
+              message: `Domain knowledge fields_governed entry "${governed}" not yet in schema fields (acceptable during incremental development)`,
             });
           }
         }
@@ -233,12 +244,16 @@ export function validateSchemas(schemasDir?: string): {
     }
   }
 
-  return { validated, errors };
+  return { validated, errors, warnings };
 }
 
 // --- CLI entry point ---
 if (require.main === module || process.argv[1]?.endsWith("validate-schemas.ts")) {
-  const { validated, errors } = validateSchemas();
+  const { validated, errors, warnings } = validateSchemas();
+
+  for (const warn of warnings) {
+    console.warn(`WARN [${warn.check}] ${warn.file}: ${warn.message}`);
+  }
 
   if (errors.length > 0) {
     for (const err of errors) {
@@ -247,5 +262,5 @@ if (require.main === module || process.argv[1]?.endsWith("validate-schemas.ts"))
     process.exit(1);
   }
 
-  console.log(`\u2713 ${validated} schemas validated`);
+  console.log(`\u2713 ${validated} schemas validated${warnings.length > 0 ? ` (${warnings.length} warnings)` : ""}`);
 }

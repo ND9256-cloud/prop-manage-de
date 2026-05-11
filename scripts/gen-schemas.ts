@@ -228,7 +228,10 @@ function main(): void {
   const singleDocType = docTypeArgIdx !== -1 ? args[docTypeArgIdx + 1] : undefined;
 
   // Step 1: Validate all schemas first
-  const { validated, errors } = validateSchemas(SCHEMAS_DIR);
+  const { validated, errors, warnings } = validateSchemas(SCHEMAS_DIR);
+  for (const warn of warnings) {
+    console.warn(`WARN [${warn.check}] ${warn.file}: ${warn.message}`);
+  }
   if (errors.length > 0) {
     for (const err of errors) {
       console.error(`FAIL [${err.check}] ${err.file}: ${err.message}`);
