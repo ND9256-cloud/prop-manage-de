@@ -1,16 +1,153 @@
 doc_type: mietvertrag
-schema_version: "2026-05-08-v1"
+schema_version: "2026-05-11-v1"
 claim_kind: assertion
 domain_knowledge_ref: domain_knowledge/mietvertrag.md
+
 prompt_fragment_template: |
-  TODO: populated in Task 1.1
+  ## Mietvertrag — extract the following fields
+
+  For each field, return:
+  - raw_value: verbatim text from the document
+  - normalized_value: typed canonical form (see per-field instructions)
+  - evidence: { quote: <verbatim quote>, page: <number>, bbox: null }
+  - confidence: high | medium | low
+  - absence_state: present | absent | illegible | ambiguous | contradicted | not_applicable | inferred | requires_human_review
+  - validation_status: valid (set this; verifiers run separately)
+
+  Evidence is MANDATORY when absence_state == present. Do not set a value without an evidence quote.
+
+  ### kaltmiete (Kaltmiete — base rent, monthly, EUR)
+
+  Extract ONLY the base rent excluding Nebenkosten. Accept synonyms: Grundmiete, Nettomiete, Nettokaltmiete.
+  REJECT (set absence_state: ambiguous) if the contract uses Bruttomiete, Inklusivmiete, or Warmmiete — these bundle operating costs and the Kaltmiete component is not separately stated.
+  normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 65000, currency: "EUR" } for €650.00.
+
+  ### unit_ref (Einheit — normalized floor/position identifier)
+
+  Extract from the filled-in unit specification, NOT from template boilerplate or headers.
+  Normalize to one of: EG, 1.OG, 2.OG, 3.OG, 4.OG, DG, Keller, Souterrain.
+  Common mappings: "Erdgeschoss" → EG; "1. Obergeschoss" → 1.OG; "Dachgeschoss" → DG.
+  If multiple units are listed (a single lease covering multiple units), extract the unit the lease primarily concerns; if genuinely ambiguous, set absence_state: ambiguous.
+
+  ### tenant_identity (Mieter — the tenant party)
+
+  Extract the tenant as written on the contract.
+  normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal_form: <optional string for entities> }.
+  Legal-entity indicators: GmbH, UG, AG, eG, GbR, KG, OHG appearing in the name. Set is_legal_entity: true and populate legal_form with the matching abbreviation.
+  For multiple co-tenants (Mietgemeinschaft), extract the first named tenant only.
+
+  ### mietbeginn (Mietbeginn — lease start date)
+
+  Extract the date the lease takes effect.
+  normalized_value: ISO 8601 (YYYY-MM-DD). Source is typically DD.MM.YYYY — normalize.
+  If the contract specifies "ab Übergabe" or similar without a concrete date, set absence_state: ambiguous.
+
+  ### mietende (Mietende — lease end date, optional)
+
+  Most German residential leases are open-ended (unbefristet). For those, set absence_state: not_applicable. NOT absence_state: absent — the difference is meaningful.
+  If the contract specifies a fixed end date (Befristung), extract it. Format: ISO 8601 (YYYY-MM-DD).
+
 fields:
-  - id: doc_type_marker
-    german_label: "Dokumenttyp-Marker (Stub)"
-    severity: nice_to_have
-    requiredness: optional
-    type: string
+  - id: kaltmiete
+    german_label: "Kaltmiete"
+    severity: critical
+    requiredness: required
+    type: money
+    verifier_refs:
+      - monetary-verbatim
+    normalization_rule_ref: kaltmiete_excludes_nebenkosten
     description: |
-      Placeholder field so the stub validates against the meta-schema's
-      "fields must contain at least one entry" rule. Replaced with real
-      fields in the per-doc-type tasks.
+      Die monatliche Grundmiete (base rent), excluding Nebenkosten/Betriebskosten.
+      Always a monthly amount in EUR. Synonyms: Grundmiete, Nettomiete,
+      Nettokaltmiete. Do NOT extract if the contract uses Bruttomiete or
+      Inklusivmiete terminology — those bundle Nebenkosten and the Kaltmiete
+      component cannot be cleanly separated; set absence_state: ambiguous.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: unit_ref
+    german_label: "Einheit"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "EG"
+      - "1.OG"
+      - "2.OG"
+      - "3.OG"
+      - "4.OG"
+      - "DG"
+      - "Keller"
+      - "Souterrain"
+    verifier_refs:
+      - enum
+    description: |
+      Normalized unit reference (Geschoss/floor identifier). Map common
+      variants: "Erdgeschoss" → "EG"; "1. Obergeschoss" → "1.OG";
+      "Dachgeschoss" → "DG". Extract from the filled-in unit field of the
+      lease, NOT from template boilerplate or page headers (Paul case:
+      template carried wrong address; only the filled-in fields are
+      authoritative). If multiple units appear and the contract is for
+      one specific unit, extract that one; if genuinely ambiguous, set
+      absence_state: ambiguous.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: tenant_identity
+    german_label: "Mieter"
+    severity: critical
+    requiredness: required
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: true
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      The tenant party to the lease. For natural persons, name is the full
+      name as written (first + last). For legal entities (GmbH, UG, AG, eG,
+      GbR), set is_legal_entity: true and populate legal_form (e.g., "GmbH").
+      The legal_form distinction is operationally important: a legal-entity
+      tenant signals a Gewerbemietvertrag risk (commercial lease misclassified
+      as residential — see gewerbe_misclassification gotcha in domain knowledge).
+      For Mietgemeinschaft (multiple tenants on one lease), extract the first
+      named tenant; multi-tenant handling is Phase 2.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: mietbeginn
+    german_label: "Mietbeginn"
+    severity: critical
+    requiredness: required
+    type: date
+    verifier_refs:
+      - date-format
+    description: |
+      The date the lease takes effect. Format must be ISO 8601 (YYYY-MM-DD).
+      Original document typically shows German format (DD.MM.YYYY); normalize.
+      This is rarely missing in a Mietvertrag — if it appears missing,
+      re-read the document carefully before setting absence_state: absent.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: mietende
+    german_label: "Mietende"
+    severity: important
+    requiredness: optional
+    type: date
+    verifier_refs:
+      - date-format
+    description: |
+      The date the lease ends, if fixed-term. Most German residential leases
+      are unbefristet (open-ended) — in that case, set absence_state:
+      not_applicable rather than omitting the field. The presence/absence
+      pattern matters: "the lease has no end date because it's open-ended"
+      is different information from "the document doesn't tell us." Format:
+      ISO 8601 (YYYY-MM-DD).
+    used_in_resolvers: false
+    customer_visible: true

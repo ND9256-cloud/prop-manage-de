@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-08-v1
+// Schema version: 2026-05-11-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -13,9 +13,29 @@ export class EnvelopeValidationError extends Error {
 const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["not_present","not_applicable","present_but_unreadable","present_but_unknown_value","present_but_low_confidence","contradicted","ambiguous","not_extracted_in_this_run"];
 
 const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: string[] | null }> = {
-  "doc_type_marker": {
-    type: "string",
-    severity: "nice_to_have",
+  "kaltmiete": {
+    type: "money",
+    severity: "critical",
+    enumValues: null,
+  },
+  "unit_ref": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["EG","1.OG","2.OG","3.OG","4.OG","DG","Keller","Souterrain"],
+  },
+  "tenant_identity": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "mietbeginn": {
+    type: "date",
+    severity: "critical",
+    enumValues: null,
+  },
+  "mietende": {
+    type: "date",
+    severity: "important",
     enumValues: null,
   }
 };
@@ -67,5 +87,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-08-v1";
+export const SCHEMA_VERSION = "2026-05-11-v1";
 export const DOC_TYPE = "mietvertrag";
