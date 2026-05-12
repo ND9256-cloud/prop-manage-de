@@ -30,15 +30,18 @@ interface SchemaFile {
 
 const SCHEMAS_DIR = path.resolve(__dirname, "../schemas");
 
+// Canonical absence_state values per architecture §3.2.
+// A field is never just "missing" or "present" — it is in one of these 8 states.
+// The prompt fragments instruct Sonnet to use these exact strings.
 const VALID_ABSENCE_STATES = [
-  "not_present",
-  "not_applicable",
-  "present_but_unreadable",
-  "present_but_unknown_value",
-  "present_but_low_confidence",
-  "contradicted",
+  "present",
+  "absent",
+  "illegible",
   "ambiguous",
-  "not_extracted_in_this_run",
+  "contradicted",
+  "not_applicable",
+  "inferred",
+  "requires_human_review",
 ] as const;
 
 // --- Header ---
