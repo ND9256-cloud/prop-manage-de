@@ -155,10 +155,11 @@ export function validateEnvelope(envelope: unknown): void {
       }
     }
 
-    // Check 4: severity must be present
-    if (v.severity === undefined || v.severity === null) {
-      throw new EnvelopeValidationError(fieldId, "severity", \`Field "\${fieldId}" must have a severity field\`);
-    }
+    // NOTE: severity is a schema-level property declared in schema.yaml per field,
+    // NOT an extraction-time property. Earlier versions of this validator required
+    // the extracted envelope to carry severity redundantly, but Sonnet has no way
+    // to know what the schema says — the value would just be copied. Severity is
+    // available to downstream consumers via FIELD_DEFS above (keyed by field id).
   }
 }
 
