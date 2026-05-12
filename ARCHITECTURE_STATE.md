@@ -387,3 +387,15 @@ The `process-document` Edge Function now branches on a v2 schema registry:
 - **Lifecycle (Phase 1):** minimal — `issue_date`/`effective_date` from `mietbeginn`, `expiry_date` from `mietende` if present, `document_status: "active"`. Fuller lifecycle analysis deferred to Phase 2.
 - **Triage UI:** not yet updated — Task 1.6 adds dual-read (v2 envelope first, legacy fallback).
 - **Edge Function deployment:** manual (`supabase functions deploy process-document`) — not auto-deployed by git push.
+
+### Task 1.5b — Validator Audit (PR pending)
+
+Comprehensive audit of `envelope_validator.ts` against architecture §3.1. Four bugs found; three fixed:
+
+- **Bug B (FIXED):** Evidence was required unconditionally. Now gated on `absence_state == "present"` per §3.1. This was the bug blocking Lena Everding's mietende (open-ended lease, `not_applicable`, no evidence).
+- **Bug C (FIXED):** Severity check was removed entirely by PR #21. Now restored: pipeline (`generateV2Envelope`) injects severity from `v2Config.fieldSpecs[fieldId].severity` before validation; validator confirms it matches the schema's FIELD_DEFS.
+- **Bug D (FIXED):** Enum check referenced `v.value` (doesn't exist in envelope) instead of `v.normalized_value`. Dead-code path fixed.
+- **Bug E (NEW):** Added checks for `confidence` (high|medium|low) and `validation_status` (valid|failed_format|failed_verifier|requires_human_review) enums.
+- **Bug A (NOT CHANGED):** Evidence stays as array (PR #22's choice). Architecture §3.1 table says object; implementation intentionally diverges to support multi-quote evidence.
+
+Test: `src/tests/envelope-validator.test.ts` — 32 assertions covering happy path, all 8 absence_state values, evidence gating, severity injection, enum invariants, and shape errors. Prevents future drift.
