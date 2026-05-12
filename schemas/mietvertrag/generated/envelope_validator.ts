@@ -10,7 +10,7 @@ export class EnvelopeValidationError extends Error {
   }
 }
 
-const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["not_present","not_applicable","present_but_unreadable","present_but_unknown_value","present_but_low_confidence","contradicted","ambiguous","not_extracted_in_this_run"];
+const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["present","absent","illegible","ambiguous","contradicted","not_applicable","inferred","requires_human_review"];
 
 const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: string[] | null }> = {
   "kaltmiete": {
