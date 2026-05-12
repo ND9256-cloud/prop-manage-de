@@ -59,9 +59,17 @@ export function validateEnvelope(envelope: unknown): void {
 
     const v = value as Record<string, unknown>;
 
-    // Check 1: evidence must exist and be a non-empty array
-    if (!Array.isArray(v.evidence) || v.evidence.length === 0) {
-      throw new EnvelopeValidationError(fieldId, "evidence", `Field "${fieldId}" must have a non-empty evidence array`);
+    // Check 1: evidence is required when absence_state === "present"
+    // (architecture §3.1: "Evidence is mandatory unless absence_state is one of the absence states")
+    if (v.absence_state === "present") {
+      if (!Array.isArray(v.evidence) || v.evidence.length === 0) {
+        throw new EnvelopeValidationError(fieldId, "evidence", `Field "${fieldId}" must have a non-empty evidence array when absence_state == "present"`);
+      }
+    } else if (v.evidence !== undefined && v.evidence !== null) {
+      // If evidence is provided for a non-present field, it must still be a valid array shape
+      if (!Array.isArray(v.evidence)) {
+        throw new EnvelopeValidationError(fieldId, "evidence", `Field "${fieldId}" evidence must be an array if provided`);
+      }
     }
 
     // Check 2: absence_state validity (if present)
@@ -71,20 +79,39 @@ export function validateEnvelope(envelope: unknown): void {
       }
     }
 
-    // Check 3: enum type validation
-    if ((def.type === "enum") && def.enumValues !== null) {
-      if (v.value !== undefined && v.value !== null && v.absence_state === undefined) {
-        if (typeof v.value !== "string" || !def.enumValues.includes(v.value)) {
-          throw new EnvelopeValidationError(fieldId, "enum_value", `Field "${fieldId}" value ${JSON.stringify(v.value)} is not in allowed enum_values: ${JSON.stringify(def.enumValues)}`);
-        }
+    // Check 3: enum type validation — applies only when absence_state == "present"
+    if ((def.type === "enum") && def.enumValues !== null && v.absence_state === "present") {
+      if (typeof v.normalized_value !== "string" || !def.enumValues.includes(v.normalized_value)) {
+        throw new EnvelopeValidationError(fieldId, "enum_value", `Field "${fieldId}" normalized_value ${JSON.stringify(v.normalized_value)} is not in allowed enum_values: ${JSON.stringify(def.enumValues)}`);
       }
     }
 
-    // NOTE: severity is a schema-level property declared in schema.yaml per field,
-    // NOT an extraction-time property. Earlier versions of this validator required
-    // the extracted envelope to carry severity redundantly, but Sonnet has no way
-    // to know what the schema says — the value would just be copied. Severity is
-    // available to downstream consumers via FIELD_DEFS above (keyed by field id).
+    // Check 4: severity must be present and match the schema (architecture §3.1:
+    // "copied into extraction for eval"). The pipeline is responsible for copying
+    // severity from FIELD_DEFS into each field of the envelope before calling
+    // validateEnvelope. The validator confirms it landed correctly.
+    if (typeof v.severity !== "string") {
+      throw new EnvelopeValidationError(fieldId, "severity", `Field "${fieldId}" must have a string severity (pipeline should inject from FIELD_DEFS)`);
+    }
+    if (v.severity !== def.severity) {
+      throw new EnvelopeValidationError(fieldId, "severity_mismatch", `Field "${fieldId}" severity "${v.severity}" does not match schema-declared severity "${def.severity}"`);
+    }
+
+    // Check 5: confidence must be one of the architecture-defined values
+    if (v.confidence !== undefined && v.confidence !== null) {
+      const validConfidence = ["high", "medium", "low"];
+      if (typeof v.confidence !== "string" || !validConfidence.includes(v.confidence)) {
+        throw new EnvelopeValidationError(fieldId, "confidence", `Field "${fieldId}" has invalid confidence: ${JSON.stringify(v.confidence)} (must be high | medium | low)`);
+      }
+    }
+
+    // Check 6: validation_status must be one of the architecture-defined values
+    if (v.validation_status !== undefined && v.validation_status !== null) {
+      const validStatus = ["valid", "failed_format", "failed_verifier", "requires_human_review"];
+      if (typeof v.validation_status !== "string" || !validStatus.includes(v.validation_status)) {
+        throw new EnvelopeValidationError(fieldId, "validation_status", `Field "${fieldId}" has invalid validation_status: ${JSON.stringify(v.validation_status)} (must be valid | failed_format | failed_verifier | requires_human_review)`);
+      }
+    }
   }
 }
 

@@ -92,11 +92,11 @@ const V2_PROMPTS: Record<string, V2Config> = {
         schemaVersion: MIETVERTRAG_SCHEMA_VERSION,
         validate: validateMietvertragEnvelope,
         fieldSpecs: {
-            kaltmiete: { id: "kaltmiete", type: "money" },
-            unit_ref: { id: "unit_ref", type: "enum", enum_values: ["EG", "1.OG", "2.OG", "3.OG", "4.OG", "DG", "Keller", "Souterrain"] },
-            tenant_identity: { id: "tenant_identity", type: "structured" },
-            mietbeginn: { id: "mietbeginn", type: "date" },
-            mietende: { id: "mietende", type: "date" },
+            kaltmiete: { id: "kaltmiete", type: "money", severity: "critical" },
+            unit_ref: { id: "unit_ref", type: "enum", enum_values: ["EG", "1.OG", "2.OG", "3.OG", "4.OG", "DG", "Keller", "Souterrain"], severity: "critical" },
+            tenant_identity: { id: "tenant_identity", type: "structured", severity: "critical" },
+            mietbeginn: { id: "mietbeginn", type: "date", severity: "critical" },
+            mietende: { id: "mietende", type: "date", severity: "important" },
         },
     },
 };
@@ -1006,6 +1006,18 @@ ${ocrText}`;
         envelope = JSON.parse(match[0]);
     } catch (parseErr) {
         throw new Error(`generateV2Envelope: JSON parse failed: ${(parseErr as Error).message}`);
+    }
+
+    // Inject schema-declared severity into each field of the envelope (architecture §3.1:
+    // "copied into extraction for eval"). Sonnet doesn't know what the schema says; the
+    // pipeline copies severity from FIELD_DEFS so the validator can confirm it's correct.
+    for (const [fieldId, fieldEnvelope] of Object.entries(envelope)) {
+        if (fieldEnvelope && typeof fieldEnvelope === "object") {
+            const fieldDef = v2Config.fieldSpecs[fieldId];
+            if (fieldDef && fieldDef.severity) {
+                (fieldEnvelope as Record<string, unknown>).severity = fieldDef.severity;
+            }
+        }
     }
 
     // Validate envelope shape
