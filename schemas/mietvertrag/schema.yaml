@@ -9,12 +9,12 @@ prompt_fragment_template: |
   For each field, return:
   - raw_value: verbatim text from the document
   - normalized_value: typed canonical form (see per-field instructions)
-  - evidence: { quote: <verbatim quote>, page: <number>, bbox: null }
+  - evidence: array of { quote: <verbatim quote>, page: <number>, bbox: null }. At least one entry required when absence_state == "present".
   - confidence: high | medium | low
   - absence_state: present | absent | illegible | ambiguous | contradicted | not_applicable | inferred | requires_human_review
   - validation_status: valid (set this; verifiers run separately)
 
-  Evidence is MANDATORY when absence_state == present. Do not set a value without an evidence quote.
+  Evidence is MANDATORY when absence_state == present. The evidence array must contain at least one entry. Do not set a value without supporting evidence quotes.
 
   ### kaltmiete (Kaltmiete — base rent, monthly, EUR)
 
