@@ -388,6 +388,18 @@ The `process-document` Edge Function now branches on a v2 schema registry:
 - **Triage UI:** not yet updated — Task 1.6 adds dual-read (v2 envelope first, legacy fallback).
 - **Edge Function deployment:** manual (`supabase functions deploy process-document`) — not auto-deployed by git push.
 
+### Task 1.6 — Triage Overlay Dual-Read
+
+Triage overlay now reads v2 envelopes from `warehouse.document_extractions_v2` with graceful fallback to legacy `document_extractions`.
+
+- **`getTriageDocument`** fetches latest v2 envelope (by `source_document_id`, `created_at DESC`). Returns `v2Envelope` and `v2EnabledDocTypes` in the data shape.
+- **Decision rule:** v2 present → v2 fields rendered (read-only, "v2" badge); v2 absent → legacy fields rendered (editable, "Legacy-Format" badge). Never both.
+- **`src/lib/extraction-display.ts`** — pure module (no React/Prisma/Supabase/Next imports) mapping v2 envelopes and legacy extracted_fields to uniform `DisplayRow[]`. Canonical location for field labels and formatting. Future v2 doc types extend the `V2_FIELDS` map here.
+- **`requeueDocumentExtraction(documentId)`** — new server action. Inserts a `processing_jobs` row with `status='queued'`; audit-logs `re_extraction_requested`. "Neu extrahieren" button visible for legacy docs whose `doc_type` is v2-enabled (currently: `mietvertrag`).
+- **v2 envelopes are read-only** in the overlay (append-only per architecture §3.1). Edit-in-overlay remains legacy-only. v2 edit flow deferred.
+- **Test:** `src/tests/triage-document-shape.test.ts` — 40 assertions covering Lena's exact v2 fields, absence_state rendering, legacy Rechnung/lease shapes, purity gate, and edge cases.
+- **Acceptance:** Lena Everding's Mietvertrag shows kaltmiete 650,00 EUR, Einheit 1.OG, Mieter Everding/Lena, Mietbeginn 01.04.2025, no Mietende row (not_applicable), "v2" badge.
+
 ### Task 1.5b — Validator Audit (PR pending)
 
 Comprehensive audit of `envelope_validator.ts` against architecture §3.1. Four bugs found; three fixed:

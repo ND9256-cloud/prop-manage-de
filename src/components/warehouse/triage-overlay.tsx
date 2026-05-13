@@ -24,8 +24,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { StatusBadge } from '@/components/warehouse/ui/status-badge';
 import { SourceIcon } from '@/components/warehouse/ui/source-icon';
 import { ConfidenceBar } from '@/components/warehouse/ui/confidence-bar';
-import { getTriageDocument, updateExtractionField, applyReviewTask, updateDocumentMetadata, quarantineDocument, logAuditEvent } from '@/lib/warehouse-actions';
-import { getCategoryHintLabel } from '@/lib/warehouse-categories';
+import { getTriageDocument, updateExtractionField, applyReviewTask, updateDocumentMetadata, quarantineDocument, logAuditEvent, requeueDocumentExtraction } from '@/lib/warehouse-actions';
+import { buildDisplayRows } from '@/lib/extraction-display';
 
 type TriageData = Awaited<ReturnType<typeof getTriageDocument>>;
 
@@ -116,6 +116,7 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const [quarantineNotes, setQuarantineNotes] = useState('');
     const [quarantining, setQuarantining] = useState(false);
     const [failedFields, setFailedFields] = useState<Set<string>>(new Set());
+    const [requeueState, setRequeueState] = useState<'idle' | 'pending' | 'error'>('idle');
     const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
@@ -162,6 +163,8 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
 
     const doc = data?.data?.document as Record<string, unknown> | undefined;
     const extraction = data?.data?.extraction;
+    const v2Envelope = data?.data?.v2Envelope ?? null;
+    const v2EnabledDocTypes = (data?.data?.v2EnabledDocTypes as string[]) ?? [];
     const signedUrl = data?.data?.signedUrl;
     const properties = data?.data?.properties ?? [];
     const confidence = data?.data?.confidence;
@@ -172,10 +175,10 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
     const category = (doc?.category as string) ?? '';
     const fields = (extraction?.extracted_fields as Record<string, unknown>) ?? {};
 
-    // Determine field layout from category (doc_type uses open German taxonomy)
-
-    // Helper: check if extraction field has a non-empty value
-    const hasValue = (v: unknown) => v != null && String(v).trim() !== '';
+    const isV2 = v2Envelope !== null;
+    const displayRows = isV2
+        ? buildDisplayRows({ kind: 'v2', envelope: v2Envelope.fields as Record<string, unknown>, docType: v2Envelope.doc_type as string })
+        : buildDisplayRows({ kind: 'legacy', extractedFields: fields, docType });
 
     // ─── Apply handler ─────────────────────────────────────────
     async function handleApply() {
@@ -403,66 +406,80 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                 {/* ── SECTION 2: Extracted fields ── */}
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                            Extrahierte Felder
-                                        </p>
-                                        {saveState === 'saving' && (
-                                            <span className="text-xs text-muted-foreground">Speichert...</span>
-                                        )}
-                                        {saveState === 'saved' && (
-                                            <span className="text-xs text-green-600">✓ Gespeichert</span>
-                                        )}
-                                        {saveState === 'error' && (
-                                            <span className="text-xs text-destructive">✗ Fehler</span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                                Extrahierte Felder
+                                            </p>
+                                            {isV2 ? (
+                                                <Badge variant="secondary" title={`Strukturierte Extraktion (Schema ${v2Envelope.schema_version})`}>
+                                                    v2
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline">Legacy-Format</Badge>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {!isV2 && v2EnabledDocTypes.includes(docType) && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-xs h-6"
+                                                    disabled={requeueState === 'pending'}
+                                                    onClick={async () => {
+                                                        const docId = doc?.id as string;
+                                                        if (!docId) return;
+                                                        setRequeueState('pending');
+                                                        try {
+                                                            const result = await requeueDocumentExtraction(docId);
+                                                            if (result.error) {
+                                                                setRequeueState('error');
+                                                            } else {
+                                                                setTimeout(() => setRequeueState('idle'), 30000);
+                                                            }
+                                                        } catch {
+                                                            setRequeueState('error');
+                                                        }
+                                                    }}
+                                                >
+                                                    {requeueState === 'pending' ? 'In Warteschlange...' : requeueState === 'error' ? 'Fehler — erneut versuchen' : 'Neu extrahieren'}
+                                                </Button>
+                                            )}
+                                            {saveState === 'saving' && (
+                                                <span className="text-xs text-muted-foreground">Speichert...</span>
+                                            )}
+                                            {saveState === 'saved' && (
+                                                <span className="text-xs text-green-600">✓ Gespeichert</span>
+                                            )}
+                                            {saveState === 'error' && (
+                                                <span className="text-xs text-destructive">✗ Fehler</span>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {(() => {
-                                        const FIELD_LABELS: Record<string, string> = {
-                                            vendor_name: 'Anbieter',
-                                            amount: 'Betrag',
-                                            invoice_date: 'Datum',
-                                            invoice_number: 'Rechnungsnr.',
-                                            description: 'Beschreibung',
-                                            currency: 'Währung',
-                                            tenant_first_name: 'Vorname Mieter',
-                                            tenant_last_name: 'Nachname Mieter',
-                                            tenant_email: 'E-Mail Mieter',
-                                            rent_cold: 'Kaltmiete',
-                                            rent_warm: 'Warmmiete',
-                                            deposit: 'Kaution',
-                                            lease_start: 'Mietbeginn',
-                                            lease_end: 'Mietende',
-                                            unit_ref: 'Einheit',
-                                            unit_hint: 'Einheit (Hinweis)',
-                                            address_hint: 'Adresshinweis',
-                                            key_dates: 'Wichtige Daten',
-                                            key_amounts: 'Wichtige Beträge',
-                                            summary: 'Zusammenfassung',
-                                            category_hint: 'Kategorie-Hinweis',
-                                            parties_mentioned: 'Beteiligte',
-                                            inspection_date: 'Besichtigungsdatum',
-                                            condition_summary: 'Zustandsbeschreibung',
-                                            damages: 'Schäden',
-                                            meter_readings: 'Zählerstände',
-                                        };
-                                        const labeledFields = Object.entries(fields)
-                                            .filter(([key, val]) => key in FIELD_LABELS && hasValue(val))
-                                            .map(([key, val]) => ({
-                                                label: FIELD_LABELS[key],
-                                                fieldName: key,
-                                                value: key === 'category_hint' ? getCategoryHintLabel(val as string) : val,
-                                            }));
-                                        return labeledFields.length > 0 ? (
-                                            <div className="space-y-2">
-                                                {labeledFields.map(f => (
-                                                    <EditableField key={f.fieldName} label={f.label} fieldName={f.fieldName} value={String(f.value)} isDirty={editedFields.has(f.fieldName)} onEdit={handleFieldEdit} readOnly={readOnly} />
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
-                                        );
-                                    })()}
+                                    {displayRows.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {displayRows.map(row => (
+                                                row.editable ? (
+                                                    <EditableField
+                                                        key={row.fieldId}
+                                                        label={row.label}
+                                                        fieldName={row.fieldId}
+                                                        value={String(row.rawValue ?? '')}
+                                                        isDirty={editedFields.has(row.fieldId)}
+                                                        onEdit={handleFieldEdit}
+                                                        readOnly={readOnly}
+                                                    />
+                                                ) : (
+                                                    <div key={row.fieldId} className="space-y-1">
+                                                        <p className="text-xs text-muted-foreground">{row.label}</p>
+                                                        <p className="text-sm text-foreground px-2 py-1">{row.display || '—'}</p>
+                                                    </div>
+                                                )
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground">Keine Felder verfügbar</p>
+                                    )}
                                 </div>
 
                                 <Separator />
@@ -550,15 +567,19 @@ export function TriageOverlay({ documentId, onClose, onApplied, readOnly }: Tria
                                             <div className="flex gap-2">
                                                 <span>🤖</span>
                                                 <span className="text-foreground">
-                                                    {extraction?.model ?? 'Claude Haiku'}
+                                                    {isV2 ? (v2Envelope.model ?? 'Claude Sonnet') : (extraction?.model ?? 'Claude Haiku')}
                                                 </span>
                                             </div>
                                             <div className="flex gap-2">
                                                 <span>📅</span>
                                                 <span className="text-muted-foreground" suppressHydrationWarning>
-                                                    {extraction?.created_at
-                                                        ? new Date(extraction.created_at).toLocaleString('de-DE')
-                                                        : '—'}
+                                                    {isV2
+                                                        ? (v2Envelope.created_at
+                                                            ? new Date(v2Envelope.created_at).toLocaleString('de-DE')
+                                                            : '—')
+                                                        : (extraction?.created_at
+                                                            ? new Date(extraction.created_at).toLocaleString('de-DE')
+                                                            : '—')}
                                                 </span>
                                             </div>
                                             <ConfidenceBar score={(confidence?.score ?? 0) * 100} />

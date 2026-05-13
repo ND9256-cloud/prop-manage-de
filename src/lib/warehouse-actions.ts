@@ -1577,13 +1577,21 @@ export async function getTriageDocument(documentId: string) {
         return { error: 'Document not found', data: null };
     }
 
-    // 2) Current extraction
+    // 2) Current extraction (legacy)
     const { data: extraction } = await db.from('document_extractions')
         .select('id, extracted_fields, confidence_score, flags, model, created_at')
         .eq('org_id', orgId)
         .eq('document_id', documentId)
         .eq('is_current', true)
         .single();
+
+    // 2b) Latest v2 envelope (if any) — preferred over legacy when present
+    const { data: v2Envelope } = await db.from('document_extractions_v2')
+        .select('id, doc_type, schema_version, prompt_version, model, extraction_run_id, fields, lifecycle, human_review_status, created_at')
+        .eq('source_document_id', documentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
     // 3) Signed URL (300s)
     let signedUrl: string | null = null;
@@ -1665,6 +1673,19 @@ export async function getTriageDocument(documentId: string) {
                 model: extraction.model as string,
                 created_at: extraction.created_at as string,
             } : null,
+            v2Envelope: v2Envelope ? {
+                id: v2Envelope.id as string,
+                doc_type: v2Envelope.doc_type as string,
+                schema_version: v2Envelope.schema_version as string,
+                prompt_version: v2Envelope.prompt_version as string,
+                model: v2Envelope.model as string,
+                extraction_run_id: v2Envelope.extraction_run_id as string,
+                fields: v2Envelope.fields as Record<string, unknown>,
+                lifecycle: v2Envelope.lifecycle as Record<string, unknown>,
+                human_review_status: v2Envelope.human_review_status as string,
+                created_at: v2Envelope.created_at as string,
+            } : null,
+            v2EnabledDocTypes: ['mietvertrag'], // TODO: import from schemas/index.ts when reachable
             signedUrl,
             properties,
             units,
@@ -1677,6 +1698,46 @@ export async function getTriageDocument(documentId: string) {
             },
         },
     };
+}
+
+// ─── Re-extraction (v2 re-queue) ─────────────────────────────
+
+export async function requeueDocumentExtraction(
+    documentId: string
+): Promise<{ jobId: string | null; error: string | null }> {
+    const orgId = await getOrgIdWritable();
+    if (!orgId) return { jobId: null, error: 'Not authenticated' };
+
+    const db = warehouseDb(orgId);
+
+    // Verify doc belongs to org
+    const { data: doc } = await db.from('documents')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('id', documentId)
+        .maybeSingle();
+
+    if (!doc) return { jobId: null, error: 'Not found' };
+
+    // Insert new processing job
+    const { data: job, error } = await db.from('processing_jobs')
+        .insert({
+            document_id: documentId,
+            org_id: orgId,
+            status: 'queued',
+            next_attempt_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+
+    if (error) return { jobId: null, error: error.message };
+
+    await logAuditEvent({
+        eventType: 're_extraction_requested',
+        documentId,
+    });
+
+    return { jobId: job.id as string, error: null };
 }
 
 export async function updateExtractionField(
