@@ -103,12 +103,30 @@ console.log("\n--- 1. Lena\u2019s v2 Mietvertrag envelope ---");
       validation_status: "valid",
       severity: "important",
     },
+    nebenkostenvorauszahlung: v2Field({
+      raw_value: "180,00 EUR",
+      normalized_value: { amount: 18000, currency: "EUR" },
+      evidence: [{ quote: "Nebenkostenvorauszahlung 180,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
+    kaution: v2Field({
+      raw_value: "1.950,00 EUR",
+      normalized_value: { amount: 195000, currency: "EUR" },
+      evidence: [{ quote: "Kaution 1.950,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
+    landlord_identity: v2Field({
+      raw_value: "Denn & Denn Verwaltungs GbR",
+      normalized_value: { name: "Denn & Denn Verwaltungs GbR", is_legal_entity: true, legal_form: "GbR" },
+      evidence: [{ quote: "Denn & Denn Verwaltungs GbR", page: 1, bbox: null }],
+      severity: "critical",
+    }),
   };
 
   const rows = buildDisplayRows({ kind: "v2", envelope, docType: "mietvertrag" });
 
-  // not_applicable → omitted, so expect 4 rows
-  expect("1a. Lena v2 returns 4 rows (mietende omitted)", rows.length === 4, `got ${rows.length}`);
+  // not_applicable → omitted, so expect 7 rows (kaltmiete, NK, kaution, unit_ref, tenant, landlord, mietbeginn)
+  expect("1a. Lena v2 returns 7 rows (mietende omitted)", rows.length === 7, `got ${rows.length}`);
 
   const ids = rows.map((r) => r.fieldId);
   expect("1b. Has kaltmiete row", ids.includes("kaltmiete"));
@@ -133,6 +151,20 @@ console.log("\n--- 1. Lena\u2019s v2 Mietvertrag envelope ---");
   const beginn = rows.find((r) => r.fieldId === "mietbeginn")!;
   expect("1n. Mietbeginn display = '01.04.2025'", beginn.display === "01.04.2025", `got '${beginn.display}'`);
   expect("1o. Mietbeginn label = 'Mietbeginn'", beginn.label === "Mietbeginn", `got '${beginn.label}'`);
+
+  const nk = rows.find((r) => r.fieldId === "nebenkostenvorauszahlung")!;
+  expect("1p. Has nebenkostenvorauszahlung row", ids.includes("nebenkostenvorauszahlung"));
+  expect("1q. nebenkostenvorauszahlung display = '180,00 EUR'", nk.display === "180,00 EUR", `got '${nk.display}'`);
+
+  const kaution = rows.find((r) => r.fieldId === "kaution")!;
+  expect("1r. Has kaution row", ids.includes("kaution"));
+  expect("1s. kaution display = '1.950,00 EUR'", kaution.display === "1.950,00 EUR", `got '${kaution.display}'`);
+
+  const landlord = rows.find((r) => r.fieldId === "landlord_identity")!;
+  expect("1t. Has landlord_identity row", ids.includes("landlord_identity"));
+  expect("1u. landlord_identity display = 'Denn & Denn Verwaltungs GbR'", landlord.display === "Denn & Denn Verwaltungs GbR", `got '${landlord.display}'`);
+
+  expect("1v. Total row count = 7", rows.length === 7, `got ${rows.length}`);
 }
 
 // --- 2. v2 envelope with mietende present ---
@@ -254,6 +286,111 @@ console.log("\n--- 7. Legacy empty fields ---");
 {
   const rows = buildDisplayRows({ kind: "legacy", extractedFields: {} });
   expect("7a. Empty legacy fields returns empty array", rows.length === 0, `got ${rows.length}`);
+}
+
+// --- 8. New fields edge cases ---
+console.log("\n--- 8. New fields edge cases ---");
+{
+  // 8a. nebenkostenvorauszahlung with absence_state=ambiguous (Warmmiete-only contract)
+  const envelope: Record<string, unknown> = {
+    kaltmiete: v2Field({ severity: "critical" }),
+    unit_ref: v2Field({ raw_value: "EG", normalized_value: "EG", severity: "critical" }),
+    tenant_identity: v2Field({
+      raw_value: "Test Mieter",
+      normalized_value: { name: "Test Mieter", is_legal_entity: false },
+      severity: "critical",
+    }),
+    landlord_identity: v2Field({
+      raw_value: "Test Vermieter",
+      normalized_value: { name: "Test Vermieter", is_legal_entity: false },
+      severity: "critical",
+    }),
+    mietbeginn: v2Field({ raw_value: "01.01.2020", normalized_value: "2020-01-01", severity: "critical" }),
+    mietende: { raw_value: null, normalized_value: null, absence_state: "not_applicable", confidence: "high", validation_status: "valid", severity: "important" },
+    nebenkostenvorauszahlung: {
+      raw_value: null,
+      normalized_value: null,
+      absence_state: "ambiguous",
+      confidence: "high",
+      validation_status: "valid",
+      severity: "important",
+    },
+    kaution: v2Field({
+      raw_value: "1.950,00 EUR",
+      normalized_value: { amount: 195000, currency: "EUR" },
+      evidence: [{ quote: "Kaution 1.950,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
+  };
+
+  const rows = buildDisplayRows({ kind: "v2", envelope, docType: "mietvertrag" });
+  const nk = rows.find((r) => r.fieldId === "nebenkostenvorauszahlung")!;
+  expect(
+    "8a. NK ambiguous renders placeholder",
+    nk.display === "\u2014 (mehrdeutig)",
+    `got '${nk.display}'`
+  );
+}
+{
+  // 8b. kaution with absence_state=not_applicable (kautionsfrei) → row omitted
+  const envelope: Record<string, unknown> = {
+    kaltmiete: v2Field({ severity: "critical" }),
+    unit_ref: v2Field({ raw_value: "EG", normalized_value: "EG", severity: "critical" }),
+    tenant_identity: v2Field({
+      raw_value: "Test Mieter",
+      normalized_value: { name: "Test Mieter", is_legal_entity: false },
+      severity: "critical",
+    }),
+    landlord_identity: v2Field({
+      raw_value: "Test Vermieter",
+      normalized_value: { name: "Test Vermieter", is_legal_entity: false },
+      severity: "critical",
+    }),
+    mietbeginn: v2Field({ raw_value: "01.01.2020", normalized_value: "2020-01-01", severity: "critical" }),
+    mietende: { raw_value: null, normalized_value: null, absence_state: "not_applicable", confidence: "high", validation_status: "valid", severity: "important" },
+    nebenkostenvorauszahlung: v2Field({
+      raw_value: "180,00 EUR",
+      normalized_value: { amount: 18000, currency: "EUR" },
+      evidence: [{ quote: "NK 180,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
+    kaution: {
+      raw_value: null,
+      normalized_value: null,
+      absence_state: "not_applicable",
+      confidence: "high",
+      validation_status: "valid",
+      severity: "important",
+    },
+  };
+
+  const rows = buildDisplayRows({ kind: "v2", envelope, docType: "mietvertrag" });
+  const ids = rows.map((r) => r.fieldId);
+  expect("8b. kaution not_applicable → row omitted", !ids.includes("kaution"));
+}
+{
+  // 8c. landlord_identity natural-person case
+  const envelope: Record<string, unknown> = {
+    kaltmiete: v2Field({ severity: "critical" }),
+    unit_ref: v2Field({ raw_value: "EG", normalized_value: "EG", severity: "critical" }),
+    tenant_identity: v2Field({
+      raw_value: "Paul Julija",
+      normalized_value: { name: "Paul, Julija", is_legal_entity: false },
+      severity: "critical",
+    }),
+    landlord_identity: v2Field({
+      raw_value: "Petra Denn",
+      normalized_value: { name: "Petra Denn", is_legal_entity: false },
+      evidence: [{ quote: "Petra Denn", page: 1, bbox: null }],
+      severity: "critical",
+    }),
+    mietbeginn: v2Field({ raw_value: "01.01.2018", normalized_value: "2018-01-01", severity: "critical" }),
+    mietende: { raw_value: null, normalized_value: null, absence_state: "not_applicable", confidence: "high", validation_status: "valid", severity: "important" },
+  };
+
+  const rows = buildDisplayRows({ kind: "v2", envelope, docType: "mietvertrag" });
+  const landlord = rows.find((r) => r.fieldId === "landlord_identity")!;
+  expect("8c. landlord natural person display = 'Petra Denn'", landlord.display === "Petra Denn", `got '${landlord.display}'`);
 }
 
 // ===================== SUMMARY =====================

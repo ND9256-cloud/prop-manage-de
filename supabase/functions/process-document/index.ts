@@ -95,8 +95,11 @@ const V2_PROMPTS: Record<string, V2Config> = {
             kaltmiete: { id: "kaltmiete", type: "money", severity: "critical" },
             unit_ref: { id: "unit_ref", type: "enum", enum_values: ["EG", "1.OG", "2.OG", "3.OG", "4.OG", "DG", "Keller", "Souterrain"], severity: "critical" },
             tenant_identity: { id: "tenant_identity", type: "structured", severity: "critical" },
+            landlord_identity: { id: "landlord_identity", type: "structured", severity: "critical" },
             mietbeginn: { id: "mietbeginn", type: "date", severity: "critical" },
             mietende: { id: "mietende", type: "date", severity: "important" },
+            nebenkostenvorauszahlung: { id: "nebenkostenvorauszahlung", type: "money", severity: "important" },
+            kaution: { id: "kaution", type: "money", severity: "important" },
         },
     },
 };
@@ -108,6 +111,8 @@ const V2_VERIFIER_REFS: Record<string, Record<string, string[]>> = {
         unit_ref: ["enum"],
         mietbeginn: ["date-format"],
         mietende: ["date-format"],
+        nebenkostenvorauszahlung: ["monetary-verbatim"],
+        kaution: ["monetary-verbatim"],
     },
 };
 

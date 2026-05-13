@@ -1,5 +1,5 @@
 doc_type: mietvertrag
-schema_version: "2026-05-11-v1"
+schema_version: "2026-05-13-v1"
 claim_kind: assertion
 domain_knowledge_ref: domain_knowledge/mietvertrag.md
 
@@ -35,6 +35,26 @@ prompt_fragment_template: |
   normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal_form: <optional string for entities> }.
   Legal-entity indicators: GmbH, UG, AG, eG, GbR, KG, OHG appearing in the name. Set is_legal_entity: true and populate legal_form with the matching abbreviation.
   For multiple co-tenants (Mietgemeinschaft), extract the first named tenant only.
+
+  ### landlord_identity (Vermieter — the landlord party)
+
+  Extract the landlord as written on the contract. Structurally identical to tenant_identity.
+  normalized_value: { name: <full name or entity name>, is_legal_entity: <bool>, legal_form: <optional string for entities> }.
+  Legal-entity indicators: GmbH, UG, AG, eG, GbR, KG, OHG, e.V., GmbH & Co. KG. Set is_legal_entity: true and populate legal_form.
+  For multiple landlords / joint ownership, extract the named entity (e.g., "Denn & Denn Verwaltungs GbR") OR the first listed natural person if no entity is named.
+
+  ### nebenkostenvorauszahlung (Nebenkostenvorauszahlung — monthly advance for Nebenkosten, EUR, optional)
+
+  Extract the monthly advance payment for Nebenkosten/Betriebskosten, separately stated from Kaltmiete. Synonyms: NK-Vorauszahlung, Betriebskostenvorauszahlung, Vorauszahlung Nebenkosten.
+  If the contract uses Inklusivmiete or only states Warmmiete without breaking out NK, set absence_state: ambiguous.
+  If the contract genuinely doesn't include NK, set absence_state: not_applicable.
+  normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 18000, currency: "EUR" } for €180.00.
+
+  ### kaution (Kaution — security deposit, EUR, optional)
+
+  Extract the TOTAL Kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
+  If the contract is kautionsfrei, set absence_state: not_applicable.
+  normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 195000, currency: "EUR" } for €1,950.00.
 
   ### mietbeginn (Mietbeginn — lease start date)
 
@@ -150,4 +170,90 @@ fields:
       is different information from "the document doesn't tell us." Format:
       ISO 8601 (YYYY-MM-DD).
     used_in_resolvers: false
+    customer_visible: true
+
+  - id: nebenkostenvorauszahlung
+    german_label: "Nebenkostenvorauszahlung"
+    severity: important
+    requiredness: optional
+    type: money
+    verifier_refs:
+      - monetary-verbatim
+    description: |
+      Monthly advance payment for Nebenkosten/Betriebskosten, separate
+      from Kaltmiete. Synonyms: "Nebenkostenvorauszahlung", "NK-Vorauszahlung",
+      "Betriebskostenvorauszahlung", "Vorauszahlung Nebenkosten". May appear
+      as a separate line item alongside Kaltmiete or as a sum within a Warmmiete
+      breakdown.
+
+      If the contract uses Inklusivmiete or only states Warmmiete without
+      breaking out NK, set absence_state: ambiguous. If the contract genuinely
+      doesn't include NK (some commercial or short-term leases), set
+      absence_state: not_applicable.
+
+      normalized_value: integer in minor units (cents) + currency code,
+      e.g. { amount: 18000, currency: "EUR" } for €180.00.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: kaution
+    german_label: "Kaution"
+    severity: important
+    requiredness: optional
+    type: money
+    verifier_refs:
+      - monetary-verbatim
+    description: |
+      Security deposit (Mietkaution). German residential leases cap kaution
+      at 3x the monthly Kaltmiete per BGB §551 (Mietkautionsobergrenze).
+      The deposit may be paid in up to 3 monthly installments by the tenant.
+
+      Extract the TOTAL kaution amount, not an installment. If the contract
+      says "Kaution: 3 Monatsmieten" without a specific euro figure, set
+      absence_state: ambiguous (the resolver will compute 3 × kaltmiete
+      separately — extraction's job is to capture explicit values only).
+
+      If the contract is kautionsfrei (no deposit required), set
+      absence_state: not_applicable.
+
+      normalized_value: integer in minor units (cents) + currency code,
+      e.g. { amount: 195000, currency: "EUR" } for €1,950.00 (3x €650 Kaltmiete).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: landlord_identity
+    german_label: "Vermieter"
+    severity: critical
+    requiredness: required
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: true
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      The landlord party to the lease. Structurally identical to tenant_identity.
+      For natural persons (e.g., "Petra Denn"), name is the full name as
+      written. For legal entities (e.g., "Denn & Denn Verwaltungs GbR"),
+      set is_legal_entity: true and populate legal_form (e.g., "GbR").
+
+      German indicators that signal legal_entity: GmbH, UG, AG, eG, GbR,
+      KG, OHG, e.V., GmbH & Co. KG.
+
+      For Eigentümerwechsel scenarios (property ownership transfer), the
+      landlord_identity in the original Mietvertrag may NOT match the
+      current Vermieter — that's expected. The current Vermieter is
+      determined by the most recent ownership document (Eigentümerwechsel
+      Übergabeprotokoll or Kaufvertrag), not by re-extracting the Mietvertrag.
+      Extraction's job is to capture what's written in THIS document.
+
+      For multiple landlords (joint ownership like a GbR with multiple
+      partners), extract the named entity (e.g., "Denn & Denn Verwaltungs GbR")
+      OR the first listed natural person if no entity is named.
+    used_in_resolvers: true
     customer_visible: true

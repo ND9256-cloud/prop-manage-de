@@ -56,11 +56,22 @@ function formatTenantIdentity(nv: unknown): string {
   return String(nv);
 }
 
+function formatLandlord(nv: unknown): string {
+  if (nv == null) return "";
+  if (typeof nv === "object" && nv !== null && "name" in nv) {
+    return (nv as { name: string }).name;
+  }
+  return String(nv);
+}
+
 const V2_FIELDS: Record<string, V2FieldDef[]> = {
   mietvertrag: [
     { fieldId: "kaltmiete", label: "Kaltmiete", format: formatMoney },
+    { fieldId: "nebenkostenvorauszahlung", label: "Nebenkostenvorauszahlung", format: formatMoney },
+    { fieldId: "kaution", label: "Kaution", format: formatMoney },
     { fieldId: "unit_ref", label: "Einheit", format: formatString },
     { fieldId: "tenant_identity", label: "Mieter", format: formatTenantIdentity },
+    { fieldId: "landlord_identity", label: "Vermieter", format: formatLandlord },
     { fieldId: "mietbeginn", label: "Mietbeginn", format: formatDate },
     { fieldId: "mietende", label: "Mietende", format: formatDate },
   ],

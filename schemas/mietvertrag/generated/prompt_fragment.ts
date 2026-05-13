@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-11-v1
+// Schema version: 2026-05-13-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export const PROMPT_FRAGMENT = `## Mietvertrag — extract the following fields
@@ -35,6 +35,26 @@ normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal
 Legal-entity indicators: GmbH, UG, AG, eG, GbR, KG, OHG appearing in the name. Set is_legal_entity: true and populate legal_form with the matching abbreviation.
 For multiple co-tenants (Mietgemeinschaft), extract the first named tenant only.
 
+### landlord_identity (Vermieter — the landlord party)
+
+Extract the landlord as written on the contract. Structurally identical to tenant_identity.
+normalized_value: { name: <full name or entity name>, is_legal_entity: <bool>, legal_form: <optional string for entities> }.
+Legal-entity indicators: GmbH, UG, AG, eG, GbR, KG, OHG, e.V., GmbH & Co. KG. Set is_legal_entity: true and populate legal_form.
+For multiple landlords / joint ownership, extract the named entity (e.g., "Denn & Denn Verwaltungs GbR") OR the first listed natural person if no entity is named.
+
+### nebenkostenvorauszahlung (Nebenkostenvorauszahlung — monthly advance for Nebenkosten, EUR, optional)
+
+Extract the monthly advance payment for Nebenkosten/Betriebskosten, separately stated from Kaltmiete. Synonyms: NK-Vorauszahlung, Betriebskostenvorauszahlung, Vorauszahlung Nebenkosten.
+If the contract uses Inklusivmiete or only states Warmmiete without breaking out NK, set absence_state: ambiguous.
+If the contract genuinely doesn't include NK, set absence_state: not_applicable.
+normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 18000, currency: "EUR" } for €180.00.
+
+### kaution (Kaution — security deposit, EUR, optional)
+
+Extract the TOTAL Kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
+If the contract is kautionsfrei, set absence_state: not_applicable.
+normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 195000, currency: "EUR" } for €1,950.00.
+
 ### mietbeginn (Mietbeginn — lease start date)
 
 Extract the date the lease takes effect.
@@ -46,5 +66,5 @@ If the contract specifies "ab Übergabe" or similar without a concrete date, set
 Most German residential leases are open-ended (unbefristet). For those, set absence_state: not_applicable. NOT absence_state: absent — the difference is meaningful.
 If the contract specifies a fixed end date (Befristung), extract it. Format: ISO 8601 (YYYY-MM-DD).`;
 
-export const SCHEMA_VERSION = "2026-05-11-v1";
+export const SCHEMA_VERSION = "2026-05-13-v1";
 export const DOC_TYPE = "mietvertrag";

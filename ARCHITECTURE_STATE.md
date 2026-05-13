@@ -410,4 +410,21 @@ Comprehensive audit of `envelope_validator.ts` against architecture §3.1. Four 
 - **Bug E (NEW):** Added checks for `confidence` (high|medium|low) and `validation_status` (valid|failed_format|failed_verifier|requires_human_review) enums.
 - **Bug A (NOT CHANGED):** Evidence stays as array (PR #22's choice). Architecture §3.1 table says object; implementation intentionally diverges to support multi-quote evidence.
 
-Test: `src/tests/envelope-validator.test.ts` — 32 assertions covering happy path, all 8 absence_state values, evidence gating, severity injection, enum invariants, and shape errors. Prevents future drift.
+Test: `src/tests/envelope-validator.test.ts` — 36 assertions covering happy path, all 8 absence_state values, evidence gating, severity injection (including new fields), enum invariants, and shape errors. Prevents future drift.
+
+### Task 1.5c — Mietvertrag Schema Expansion (3 fields)
+
+Schema bumped from `2026-05-11-v1` to `2026-05-13-v1`. Three fields added to `schemas/mietvertrag/schema.yaml`:
+
+- **nebenkostenvorauszahlung** (money, important) — monthly NK advance. Sets ambiguous for Warmmiete/Inklusivmiete contracts; not_applicable for kein-NK leases.
+- **kaution** (money, important) — security deposit. Sets ambiguous for "3 Monatsmieten" without euro figure; not_applicable for kautionsfrei contracts. BGB §551 cap is the resolver's job.
+- **landlord_identity** (structured, critical) — Vermieter party, mirrors tenant_identity shape. For Eigentümerwechsel scenarios, captures the ORIGINAL Vermieter from the contract.
+
+These three fields were already declared in `domain_knowledge/mietvertrag.md` `fields_governed` but had been deferred during Phase 1 minimal-schema rollout. All 8 mietvertrag fields_governed entries are now covered by the schema.
+
+Existing v2 envelopes (Lena, Paul) remain on `2026-05-11-v1` — no migration risk. New extractions land on `2026-05-13-v1`. After merge: Nils manually redeploys Edge Function and re-queues Lena's + Paul's jobs to get them onto the new schema.
+
+- Renderer: `V2_FIELDS.mietvertrag` in `extraction-display.ts` has 8 entries (money cluster → unit → parties → dates).
+- Pipeline: `V2_PROMPTS.mietvertrag.fieldSpecs` has 8 entries with correct severities.
+- Tests: envelope-validator 36 assertions, triage-document-shape 50 assertions.
+- gen:schemas:check warnings reduced from 12 to 9 (3 mietvertrag "not yet in schema" warnings gone).
