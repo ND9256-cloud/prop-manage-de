@@ -79,7 +79,7 @@ function absentField(absenceState: string, severity: string, overrides: Record<s
   };
 }
 
-// Full happy-path envelope: all 5 mietvertrag fields present
+// Full happy-path envelope: all 8 mietvertrag fields present
 function fullEnvelope(): Record<string, Record<string, unknown>> {
   return {
     kaltmiete: presentField({ severity: "critical" }),
@@ -95,6 +95,12 @@ function fullEnvelope(): Record<string, Record<string, unknown>> {
       evidence: [{ quote: "Lena Everding", page: 1, bbox: null }],
       severity: "critical",
     }),
+    landlord_identity: presentField({
+      raw_value: "Denn & Denn Verwaltungs GbR",
+      normalized_value: { name: "Denn & Denn Verwaltungs GbR", is_legal_entity: true, legal_form: "GbR" },
+      evidence: [{ quote: "Denn & Denn Verwaltungs GbR", page: 1, bbox: null }],
+      severity: "critical",
+    }),
     mietbeginn: presentField({
       raw_value: "01.07.2020",
       normalized_value: "2020-07-01",
@@ -102,6 +108,18 @@ function fullEnvelope(): Record<string, Record<string, unknown>> {
       severity: "critical",
     }),
     mietende: absentField("not_applicable", "important"),
+    nebenkostenvorauszahlung: presentField({
+      raw_value: "180,00 EUR",
+      normalized_value: { amount: 18000, currency: "EUR" },
+      evidence: [{ quote: "Nebenkostenvorauszahlung 180,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
+    kaution: presentField({
+      raw_value: "1.950,00 EUR",
+      normalized_value: { amount: 195000, currency: "EUR" },
+      evidence: [{ quote: "Kaution 1.950,00 EUR", page: 2, bbox: null }],
+      severity: "important",
+    }),
   };
 }
 
@@ -258,6 +276,43 @@ console.log("\n--- Enum validation (Bug D: normalized_value, not value) ---");
   const env = fullEnvelope();
   env.unit_ref = absentField("ambiguous", "critical");
   shouldPass("10c. enum field with absence_state=ambiguous skips enum check", env);
+}
+
+// --- 11. All 8 fields present (rich Lena envelope) ---
+console.log("\n--- All 8 fields present ---");
+shouldPass("11. Full 8-field envelope with NK, Kaution, landlord passes", fullEnvelope());
+
+// --- 12. Severity mismatch on new fields ---
+console.log("\n--- Severity mismatch on new fields ---");
+{
+  const env = fullEnvelope();
+  env.kaution = presentField({
+    raw_value: "1.950,00 EUR",
+    normalized_value: { amount: 195000, currency: "EUR" },
+    evidence: [{ quote: "Kaution 1.950,00 EUR", page: 2, bbox: null }],
+    severity: "critical", // schema says "important"
+  });
+  shouldThrow("12a. kaution with severity=critical (schema says important) → mismatch", env, "severity_mismatch");
+}
+{
+  const env = fullEnvelope();
+  env.nebenkostenvorauszahlung = presentField({
+    raw_value: "180,00 EUR",
+    normalized_value: { amount: 18000, currency: "EUR" },
+    evidence: [{ quote: "NK 180,00 EUR", page: 2, bbox: null }],
+    severity: "critical", // schema says "important"
+  });
+  shouldThrow("12b. nebenkostenvorauszahlung with severity=critical → mismatch", env, "severity_mismatch");
+}
+{
+  const env = fullEnvelope();
+  env.landlord_identity = presentField({
+    raw_value: "Petra Denn",
+    normalized_value: { name: "Petra Denn", is_legal_entity: false },
+    evidence: [{ quote: "Petra Denn", page: 1, bbox: null }],
+    severity: "important", // schema says "critical"
+  });
+  shouldThrow("12c. landlord_identity with severity=important (schema says critical) → mismatch", env, "severity_mismatch");
 }
 
 // ===================== SUMMARY =====================

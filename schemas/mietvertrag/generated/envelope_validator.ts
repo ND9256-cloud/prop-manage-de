@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-11-v1
+// Schema version: 2026-05-13-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -36,6 +36,21 @@ const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: s
   "mietende": {
     type: "date",
     severity: "important",
+    enumValues: null,
+  },
+  "nebenkostenvorauszahlung": {
+    type: "money",
+    severity: "important",
+    enumValues: null,
+  },
+  "kaution": {
+    type: "money",
+    severity: "important",
+    enumValues: null,
+  },
+  "landlord_identity": {
+    type: "structured",
+    severity: "critical",
     enumValues: null,
   }
 };
@@ -115,5 +130,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-11-v1";
+export const SCHEMA_VERSION = "2026-05-13-v1";
 export const DOC_TYPE = "mietvertrag";

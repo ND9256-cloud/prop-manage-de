@@ -1,11 +1,14 @@
 {
-  "schema_version": "2026-05-11-v1",
+  "schema_version": "2026-05-13-v1",
   "doc_type": "mietvertrag",
   "labels": {
     "kaltmiete": "Kaltmiete",
     "unit_ref": "Einheit",
     "tenant_identity": "Mieter",
     "mietbeginn": "Mietbeginn",
-    "mietende": "Mietende"
+    "mietende": "Mietende",
+    "nebenkostenvorauszahlung": "Nebenkostenvorauszahlung",
+    "kaution": "Kaution",
+    "landlord_identity": "Vermieter"
   }
 }
