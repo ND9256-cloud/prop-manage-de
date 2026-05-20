@@ -6,6 +6,7 @@ import { PROMPT_FRAGMENT as MIETVERTRAG_PROMPT, SCHEMA_VERSION as MIETVERTRAG_SC
 import { validateEnvelope as validateMietvertragEnvelope } from "../../../schemas/mietvertrag/generated/envelope_validator.ts";
 import { VERIFIERS } from "./verifiers/index.ts";
 import type { FieldSpec, FieldEnvelope } from "./verifiers/index.ts";
+import { classifyOcrResponse } from "./ocr-result.ts";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -231,7 +232,7 @@ async function extractText(
                 },
                 body: JSON.stringify({
                     model: "claude-haiku-4-5-20251001",
-                    max_tokens: 4000,
+                    max_tokens: 64000,  // Haiku 4.5 supports up to 64K output tokens
                     messages: [{
                         role: "user",
                         content: [
@@ -257,9 +258,17 @@ async function extractText(
             }
 
             const pdfResult = await pdfResponse.json();
-            extractedText = pdfResult.content?.[0]?.text || "";
-            ocrConfidence = 90;
-            console.log(`extractText: PDF text extracted via Claude (${extractedText.length} chars)`);
+            const classified = classifyOcrResponse(pdfResult, 90);
+            extractedText = classified.text;
+            ocrConfidence = classified.confidence;
+            if (classified.truncated) {
+                console.warn(
+                    `extractText: PDF OCR hit max_tokens for doc ${doc.id}; ` +
+                    `${extractedText.length} chars extracted (TRUNCATED). ocr_confidence set to 60.`
+                );
+            } else {
+                console.log(`extractText: PDF text extracted via Claude (${extractedText.length} chars)`);
+            }
 
         } else if (doc.mime_type.startsWith("image/")) {
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
@@ -274,7 +283,7 @@ async function extractText(
                 },
                 body: JSON.stringify({
                     model: "claude-haiku-4-5-20251001",
-                    max_tokens: 2000,
+                    max_tokens: 8000,  // Defensive headroom for dense scans
                     messages: [{
                         role: "user",
                         content: [
@@ -300,9 +309,17 @@ async function extractText(
             }
 
             const visionResult = await visionResponse.json();
-            extractedText = visionResult.content?.[0]?.text || "";
-            ocrConfidence = 85;
-            console.log(`extractText: image OCR extracted (${extractedText.length} chars)`);
+            const classified = classifyOcrResponse(visionResult, 85);
+            extractedText = classified.text;
+            ocrConfidence = classified.confidence;
+            if (classified.truncated) {
+                console.warn(
+                    `extractText: image OCR hit max_tokens for doc ${doc.id}; ` +
+                    `${extractedText.length} chars extracted (TRUNCATED). ocr_confidence set to 60.`
+                );
+            } else {
+                console.log(`extractText: image OCR extracted (${extractedText.length} chars)`);
+            }
 
         } else {
             extractedText = "";

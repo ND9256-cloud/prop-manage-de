@@ -428,3 +428,15 @@ Existing v2 envelopes (Lena, Paul) remain on `2026-05-11-v1` — no migration ri
 - Pipeline: `V2_PROMPTS.mietvertrag.fieldSpecs` has 8 entries with correct severities.
 - Tests: envelope-validator 36 assertions, triage-document-shape 50 assertions.
 - gen:schemas:check warnings reduced from 12 to 9 (3 mietvertrag "not yet in schema" warnings gone).
+
+### Task 1.5d — OCR Truncation Fix (extractText max_tokens + stop_reason guard)
+
+`extractText` was capped at `max_tokens: 4000` (~16k chars output) while Claude Haiku 4.5 supports up to 64,000 output tokens. Multi-page documents were silently truncated mid-document. Sonnet then operated on truncated text, marking fields in the missing portion as `absent` with high confidence and no warning.
+
+Fix:
+- **PDF path:** `max_tokens` raised 4000 → 64000 (Haiku 4.5 model max)
+- **Image path:** `max_tokens` raised 2000 → 8000 (defensive headroom for dense scans)
+- **New pure helper** `classifyOcrResponse` in `supabase/functions/process-document/ocr-result.ts`: inspects `stop_reason` on the Anthropic response. If `stop_reason === "max_tokens"`, drops `ocr_confidence` to 60 and logs a structured warning with the doc_id. Loud failure instead of silent truncation.
+- **New test** `src/tests/extract-text-truncation.test.ts` — 22 assertions covering happy path (PDF/image), truncated path, empty/missing content, and other stop_reasons. Pure test, no DB or API calls.
+
+Followup: corpus docs with truncated OCR (confirmed: Lena Everding + Julija Paul mietverträge) need re-queue after Edge Function redeploy. Runbook in the PR description.
