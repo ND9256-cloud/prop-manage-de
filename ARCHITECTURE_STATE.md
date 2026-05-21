@@ -225,7 +225,37 @@ Three new tables in `warehouse.*` schema: `claims`, `claim_closures`, `derivatio
 - **Tenant isolation:** All three tables annotated `@tenant-scoped-via property_id` (directly or transitively via target_claim_id). RLS enabled with org isolation policies.
 - **Migration:** `supabase/migrations/20260510080000_v2_claim_store.sql`
 - **Integration test:** `src/tests/v2-claim-store-migration.test.ts` (13 assertions: constraints, triggers, immutability)
-- **Status:** Schema live, no code yet writes claims (Phase 1 emitters do that).
+- **Status:** Schema live, applier writes claims (Task 1.8). Not yet wired into pipeline (Task 1.9).
+
+## Claim-store transaction applier (Task 1.8)
+
+Single writer to `warehouse.claims`, `warehouse.claim_closures`, and
+`warehouse.derivation_records` in normal pipeline operation. Architecture §5.5.
+
+**Shipped:**
+- `src/lib/claim-store/applier.ts` (Task 1.8, 2026-05-22) — `applyEmission`
+  function. All three close_modes implemented. Three claim-aware blocker
+  checks (multi-tenant partial, vacant-possession safeguard, Staffelmiete
+  conflict). Fuzzy tenant matching for closure verification. DerivationRecord
+  per insert and per closure. Transaction-wrapped; rollback on any safety
+  failure. Idempotent via SELECT-before-INSERT on `(source_extraction_run_id,
+  subject, predicate, source_field_path)`.
+- `src/lib/claim-store/fuzzy-tenant-match.ts` — pure token-subset matcher,
+  Anrede-stripped, no Levenshtein. 12 unit tests.
+- `src/lib/claim-store/types.ts` — ApplyContext, ApplyResult, BlockerReason,
+  APPLIER_VERSION.
+
+**Pending (separate tasks):**
+- Closing-matrix predicate-pair allowlist enforcement (TODO in applier.ts) —
+  blocks on the second emitter type landing
+- Optional-match confidence downgrade (TODO in applier.ts)
+- Test-environment trigger bypass for cleanup — currently tests use
+  transaction rollback via passed-in `tx`; production pipeline call (Task 1.9)
+  opens its own transaction
+
+**Wire-up:** Task 1.9 calls `applyEmission` from the Edge Function after
+Step 8b writes the v2 envelope and the appropriate emitter produces an
+EmissionResult.
 
 ---
 
