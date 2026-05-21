@@ -504,3 +504,27 @@ populates correctly.
 
 If still absent on either: missed-content verifier (Task 1.5e-verifier)
 becomes next priority.
+
+## Emitters (Task 1.7+)
+
+Pure functions in `src/lib/emitters/<doc_type>.ts` that read v2 envelopes
+and return `EmissionResult { claims_to_insert, closure_intents }`. Architecture
+§4.4 contract.
+
+**Shipped:**
+- `mietvertrag.ts` (Task 1.7, 2026-05-21) — emits kaltmiete + tenant_active
+  assertion claims, optionally kaution. No closures. Returns empty result
+  for drafts or missing load-bearing fields.
+
+**Pending:**
+- `mieterhoehung.ts` — produces kaltmiete claim + close_overlapping_only closure
+- `wohnungsuebergabeprotokoll.ts` — dispatches on uebergabe_typ
+- `kuendigung.ts` — produces lease_terminated event + close_overlapping_and_future
+  closures, conditional on signature/widerspruch/multi_tenant_partial blockers
+
+**Purity gate:** `src/tests/emitter-purity.test.ts` rejects any DB/fetch
+import in `src/lib/emitters/`. CI-enforced on every PR.
+
+**Applier wiring:** see Task 1.8 (claim-store transaction applier). Emitters
+are not yet called from the Edge Function — the envelope is produced and
+stored, but no claims are persisted until 1.8 ships.
