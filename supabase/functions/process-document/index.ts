@@ -7,6 +7,7 @@ import { validateEnvelope as validateMietvertragEnvelope } from "../../../schema
 import { VERIFIERS } from "./verifiers/index.ts";
 import type { FieldSpec, FieldEnvelope } from "./verifiers/index.ts";
 import { classifyOcrResponse } from "./ocr-result.ts";
+import { splitPdfIntoPages, extractAllPages, stitchPageOutputs, aggregateResults } from "./page-extraction.ts";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -221,54 +222,38 @@ async function extractText(
     try {
         if (doc.mime_type === "application/pdf") {
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
-            const base64Pdf = arrayBufferToBase64(fileBuffer);
 
-            const pdfResponse = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                    "x-api-key": anthropicKey,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: "claude-haiku-4-5-20251001",
-                    max_tokens: 64000,  // Haiku 4.5 supports up to 64K output tokens
-                    messages: [{
-                        role: "user",
-                        content: [
-                            {
-                                type: "document",
-                                source: {
-                                    type: "base64",
-                                    media_type: "application/pdf",
-                                    data: base64Pdf,
-                                },
-                            },
-                            {
-                                type: "text",
-                                text: "Extract all text from this PDF document. Return only the raw text content, preserving the original structure. No commentary.",
-                            },
-                        ],
-                    }],
-                }),
-            });
-
-            if (!pdfResponse.ok) {
-                throw new Error(`Claude PDF API error: ${pdfResponse.status} ${await pdfResponse.text()}`);
+            // Split PDF into pages
+            let pageBuffers: Uint8Array[];
+            try {
+                pageBuffers = await splitPdfIntoPages(fileBuffer);
+                console.log(`extractText: split PDF into ${pageBuffers.length} pages for doc ${doc.id}`);
+            } catch (splitErr) {
+                const errMsg = splitErr instanceof Error ? splitErr.message : "PDF split failed";
+                throw new Error(`PDF split failed: ${errMsg}`);
             }
 
-            const pdfResult = await pdfResponse.json();
-            const classified = classifyOcrResponse(pdfResult, 90);
-            extractedText = classified.text;
-            ocrConfidence = classified.confidence;
-            if (classified.truncated) {
+            // Extract each page in parallel batches
+            const pageResults = await extractAllPages(anthropicKey, pageBuffers, arrayBufferToBase64);
+
+            // Aggregate + stitch
+            const stitched = stitchPageOutputs(pageResults);
+            const aggregated = aggregateResults(pageResults);
+            extractedText = stitched;
+            ocrConfidence = aggregated.confidence;
+
+            if (aggregated.failedPages.length > 0) {
                 console.warn(
-                    `extractText: PDF OCR hit max_tokens for doc ${doc.id}; ` +
-                    `${extractedText.length} chars extracted (TRUNCATED). ocr_confidence set to 60.`
+                    `extractText: doc ${doc.id} — ${aggregated.failedPages.length}/${pageResults.length} pages failed: [${aggregated.failedPages.join(", ")}]`
                 );
-            } else {
-                console.log(`extractText: PDF text extracted via Claude (${extractedText.length} chars)`);
             }
+            if (aggregated.anyTruncated) {
+                console.warn(
+                    `extractText: doc ${doc.id} — at least one page hit max_tokens=4000 (unexpected for single-page input)`
+                );
+            }
+
+            console.log(`extractText: PDF text extracted via per-page (${extractedText.length} chars, confidence=${ocrConfidence})`);
 
         } else if (doc.mime_type.startsWith("image/")) {
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
