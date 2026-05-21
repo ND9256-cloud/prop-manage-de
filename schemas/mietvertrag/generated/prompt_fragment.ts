@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-13-v1
+// Schema version: 2026-05-21-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export const PROMPT_FRAGMENT = `## Mietvertrag — extract the following fields
@@ -51,8 +51,26 @@ normalized_value: integer in minor units (cents) + currency code, e.g. { amount:
 
 ### kaution (Kaution — security deposit, EUR, optional)
 
-Extract the TOTAL Kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
+Kaution oder Mietsicherheit, vom Mieter beim Vermieter zu hinterlegen.
+
+WICHTIG: In deutschen Mietverträgen erscheint dieses Konzept unter verschiedenen Bezeichnungen — alle bezeichnen denselben Sachverhalt:
+- "Kaution"
+- "Mietsicherheit"
+- "Barkaution"
+- "Sicherheitsleistung"
+- Auch Kombinationen wie "Mietsicherheit in Form einer Barkaution"
+
+Der Geldbetrag erscheint oft in Vorlagen mit umgebenden Unterstrichen, Punkten oder Strichen, etwa:
+- "__________1.100,00 €"
+- ". . . . . . . 1.950,00 Euro"
+- "in Höhe von _____ Euro"
+
+Suche im gesamten Dokument nach diesen Bezeichnungen und extrahiere den genannten Betrag, unabhängig von der umgebenden Formatierung. Der Betrag ist real auch dann, wenn das Vertragsformular Leerstellen oder Platzhalter um die Zahl herum aufweist.
+
+Extract the TOTAL kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
 If the contract is kautionsfrei, set absence_state: not_applicable.
+Falls KEINE dieser Bezeichnungen im Dokument vorkommt, setze absence_state: "absent".
+Falls die Bezeichnung vorkommt aber kein Betrag genannt wird, setze absence_state: "ambiguous" mit einer Erklärung.
 normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 195000, currency: "EUR" } for €1,950.00.
 
 ### mietbeginn (Mietbeginn — lease start date)
@@ -66,5 +84,5 @@ If the contract specifies "ab Übergabe" or similar without a concrete date, set
 Most German residential leases are open-ended (unbefristet). For those, set absence_state: not_applicable. NOT absence_state: absent — the difference is meaningful.
 If the contract specifies a fixed end date (Befristung), extract it. Format: ISO 8601 (YYYY-MM-DD).`;
 
-export const SCHEMA_VERSION = "2026-05-13-v1";
+export const SCHEMA_VERSION = "2026-05-21-v1";
 export const DOC_TYPE = "mietvertrag";

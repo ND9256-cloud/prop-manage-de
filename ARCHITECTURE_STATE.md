@@ -486,3 +486,21 @@ New tests: src/tests/rate-limiter.test.ts (18 assertions)
 New tests: src/tests/anthropic-client.test.ts (23 assertions)
 
 Two new env vars (with safe defaults): ANTHROPIC_RPS, ANTHROPIC_BURST.
+
+## Task 1.5e-prompt — Kaution synonym hints (2026-05-21)
+
+mietvertrag schema.yaml kaution field description expanded to include German
+synonyms (Mietsicherheit, Barkaution, Sicherheitsleistung) and form-template
+formatting hints (underscores, dotted lines around amounts).
+
+Schema version: 2026-05-13-v1 → 2026-05-21-v1
+
+Motivation: Lena's Mietsicherheit clause and Paul's Kaution clause were both
+present in OCR text after Task 1.5g but Sonnet returned absent on both.
+Hypothesis: prompt didn't mention the synonyms or form-template patterns.
+
+After Edge Function redeploy, re-extract Lena + Paul and verify kaution
+populates correctly.
+
+If still absent on either: missed-content verifier (Task 1.5e-verifier)
+becomes next priority.

@@ -1,5 +1,5 @@
 doc_type: mietvertrag
-schema_version: "2026-05-13-v1"
+schema_version: "2026-05-21-v1"
 claim_kind: assertion
 domain_knowledge_ref: domain_knowledge/mietvertrag.md
 
@@ -52,8 +52,26 @@ prompt_fragment_template: |
 
   ### kaution (Kaution — security deposit, EUR, optional)
 
-  Extract the TOTAL Kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
+  Kaution oder Mietsicherheit, vom Mieter beim Vermieter zu hinterlegen.
+
+  WICHTIG: In deutschen Mietverträgen erscheint dieses Konzept unter verschiedenen Bezeichnungen — alle bezeichnen denselben Sachverhalt:
+  - "Kaution"
+  - "Mietsicherheit"
+  - "Barkaution"
+  - "Sicherheitsleistung"
+  - Auch Kombinationen wie "Mietsicherheit in Form einer Barkaution"
+
+  Der Geldbetrag erscheint oft in Vorlagen mit umgebenden Unterstrichen, Punkten oder Strichen, etwa:
+  - "__________1.100,00 €"
+  - ". . . . . . . 1.950,00 Euro"
+  - "in Höhe von _____ Euro"
+
+  Suche im gesamten Dokument nach diesen Bezeichnungen und extrahiere den genannten Betrag, unabhängig von der umgebenden Formatierung. Der Betrag ist real auch dann, wenn das Vertragsformular Leerstellen oder Platzhalter um die Zahl herum aufweist.
+
+  Extract the TOTAL kaution amount, not an installment. If the contract says "Kaution: 3 Monatsmieten" without a euro figure, set absence_state: ambiguous.
   If the contract is kautionsfrei, set absence_state: not_applicable.
+  Falls KEINE dieser Bezeichnungen im Dokument vorkommt, setze absence_state: "absent".
+  Falls die Bezeichnung vorkommt aber kein Betrag genannt wird, setze absence_state: "ambiguous" mit einer Erklärung.
   normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 195000, currency: "EUR" } for €1,950.00.
 
   ### mietbeginn (Mietbeginn — lease start date)
@@ -204,9 +222,30 @@ fields:
     verifier_refs:
       - monetary-verbatim
     description: |
-      Security deposit (Mietkaution). German residential leases cap kaution
-      at 3x the monthly Kaltmiete per BGB §551 (Mietkautionsobergrenze).
-      The deposit may be paid in up to 3 monthly installments by the tenant.
+      Kaution oder Mietsicherheit, vom Mieter beim Vermieter zu hinterlegen.
+
+      WICHTIG: In deutschen Mietverträgen erscheint dieses Konzept unter
+      verschiedenen Bezeichnungen — alle bezeichnen denselben Sachverhalt:
+      - "Kaution"
+      - "Mietsicherheit"
+      - "Barkaution"
+      - "Sicherheitsleistung"
+      - Auch Kombinationen wie "Mietsicherheit in Form einer Barkaution"
+
+      Der Geldbetrag erscheint oft in Vorlagen mit umgebenden Unterstrichen,
+      Punkten oder Strichen, etwa:
+      - "__________1.100,00 €"
+      - ". . . . . . . 1.950,00 Euro"
+      - "in Höhe von _____ Euro"
+
+      Suche im gesamten Dokument nach diesen Bezeichnungen und extrahiere
+      den genannten Betrag, unabhängig von der umgebenden Formatierung.
+      Der Betrag ist real auch dann, wenn das Vertragsformular Leerstellen
+      oder Platzhalter um die Zahl herum aufweist.
+
+      German residential leases cap kaution at 3x the monthly Kaltmiete
+      per BGB §551 (Mietkautionsobergrenze). The deposit may be paid in
+      up to 3 monthly installments by the tenant.
 
       Extract the TOTAL kaution amount, not an installment. If the contract
       says "Kaution: 3 Monatsmieten" without a specific euro figure, set
@@ -215,6 +254,11 @@ fields:
 
       If the contract is kautionsfrei (no deposit required), set
       absence_state: not_applicable.
+
+      Falls KEINE dieser Bezeichnungen im Dokument vorkommt, setze
+      absence_state: "absent".
+      Falls die Bezeichnung vorkommt aber kein Betrag genannt wird, setze
+      absence_state: "ambiguous" mit einer Erklärung.
 
       normalized_value: integer in minor units (cents) + currency code,
       e.g. { amount: 195000, currency: "EUR" } for €1,950.00 (3x €650 Kaltmiete).

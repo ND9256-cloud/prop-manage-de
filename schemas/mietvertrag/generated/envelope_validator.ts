@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-13-v1
+// Schema version: 2026-05-21-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -130,5 +130,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-13-v1";
+export const SCHEMA_VERSION = "2026-05-21-v1";
 export const DOC_TYPE = "mietvertrag";
