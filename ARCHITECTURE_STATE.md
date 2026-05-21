@@ -458,3 +458,31 @@ Predictable Haiku cost linear in pages.
 New module: supabase/functions/process-document/page-extraction.ts
 New test: src/tests/page-extraction.test.ts (33 assertions)
 classifyOcrResponse from Task 1.5d retained for image branch only.
+
+## Task 1.5g — Anthropic rate limiter (2026-05-21)
+
+All outbound Anthropic API calls now route through a single shared token-bucket
+rate limiter in supabase/functions/process-document/rate-limiter.ts +
+anthropic-client.ts. Configuration via env vars ANTHROPIC_RPS (default 0.67 =
+40 rpm) and ANTHROPIC_BURST (default 5). Retry policy includes 429 (rate limit)
+and 529 (overload). Honors retry-after header.
+
+Six call sites refactored to use callAnthropic():
+- extractPageText (per-page OCR)
+- extractText image branch
+- classifyDocument
+- extractFields (legacy)
+- generateV2Envelope (Sonnet)
+- generateIntelligence (Sonnet, Step 8b)
+
+Motivation: Task 1.5f's 5-way parallel OCR burst hit Anthropic's 50 rpm Tier 2
+rate limit, causing pages 3-5 of Paul's mietvertrag to fail with 429. Rate
+limiter prevents bursts while preserving per-doc parallelism (concurrency
+within a doc is decoupled from API request rate).
+
+New module: rate-limiter.ts (pure, ~80 lines)
+New module: anthropic-client.ts (~120 lines)
+New tests: src/tests/rate-limiter.test.ts (18 assertions)
+New tests: src/tests/anthropic-client.test.ts (23 assertions)
+
+Two new env vars (with safe defaults): ANTHROPIC_RPS, ANTHROPIC_BURST.
