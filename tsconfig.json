@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "npm:pdf-lib@1.17.1": [
+        "./node_modules/pdf-lib"
       ]
     }
   },

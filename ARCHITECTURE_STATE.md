@@ -440,3 +440,21 @@ Fix:
 - **New test** `src/tests/extract-text-truncation.test.ts` — 22 assertions covering happy path (PDF/image), truncated path, empty/missing content, and other stop_reasons. Pure test, no DB or API calls.
 
 Followup: corpus docs with truncated OCR (confirmed: Lena Everding + Julija Paul mietverträge) need re-queue after Edge Function redeploy. Runbook in the PR description.
+
+## Task 1.5f — Page-by-page PDF OCR (2026-05-21)
+
+extractText PDF branch now splits the PDF into single-page PDFs (pdf-lib),
+extracts each page in parallel batches of 5 via Haiku 4.5 with max_tokens=4000,
+and stitches outputs with --- Seite N --- boundary markers. Per-page timeout 45s
+with retry on 529 (waits 30s, then 90s). Failed pages produce [ERROR: ...]
+markers inline so absence is visible, not silent.
+
+Replaces Task 1.5d single-call max_tokens=64000 strategy for PDF input.
+Image input still uses single-call extraction (classifyOcrResponse retained).
+
+Expected p50 latency drop from 8+ min to 30s for typical mietverträge.
+Predictable Haiku cost linear in pages.
+
+New module: supabase/functions/process-document/page-extraction.ts
+New test: src/tests/page-extraction.test.ts (33 assertions)
+classifyOcrResponse from Task 1.5d retained for image branch only.
