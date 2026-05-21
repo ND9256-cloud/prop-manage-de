@@ -1,4 +1,5 @@
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
+import { callAnthropic, AnthropicClientError } from "./anthropic-client.ts";
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ export function aggregateResults(results: PageResult[]): Omit<AggregatedOcr, "te
 // ─── Orchestrators (impure — network calls) ─────────────────────
 
 /**
- * Call Haiku for a single page with retry + timeout.
+ * Call Haiku for a single page via the shared rate-limited client.
  */
 export async function extractPageText(
     anthropicKey: string,
@@ -87,104 +88,55 @@ export async function extractPageText(
     pageBytes: Uint8Array,
     base64Encode: (b: Uint8Array) => string,
 ): Promise<PageResult> {
-    const attempts = [
-        { timeoutMs: 45000, waitBeforeMs: 0 },
-        { timeoutMs: 45000, waitBeforeMs: 30000 },
-        { timeoutMs: 60000, waitBeforeMs: 90000 },
-    ];
+    try {
+        const response = await callAnthropic({
+            model: "claude-haiku-4-5-20251001",
+            maxTokens: 4000,
+            apiKey: anthropicKey,
+            timeoutMs: 90000,
+            callLabel: `ocr-page-${pageNumber}`,
+            messages: [{
+                role: "user",
+                content: [
+                    {
+                        type: "document",
+                        source: {
+                            type: "base64",
+                            media_type: "application/pdf",
+                            data: base64Encode(pageBytes),
+                        },
+                    },
+                    {
+                        type: "text",
+                        text: "Extract all text from this PDF page. Return only the raw text content, preserving the original structure. No commentary.",
+                    },
+                ],
+            }],
+        });
 
-    for (let attemptIdx = 0; attemptIdx < attempts.length; attemptIdx++) {
-        const { timeoutMs, waitBeforeMs } = attempts[attemptIdx];
-
-        if (waitBeforeMs > 0) {
-            await new Promise(r => setTimeout(r, waitBeforeMs));
-        }
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-        try {
-            const response = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                signal: controller.signal,
-                headers: {
-                    "x-api-key": anthropicKey,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: "claude-haiku-4-5-20251001",
-                    max_tokens: 4000,
-                    messages: [{
-                        role: "user",
-                        content: [
-                            {
-                                type: "document",
-                                source: {
-                                    type: "base64",
-                                    media_type: "application/pdf",
-                                    data: base64Encode(pageBytes),
-                                },
-                            },
-                            {
-                                type: "text",
-                                text: "Extract all text from this PDF page. Return only the raw text content, preserving the original structure. No commentary.",
-                            },
-                        ],
-                    }],
-                }),
-            });
-            clearTimeout(timeoutId);
-
-            // 529 → retry if attempts left
-            if (response.status === 529 && attemptIdx < attempts.length - 1) {
-                console.warn(`extractPageText: page ${pageNumber} got 529, retry ${attemptIdx + 1}`);
-                continue;
-            }
-
-            if (!response.ok) {
-                return {
-                    pageNumber,
-                    text: "",
-                    stopReason: null,
-                    truncated: false,
-                    failed: true,
-                    errorMessage: `Haiku ${response.status}`,
-                };
-            }
-
-            const json = await response.json();
-            const text = json.content?.[0]?.text || "";
-            const stopReason = json.stop_reason ?? null;
-            return {
-                pageNumber,
-                text,
-                stopReason,
-                truncated: stopReason === "max_tokens",
-                failed: false,
-                errorMessage: null,
-            };
-        } catch (err) {
-            clearTimeout(timeoutId);
-            const isTimeout = err instanceof Error && err.name === "AbortError";
-            const isLastAttempt = attemptIdx === attempts.length - 1;
-
-            if (isLastAttempt) {
-                return {
-                    pageNumber,
-                    text: "",
-                    stopReason: null,
-                    truncated: false,
-                    failed: true,
-                    errorMessage: isTimeout ? "timeout" : (err instanceof Error ? err.message : "unknown"),
-                };
-            }
-            console.warn(`extractPageText: page ${pageNumber} attempt ${attemptIdx + 1} failed, retrying`);
-        }
+        const text = response.content?.[0]?.text || "";
+        const stopReason = response.stop_reason ?? null;
+        return {
+            pageNumber,
+            text,
+            stopReason,
+            truncated: stopReason === "max_tokens",
+            failed: false,
+            errorMessage: null,
+        };
+    } catch (err) {
+        const message = err instanceof AnthropicClientError
+            ? `Haiku ${err.httpStatus ?? "?"} after ${err.attemptsUsed} attempts`
+            : (err instanceof Error ? err.message : "unknown error");
+        return {
+            pageNumber,
+            text: "",
+            stopReason: null,
+            truncated: false,
+            failed: true,
+            errorMessage: message,
+        };
     }
-
-    // Unreachable but TS demands it
-    return { pageNumber, text: "", stopReason: null, truncated: false, failed: true, errorMessage: "exhausted retries" };
 }
 
 /**

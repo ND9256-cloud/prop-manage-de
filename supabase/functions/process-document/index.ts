@@ -8,6 +8,7 @@ import { VERIFIERS } from "./verifiers/index.ts";
 import type { FieldSpec, FieldEnvelope } from "./verifiers/index.ts";
 import { classifyOcrResponse } from "./ocr-result.ts";
 import { splitPdfIntoPages, extractAllPages, stitchPageOutputs, aggregateResults } from "./page-extraction.ts";
+import { callAnthropic } from "./anthropic-client.ts";
 
 // ─── Types ───────────────────────────────────────────────────────
 
@@ -259,41 +260,30 @@ async function extractText(
             const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
             const base64Data = arrayBufferToBase64(fileBuffer);
 
-            const visionResponse = await fetch("https://api.anthropic.com/v1/messages", {
-                method: "POST",
-                headers: {
-                    "x-api-key": anthropicKey,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                    model: "claude-haiku-4-5-20251001",
-                    max_tokens: 8000,  // Defensive headroom for dense scans
-                    messages: [{
-                        role: "user",
-                        content: [
-                            {
-                                type: "image",
-                                source: {
-                                    type: "base64",
-                                    media_type: doc.mime_type,
-                                    data: base64Data,
-                                },
+            const visionResult = await callAnthropic({
+                model: "claude-haiku-4-5-20251001",
+                maxTokens: 8000,  // Defensive headroom for dense scans
+                apiKey: anthropicKey,
+                callLabel: `image-ocr-${doc.id}`,
+                messages: [{
+                    role: "user",
+                    content: [
+                        {
+                            type: "image",
+                            source: {
+                                type: "base64",
+                                media_type: doc.mime_type,
+                                data: base64Data,
                             },
-                            {
-                                type: "text",
-                                text: "Extract all text from this document image. Return only the raw text, nothing else.",
-                            },
-                        ],
-                    }],
-                }),
+                        },
+                        {
+                            type: "text",
+                            text: "Extract all text from this document image. Return only the raw text, nothing else.",
+                        },
+                    ],
+                }],
             });
 
-            if (!visionResponse.ok) {
-                throw new Error(`Claude vision API error: ${visionResponse.status} ${await visionResponse.text()}`);
-            }
-
-            const visionResult = await visionResponse.json();
             const classified = classifyOcrResponse(visionResult, 85);
             extractedText = classified.text;
             ocrConfidence = classified.confidence;
@@ -359,29 +349,17 @@ async function classifyDocument(
 
     try {
         const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!;
-        const classifyResponse = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-                "x-api-key": anthropicKey,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "claude-haiku-4-5-20251001",
-                max_tokens: 200,
-                messages: [{
-                    role: "user",
-                    content: `You are classifying a document from a German Hausverwaltung (property management company).\nReturn the most specific German document type term.\nExamples: mietvertrag, nebenkostenabrechnung, mieterhöhung, kündigung, rechnung, grundsteuerbescheid, energieausweis, handwerkerrechnung, betriebskostenabrechnung, heizkostenabrechnung, wohnungsübergabeprotokoll, versicherungspolice, hausgeldabrechnung, mahnung, mietbescheinigung.\nIMPORTANT: If the text is short but contains an amount, price, or payment reference with a company or vendor name, classify as rechnung. Screenshots of payment confirmations, bank transactions, or ticket purchases are rechnung.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"doc_type":"<german_term>","doc_type_en":"<english_translation>","language":"de|en|mixed|unknown","confidence":0}\n\nDocument text:\n${extractedText.slice(0, 3000)}`,
-
-                }],
-            }),
+        const classifyResult = await callAnthropic({
+            model: "claude-haiku-4-5-20251001",
+            maxTokens: 200,
+            apiKey: anthropicKey,
+            callLabel: `classify-${doc.id}`,
+            messages: [{
+                role: "user",
+                content: `You are classifying a document from a German Hausverwaltung (property management company).\nReturn the most specific German document type term.\nExamples: mietvertrag, nebenkostenabrechnung, mieterhöhung, kündigung, rechnung, grundsteuerbescheid, energieausweis, handwerkerrechnung, betriebskostenabrechnung, heizkostenabrechnung, wohnungsübergabeprotokoll, versicherungspolice, hausgeldabrechnung, mahnung, mietbescheinigung.\nIMPORTANT: If the text is short but contains an amount, price, or payment reference with a company or vendor name, classify as rechnung. Screenshots of payment confirmations, bank transactions, or ticket purchases are rechnung.\nReturn ONLY valid JSON, no markdown, no explanation:\n{"doc_type":"<german_term>","doc_type_en":"<english_translation>","language":"de|en|mixed|unknown","confidence":0}\n\nDocument text:\n${extractedText.slice(0, 3000)}`,
+            }],
         });
 
-        if (!classifyResponse.ok) {
-            throw new Error(`Claude classify API error: ${classifyResponse.status} ${await classifyResponse.text()}`);
-        }
-
-        const classifyResult = await classifyResponse.json();
         const classifyText = classifyResult.content?.[0]?.text || "";
         const classifyMatch = classifyText.match(/\{[\s\S]*\}/);
         if (classifyMatch) {
@@ -459,28 +437,17 @@ async function extractFields(
         const promptKey = (DOC_TYPE_MAP[classification.doc_type] ?? DOC_TYPE_DEFAULT).extraction_prompt_key;
         const extractPrompt = prompts[promptKey] || defaultPrompt;
 
-        const extractResponse = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-                "x-api-key": anthropicKey,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "claude-haiku-4-5-20251001",
-                max_tokens: 800,
-                messages: [{
-                    role: "user",
-                    content: extractPrompt,
-                }],
-            }),
+        const extractResult = await callAnthropic({
+            model: "claude-haiku-4-5-20251001",
+            maxTokens: 800,
+            apiKey: anthropicKey,
+            callLabel: `extract-fields-${job.document_id}`,
+            messages: [{
+                role: "user",
+                content: extractPrompt,
+            }],
         });
 
-        if (!extractResponse.ok) {
-            throw new Error(`Claude extract API error: ${extractResponse.status} ${await extractResponse.text()}`);
-        }
-
-        const extractResult = await extractResponse.json();
         const extractText = extractResult.content?.[0]?.text || "";
         const extractMatch = extractText.match(/\{[\s\S]*\}/);
         if (extractMatch) {
@@ -976,30 +943,18 @@ ${v2Config.prompt}
 Dokumenttext:
 ${ocrText}`;
 
-    // Call Sonnet
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-            "x-api-key": anthropicKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-        },
-        body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 3000,
-            messages: [{
-                role: "user",
-                content: fullPrompt,
-            }],
-        }),
+    // Call Sonnet via shared rate-limited client
+    const result = await callAnthropic({
+        model: "claude-sonnet-4-20250514",
+        maxTokens: 3000,
+        apiKey: anthropicKey,
+        callLabel: `v2-envelope-${docType}-${job.document_id}`,
+        messages: [{
+            role: "user",
+            content: fullPrompt,
+        }],
     });
 
-    if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`generateV2Envelope: Sonnet API error ${response.status}: ${body}`);
-    }
-
-    const result = await response.json();
     const text = result.content?.[0]?.text || "";
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) {
@@ -1163,29 +1118,17 @@ async function generateIntelligence(
 
         const docTypeFragment = STRUCTURED_PROMPTS[classification.doc_type]?.() ?? "";
 
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-                "x-api-key": anthropicKey,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 1500,
-                messages: [{
-                    role: "user",
-                    content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true,"cost_class":"betriebskosten|erwerbskosten|abrechnung|finanzierung|mieteingang|nicht_immobilien|nicht_zugeordnet","umlagefaehig":true|false|null,"structured_fields":null}\n\ncost_class: Klassifiziere die Kostenart. nicht_zugeordnet wenn unklar.\numlagefaehig: true wenn Kosten nach BetrKV auf Mieter umlegbar (Grundsteuer, Wasser, Abwasser, Müllabfuhr, Versicherung, Schornsteinfeger, Winterdienst, Hausmeister, Gartenpflege, Aufzug, Gemeinschaftsstrom, Kabelanschluss). false wenn nicht umlegbar (Instandhaltung, Reparaturen, Verwaltungskosten). null wenn kein Kostendokument.\n${docTypeFragment ? "\n" + docTypeFragment + "\n" : ""}\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
-                }],
-            }),
+        const result = await callAnthropic({
+            model: "claude-sonnet-4-20250514",
+            maxTokens: 1500,
+            apiKey: anthropicKey,
+            callLabel: `intelligence-${job.document_id}`,
+            messages: [{
+                role: "user",
+                content: `Du bist ein deutscher Hausverwaltungs-Assistent. Analysiere dieses Dokument. Antworte NUR mit validem JSON:\n{"summary":"2-3 Sätze","tags":[],"entity_name":"Hauptperson/Firma","entity_type":"mieter|vermieter|dienstleister|behoerde|versicherung|bank|notar|sonstiges","unit_ref":"EG|1.OG|DG|Keller|null","period_start":"YYYY-MM-DD|null","period_end":"YYYY-MM-DD|null","action_signals":[],"viewer_safe":true,"cost_class":"betriebskosten|erwerbskosten|abrechnung|finanzierung|mieteingang|nicht_immobilien|nicht_zugeordnet","umlagefaehig":true|false|null,"structured_fields":null}\n\ncost_class: Klassifiziere die Kostenart. nicht_zugeordnet wenn unklar.\numlagefaehig: true wenn Kosten nach BetrKV auf Mieter umlegbar (Grundsteuer, Wasser, Abwasser, Müllabfuhr, Versicherung, Schornsteinfeger, Winterdienst, Hausmeister, Gartenpflege, Aufzug, Gemeinschaftsstrom, Kabelanschluss). false wenn nicht umlegbar (Instandhaltung, Reparaturen, Verwaltungskosten). null wenn kein Kostendokument.\n${docTypeFragment ? "\n" + docTypeFragment + "\n" : ""}\nKontext: ${contextBlock}\n\nDokumenttext:\n${ocrText}`,
+            }],
         });
 
-        if (!response.ok) {
-            console.error(`generateIntelligence: API error ${response.status}`);
-            return;
-        }
-
-        const result = await response.json();
         const text = result.content?.[0]?.text || "";
         const match = text.match(/\{[\s\S]*\}/);
         if (!match) {
