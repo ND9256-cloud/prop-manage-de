@@ -591,3 +591,11 @@ import in `src/lib/emitters/`. CI-enforced on every PR.
 **Applier wiring:** see Task 1.8 (claim-store transaction applier). Emitters
 are not yet called from the Edge Function — the envelope is produced and
 stored, but no claims are persisted until 1.8 ships.
+
+### Hotfix (2026-05-22) — apply-emission route column names
+
+`/api/pipeline/apply-emission` now reads `property_id` and `org_id` directly from
+`warehouse.documents` (snake_case, both columns present on row creation) instead
+of joining to `Property` for `"organizationId"`. The original draft used a JOIN
+that referenced non-existent camelCase columns and would have 400'd every bridge
+call. Tenant-isolation annotation reason updated to reflect the direct read.
