@@ -535,6 +535,39 @@ populates correctly.
 If still absent on either: missed-content verifier (Task 1.5e-verifier)
 becomes next priority.
 
+## v2 pipeline wiring (Task 1.9+)
+
+The Deno Edge Function (`supabase/functions/process-document/index.ts`)
+calls a Node-side API route (`POST /api/pipeline/apply-emission`) after
+Step 8b commits the v2 envelope. The Node route looks up the appropriate
+emitter from the registry, runs it, and calls `applyEmission` (Task 1.8).
+
+**Why HTTP, not direct Deno DB writes:** the applier is Prisma-based
+(Node-only). Reimplementing it in Deno would duplicate ~500 lines of
+closure logic and create a drift surface. The HTTP bridge adds ~50ms
+per document but keeps a single source of truth for claim emission
+and closure semantics.
+
+**Failure mode:** if the bridge call fails (HTTP error, network, or 5s timeout), the
+Edge Function logs and proceeds. The envelope persists; claims can be
+applied later via a manual replay script. Phase 1 prioritizes envelope
+durability over claim-store completeness. `step9_apply_status` values:
+`applied`, `no_emitter_for_doc_type`, `bridge_http_error`, `bridge_network_error`,
+`bridge_timeout`, `skipped_no_url`.
+
+**Auth:** `x-internal-secret` header. Both sides read `PIPELINE_INTERNAL_SECRET`
+from env. The route returns 401 on mismatch.
+
+**Registered emitters:**
+- `mietvertrag` → `emitMietvertragClaims` (Task 1.7), version `1.0.0`
+
+**Pending wiring follow-ups (not Task 1.9):**
+- Evidence-row population (`EmitterContext.evidence_id_for_field` currently
+  returns null for all fields)
+- Retry/backoff on transient bridge failures
+- Backfill script for already-extracted envelopes
+- Multi-emitter registry entries as other doc-type emitters land
+
 ## Emitters (Task 1.7+)
 
 Pure functions in `src/lib/emitters/<doc_type>.ts` that read v2 envelopes

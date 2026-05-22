@@ -915,7 +915,7 @@ async function generateV2Envelope(
     job: Job,
     doc: Doc,
     classification: Classification,
-): Promise<void> {
+): Promise<string> {
     const docType = classification.doc_type;
     const v2Config = V2_PROMPTS[docType];
     if (!v2Config) {
@@ -1091,6 +1091,8 @@ ${ocrText}`;
         `generateV2Envelope complete: v2 envelope written for ${docType} ` +
         `(extraction_run_id=${extractionRunId}, schema_version=${v2Config.schemaVersion})`
     );
+
+    return extractionRunId;
 }
 
 // ─── 8b. generateIntelligence (NON-FATAL) ────────────────────
@@ -1271,12 +1273,59 @@ serve(async (req: Request) => {
         await categorize(supabase, fields, classification, job.org_id, doc);
 
         let finalStatus = "needs_review";
+        let step9ApplyStatus: string | undefined;
 
         if (isV2) {
             // ── v2 path: Sonnet envelope → document_extractions_v2 ──
             // Step 7/8/9 legacy skipped. Step 8b-v2 replaces them.
             // FATAL on failure — do NOT fall back to legacy extraction.
-            await generateV2Envelope(supabase, job, doc, classification);
+            const extractionRunId = await generateV2Envelope(supabase, job, doc, classification);
+
+            // --- Step 9: bridge to Node-side emitter + applier -----------------------
+            // After the v2 envelope is committed, POST to the Node API route which
+            // loads the emitter, produces claims, and runs the applier. Phase 1
+            // failure mode: if the bridge call fails, log and proceed — the envelope
+            // persists; a manual retry script can replay later.
+
+            let applyResult: unknown = null;
+            let applyStatus = "skipped_no_url";
+
+            const appUrl = Deno.env.get("NEXT_PUBLIC_APP_URL");
+            const internalSecret = Deno.env.get("PIPELINE_INTERNAL_SECRET");
+
+            if (appUrl && internalSecret) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s hard cap
+                try {
+                    const bridgeRes = await fetch(`${appUrl}/api/pipeline/apply-emission`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "x-internal-secret": internalSecret,
+                        },
+                        body: JSON.stringify({ extraction_run_id: extractionRunId }),
+                        signal: controller.signal,
+                    });
+                    clearTimeout(timeoutId);
+                    const bridgeBody = await bridgeRes.json();
+                    if (!bridgeRes.ok) {
+                        applyStatus = "bridge_http_error";
+                        applyResult = { http_status: bridgeRes.status, body: bridgeBody };
+                        console.warn("[step9] bridge HTTP error", bridgeRes.status, bridgeBody);
+                    } else {
+                        applyStatus = bridgeBody.status;
+                        applyResult = bridgeBody;
+                    }
+                } catch (err) {
+                    clearTimeout(timeoutId);
+                    const isTimeout = (err as Error)?.name === "AbortError";
+                    applyStatus = isTimeout ? "bridge_timeout" : "bridge_network_error";
+                    applyResult = { error: String(err) };
+                    console.warn(`[step9] ${applyStatus}`, err);
+                }
+            } else {
+                console.warn("[step9] NEXT_PUBLIC_APP_URL or PIPELINE_INTERNAL_SECRET missing; skipping apply");
+            }
 
             // Route v2 documents to needs_review (triage UI dual-read is Task 1.6)
             await supabase
@@ -1295,6 +1344,9 @@ serve(async (req: Request) => {
                     reason_code: "v2_extraction",
                     status: "open",
                 });
+
+            console.log(`[step9] apply_status=${applyStatus}`, JSON.stringify(applyResult));
+            step9ApplyStatus = applyStatus;
 
             finalStatus = "needs_review";
         } else {
@@ -1324,6 +1376,7 @@ serve(async (req: Request) => {
                 doc_type: classification.doc_type,
                 path: isV2 ? "v2_envelope" : "legacy",
                 status: finalStatus,
+                ...(step9ApplyStatus ? { step9_apply_status: step9ApplyStatus } : {}),
             }),
             { status: 200, headers: { "Content-Type": "application/json" } }
         );
