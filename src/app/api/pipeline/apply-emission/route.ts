@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Load envelope --------------------------------------------------------
+  // @tenant-isolation-disable-next-line -- reason: route is internal-only and secret-gated, envelope lookup is keyed on extraction_run_id (UUID, not enumerable)
   const envelopeRows = await prisma.$queryRaw<
     {
       id: string;
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Look up property + org for context ----------------------------------
-  // @tenant-isolation-disable-next-line -- reason: apply-emission route resolves property/org from warehouse.documents for applier context, scoped by extraction envelope's source_document_id
+  // @tenant-isolation-disable-next-line -- reason: property lookup derives organizationId which is then passed explicitly to applyEmission's tenant-isolation check
   const propertyRows = await prisma.$queryRaw<
     { property_id: string; organizationId: string }[]
   >`
