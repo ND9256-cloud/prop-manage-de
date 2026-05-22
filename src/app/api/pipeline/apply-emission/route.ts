@@ -97,13 +97,12 @@ export async function POST(req: NextRequest) {
   }
 
   // --- Look up property + org for context ----------------------------------
-  // @tenant-isolation-disable-next-line -- reason: property lookup derives organizationId which is then passed explicitly to applyEmission's tenant-isolation check
+  // @tenant-isolation-disable-next-line -- reason: route is internal-only and secret-gated; org_id is read directly from documents (set at document creation time)
   const propertyRows = await prisma.$queryRaw<
     { property_id: string; organizationId: string }[]
   >`
-    SELECT d.property_id, p."organizationId"
+    SELECT d.property_id, d.org_id AS "organizationId"
     FROM warehouse.documents d
-    JOIN "Property" p ON p.id = d.property_id
     WHERE d.id = ${envelope.source_document_id}::uuid
     LIMIT 1
   `;
