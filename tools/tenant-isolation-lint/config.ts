@@ -83,6 +83,7 @@ export const DIRECTORY_ALLOWLIST: Record<string, string> = {
   'scripts/reset-synthetic-password.ts': 'One-shot password reset, operator-only',
   'supabase/migrations/': 'Schema migrations run against the whole database',
   'src/tests/cross-tenant-isolation.test.ts': 'Test fixture for cross-tenant boundary enforcement',
+  'src/tests/claim-store/': 'Claim-store integration tests use raw SQL for seed data and assertions, org-scoped by TEST_ORG_ID constant',
 };
 
 /** Path to Prisma schema for annotation parsing. */
