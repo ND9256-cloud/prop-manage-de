@@ -744,3 +744,38 @@ pre-2024-04-01) with `single_active_claim` and `confidence: "high"`.
 - Task 2.4: Übergabeprotokoll emitter
 - Task 2.5: Hofmann fixture (Eigentümerwechsel safeguard)
 - Task 2.6: PLZ verifier
+
+## Übergabeprotokoll schema expanded (Task 2.3, 2026-05-27)
+
+The schema YAML stub at `schemas/wohnungsuebergabeprotokoll/schema.yaml`
+(placeholder since Task 0.2) has been expanded with all 11 production fields.
+Domain knowledge file `domain_knowledge/wohnungsuebergabeprotokoll.md` was
+already populated in Task 1.4 — no changes needed there.
+
+**Fields shipped in the schema:**
+- uebergabe_typ (critical, enum: Einzug, Auszug, Eigentümerwechsel, unklar) —
+  THE dispatch discriminator for Task 2.4's emitter
+- unit_ref (critical, enum, conditional on uebergabe_typ in [Einzug, Auszug])
+- uebergabe_datum (critical, date)
+- kaeufer / verkaeufer (critical, structured, conditional on Eigentümerwechsel)
+- mieter_in (critical, structured, conditional on Einzug)
+- mieter_out (critical, structured, conditional on Auszug)
+- vacant_possession_language_present (important, boolean) — Hofmann signal
+- vacant_possession_language_excerpts (nice_to_have, structured_array)
+- meter_readings (important, structured_array) — evidence baseline
+- damages_noted (nice_to_have, structured_array)
+- signatures (important, structured)
+
+The schema's prompt_fragment_template embeds explicit Hofmann-safeguard
+guidance: when in doubt, set uebergabe_typ="unklar". The Eigentümerwechsel
+closure rule (in domain knowledge front-matter) is the structural backstop;
+"unklar" is the SAFE default at extraction time.
+
+**Pending (separate tasks):**
+- Task 2.4: emitter dispatching on uebergabe_typ (with the Hofmann safeguard
+  enforced in code)
+- Task 2.5: Hofmann fixture test (the gate test)
+- Inconsistency to resolve in Task 2.4: domain knowledge `closes` array uses
+  `close_overlapping_only` for Eigentümerwechsel, but architecture §5.5.2
+  specifies `close_overlapping_and_supersede_future`. Pick one when
+  implementing the emitter; the architecture spec should win.

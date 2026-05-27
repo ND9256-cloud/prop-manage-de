@@ -1,16 +1,340 @@
 doc_type: wohnungsuebergabeprotokoll
-schema_version: "2026-05-08-v1"
+schema_version: "2026-05-27-v1"
 claim_kind: event
 domain_knowledge_ref: domain_knowledge/wohnungsuebergabeprotokoll.md
+
 prompt_fragment_template: |
-  TODO: populated in Task 1.4
+  ## Wohnungsübergabeprotokoll — extract the following fields
+
+  For each field, return:
+  - raw_value: verbatim text from the document
+  - normalized_value: typed canonical form (see per-field instructions)
+  - evidence: array of { quote: <verbatim quote>, page: <number>, bbox: null }. At least one entry required when absence_state == "present".
+  - confidence: high | medium | low
+  - absence_state: present | absent | illegible | ambiguous | contradicted | not_applicable | inferred | requires_human_review
+  - validation_status: valid (set this; verifiers run separately)
+
+  Evidence is MANDATORY when absence_state == present.
+
+  ### uebergabe_typ (CRITICAL discriminator — determines all downstream behavior)
+
+  Classify into exactly one of:
+  - "Einzug" — a tenant moves IN. Signals: tenant signature with "übernehme die Wohnung", Übergabe-/Einzugsdatum, meter readings as starting baselines.
+  - "Auszug" — a tenant moves OUT. Signals: "Rückgabe"/"Wohnungsrückgabe" language, tenant signature with "übergebe die Wohnung", often documents damages, meter readings as closing values.
+  - "Eigentümerwechsel" — property OWNERSHIP transfers. Signals: Käufer and Verkäufer named, reference to a Kaufvertrag, typically NO Mieter signature (or Mieter only as bystander), identifies the property rather than a specific unit.
+  - "unklar" — document does not clearly signal one of the above. SAFE DEFAULT when in doubt. Forces human review. Emitter skips claim emission entirely.
+
+  When signals conflict or are missing, choose "unklar". Better no claim than a wrong claim. The Hofmann case (misclassified Eigentümerwechsel) is the canonical failure to avoid.
+
+  ### unit_ref (Einheit — normalized floor/position identifier)
+
+  Required for Einzug and Auszug. Optional for Eigentümerwechsel (which is property-level). Normalize to: EG, 1.OG, 2.OG, 3.OG, 4.OG, DG, Keller, Souterrain. Common variants: "Erdgeschoss" → "EG", "1. Obergeschoss" → "1.OG", "Dachgeschoss" → "DG".
+
+  ### uebergabe_datum (date the handover physically occurred)
+
+  ISO 8601 (YYYY-MM-DD). Drives valid_from on new claims and close_at on closure intents. Source is typically DD.MM.YYYY — normalize. Distinct from notarial signing date (for Eigentümerwechsel, the Kaufvertrag's date is typically earlier than the handover).
+
+  ### kaeufer (incoming owner — required when uebergabe_typ == "Eigentümerwechsel")
+
+  normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal_form: <e.g. "GmbH", "eGbR", "KG"> }. May be a natural person or legal entity.
+
+  ### verkaeufer (outgoing owner — required when uebergabe_typ == "Eigentümerwechsel")
+
+  normalized_value: { name, is_legal_entity, legal_form }. Used for owner-closure match — verkaeufer must match the current owner claim being superseded.
+
+  ### mieter_in (incoming tenant — required when uebergabe_typ == "Einzug")
+
+  normalized_value: { name, is_legal_entity, legal_form }. Becomes the new tenant_active claim.
+
+  ### mieter_out (outgoing tenant — required when uebergabe_typ == "Auszug")
+
+  normalized_value: { name, is_legal_entity, legal_form }. Used for tenant-claim closure match (required strictness).
+
+  ### vacant_possession_language_present (boolean — Hofmann safeguard signal)
+
+  true if the document contains language asserting vacant possession (mietfrei, geräumt, bezugsfrei, "ohne Mietverhältnis", "frei von Mietern", "leerstehend"). ADVISORY ONLY — the applier emits an occupancy_conflict warning event but never closes tenant claims on this signal alone. The Hofmann safeguard codified.
+
+  ### vacant_possession_language_excerpts (array of verbatim excerpts, when applicable)
+
+  Populated only when vacant_possession_language_present == true. Used by triage UI to show humans the exact source language. Verbatim from the document.
+
+  ### meter_readings (Zählerstände — evidence, not claims)
+
+  Structured per-meter readings: { meter_type: "Strom"|"Gas"|"Wasser"|"Heizung"|"Wärmemenge", meter_serial, reading_value, reading_unit, reading_date }. Stored as evidence baseline; not directly emitted as claims at launch (Phase 2+ scope).
+
+  ### damages_noted (Mängel / Schäden — informational)
+
+  Structured deficiencies: { location, description, severity (gering|mittel|erheblich), photo_reference (optional) }. Surfaces in triage and downstream reports; not used by emitter.
+
+  ### signatures (signature presence per role)
+
+  Booleans for mieter, vermieter, kaeufer, verkaeufer signature presence. Drives form-validity downstream; the emitter uses uebergabe_datum + uebergabe_typ + relevant party identity rather than signature presence directly.
+
 fields:
-  - id: doc_type_marker
-    german_label: "Dokumenttyp-Marker (Stub)"
+  - id: uebergabe_typ
+    german_label: "Übergabetyp"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "Einzug"
+      - "Auszug"
+      - "Eigentümerwechsel"
+      - "unklar"
+    verifier_refs:
+      - enum
+    normalization_rule_ref: uebergabe_typ_canonical_values
+    classification_hints: |
+      Einzug = tenant moves IN (tenant signature, starting meter readings).
+      Auszug = tenant moves OUT (Rückgabe language, closing meter readings, often damages).
+      Eigentümerwechsel = property sale (Käufer/Verkäufer named, reference to Kaufvertrag, typically no Mieter signature).
+      unklar = mixed signals, missing primary signature, or draft. SAFE DEFAULT.
+    description: |
+      The critical-severity discriminator. Drives ALL downstream emitter behavior:
+      Einzug emits tenant_active claim; Auszug emits lease_terminated + closes
+      tenant/kaltmiete/kaution claims; Eigentümerwechsel emits new owner +
+      closes previous owner (NEVER tenant claims — Hofmann safeguard).
+      Misclassification is the most consequential extraction error for this
+      doc_type.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: unit_ref
+    german_label: "Einheit"
+    severity: critical
+    requiredness: conditional
+    condition: "uebergabe_typ in ['Einzug', 'Auszug']"
+    type: enum
+    enum_values:
+      - "EG"
+      - "1.OG"
+      - "2.OG"
+      - "3.OG"
+      - "4.OG"
+      - "DG"
+      - "Keller"
+      - "Souterrain"
+    verifier_refs:
+      - enum
+    description: |
+      Normalized unit reference. Required for Einzug and Auszug (where claims
+      are unit-scoped). Optional for Eigentümerwechsel (which is property-level).
+      Map common variants: "Erdgeschoss" → "EG", "1. Obergeschoss" → "1.OG",
+      "Dachgeschoss" → "DG".
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: uebergabe_datum
+    german_label: "Übergabedatum"
+    severity: critical
+    requiredness: required
+    type: date
+    verifier_refs:
+      - date-format
+    description: |
+      Date the handover physically occurred. ISO 8601 (YYYY-MM-DD). Drives the
+      new claim's valid_from and the closure intent's close_at. For
+      Eigentümerwechsel the previous owner's close_at = uebergabe_datum - 1 day;
+      new owner valid_from = uebergabe_datum. Distinct from notarial date.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: kaeufer
+    german_label: "Käufer (neuer Eigentümer)"
+    severity: critical
+    requiredness: conditional
+    condition: "uebergabe_typ == 'Eigentümerwechsel'"
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      Incoming owner. Required for Eigentümerwechsel. May be a natural person
+      or legal entity (GmbH, KG, eGbR, e.K.). Becomes the new owner claim.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: verkaeufer
+    german_label: "Verkäufer (bisheriger Eigentümer)"
+    severity: critical
+    requiredness: conditional
+    condition: "uebergabe_typ == 'Eigentümerwechsel'"
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      Outgoing owner. Required for Eigentümerwechsel. Used for owner-claim
+      closure match — verkaeufer must match the current owner claim being
+      superseded.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: mieter_in
+    german_label: "Einziehender Mieter"
+    severity: critical
+    requiredness: conditional
+    condition: "uebergabe_typ == 'Einzug'"
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      Incoming tenant. Required for Einzug. Becomes the new tenant_active claim
+      for unit:<unit_ref>.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: mieter_out
+    german_label: "Ausziehender Mieter"
+    severity: critical
+    requiredness: conditional
+    condition: "uebergabe_typ == 'Auszug'"
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      Outgoing tenant. Required for Auszug. Used for tenant-claim closure match
+      (required strictness — fuzzy match against the active tenant_active
+      claim; failure routes to triage).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: vacant_possession_language_present
+    german_label: "Mietfrei-Sprache vorhanden"
+    severity: important
+    requiredness: optional
+    type: boolean
+    description: |
+      true if the document contains vacant-possession language (mietfrei,
+      geräumt, bezugsfrei, "ohne Mietverhältnis", "frei von Mietern",
+      "leerstehend"). ADVISORY only — the applier emits an occupancy_conflict
+      warning event when detected during Eigentümerwechsel processing, but
+      NEVER closes tenant claims on this signal. The Hofmann safeguard.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: vacant_possession_language_excerpts
+    german_label: "Mietfrei-Belegstellen"
+    severity: nice_to_have
+    requiredness: conditional
+    condition: "vacant_possession_language_present == true"
+    type: structured_array
+    item_schema:
+      - field: excerpt
+        type: string
+        required: true
+    description: |
+      Verbatim excerpts matching vacant-possession indicators. Populated only
+      when vacant_possession_language_present is true. Surfaced in triage UI
+      for human review of the exact source language.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: meter_readings
+    german_label: "Zählerstände"
+    severity: important
+    requiredness: optional
+    type: structured
+    item_schema:
+      - field: meter_type
+        type: string
+        required: true
+      - field: meter_serial
+        type: string
+        required: false
+      - field: reading_value
+        type: number
+        required: true
+      - field: reading_unit
+        type: string
+        required: false
+      - field: reading_date
+        type: date
+        required: false
+    description: |
+      Per-meter readings (Strom, Gas, Wasser, Heizung, Wärmemenge). Stored as
+      evidence baseline for utility accounting. NOT emitted as claims at
+      launch — Phase 2+ scope for consumption delta and Nebenkostenabrechnung.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: damages_noted
+    german_label: "Festgestellte Mängel"
     severity: nice_to_have
     requiredness: optional
-    type: string
+    type: structured
+    item_schema:
+      - field: location
+        type: string
+        required: true
+      - field: description
+        type: string
+        required: true
+      - field: severity
+        type: enum
+        enum_values: ["gering", "mittel", "erheblich"]
+        required: false
+      - field: photo_reference
+        type: string
+        required: false
     description: |
-      Placeholder field so the stub validates against the meta-schema's
-      "fields must contain at least one entry" rule. Replaced with real
-      fields in the per-doc-type tasks.
+      Documented deficiencies. Surfaces in triage and downstream reports.
+      Not used by the emitter. Severity is loose at launch (will tighten
+      taxonomy with downstream analytics).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: signatures
+    german_label: "Unterschriften"
+    severity: important
+    requiredness: optional
+    type: structured
+    item_schema:
+      - field: mieter_signature_present
+        type: boolean
+        required: false
+      - field: vermieter_signature_present
+        type: boolean
+        required: false
+      - field: kaeufer_signature_present
+        type: boolean
+        required: false
+      - field: verkaeufer_signature_present
+        type: boolean
+        required: false
+    description: |
+      Signature presence per role. Drives downstream form-validity checks.
+      The emitter does NOT branch on signatures directly — it uses
+      uebergabe_typ + uebergabe_datum + party identity instead.
+    used_in_resolvers: false
+    customer_visible: true
