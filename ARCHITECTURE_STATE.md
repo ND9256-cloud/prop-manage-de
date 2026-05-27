@@ -654,3 +654,60 @@ ever fails, Phase 1 is broken and must be fixed before any Phase 2 work.
 
 **Next:** Phase 2 — extend to other doc types (Mieterhöhung, Kündigung,
 Übergabeprotokoll, Eigentümerwechsel) per the closing-matrix pattern.
+
+## Mieterhöhung emitter shipped (Task 2.1, 2026-05-27)
+
+Second doc_type in the v2 chain, and the FIRST emitter that produces closure
+intents. Starts Phase 2.
+
+**Shipped:**
+- `domain_knowledge/mieterhoehung.md` — front-matter declares the `closes` rule
+  (target_predicate: kaltmiete, target_subject_pattern: "unit:<unit_ref>",
+  close_mode: close_overlapping_only, valid_to_source: "effective_date - 1 day",
+  blocker_check: [staffelmiete_conflict]) plus the seven required gotchas
+  (scope_narrowed_to_rent_change, kappungsgrenze_15_percent,
+  tenant_consent_requirement, effective_date_vs_notice_date,
+  future_dated_increase_no_immediate_closure, staffelmiete_mid_schedule_amendment,
+  closure_prerequisites). Note: the front-matter `closes` shape follows the
+  shipped Zod contract in src/tests/domain-knowledge.test.ts (CloseEntry), not
+  the illustrative shape in the task brief.
+- `schemas/mieterhoehung/schema.yaml` — extraction fields nachtrag_typ,
+  rechtsgrundlage, new_kaltmiete, previous_kaltmiete, effective_date,
+  notice_date, unit_ref, tenant_identity, landlord/tenant signature flags,
+  document_status, staffelmiete_context, plus §558/§559/Indexmiete structured
+  sub-objects (conditional, extractor-side only). Generated prompt fragment +
+  validator + field labels regenerated via `npm run gen:schemas`.
+- `src/lib/emitters/mieterhoehung.ts` — pure function. Always emits one new
+  `kaltmiete` assertion claim (confidence downgraded to "low" when closure
+  prerequisites fail, so drafts still surface in triage without superseding the
+  open claim). When prerequisites pass (landlord_signed, effective_date present,
+  unit_ref present, document_status not draft/unsigned) it ALSO emits a
+  `kaltmiete_amended` **event** claim and a `ClaimClosure` (close_overlapping_only,
+  close edge = effective_date - 1 day). The event claim is required by the
+  applier: applyEmission throws unless exactly one event claim accompanies a
+  closure intent, and it dispatches the §5.5.5 Staffelmiete blocker on the event
+  claim's predicate. Throws when new_kaltmiete is absent. Sets
+  blocker_status="requires_review" when staffelmiete_context=true; the applier
+  independently re-checks the claim store (checkStaffelmieteConflict).
+- `src/lib/emitters/index.ts` — `mieterhoehung` registered for HTTP bridge dispatch.
+- `src/tests/emitter-mieterhoehung.test.ts` — 46 assertions across happy path,
+  draft-no-closure, Staffelmiete-blocker, missing-effective_date, missing-
+  new_kaltmiete (throws), and determinism scenarios.
+- Emitter purity gate (`src/tests/emitter-purity.test.ts`) auto-discovers the
+  new file; no edit needed.
+
+**Reconciliation note (task brief vs shipped code):** the brief's Step 3/Step 5
+code used invented type names (`ClosureIntent`, `ClaimToInsert`) and a
+single-claim/`target_predicate`-singular shape. The shipped types are `Claim`
+and `ClaimClosure` (`target_predicates: string[]`, no `triggering_event_predicate`),
+and the shipped applier requires the accompanying `kaltmiete_amended` event
+claim. The emitter and tests were aligned to the shipped contract, as the brief
+itself instructs ("verify type alignment ... any mismatch breaks the integration").
+
+**Pending (separate tasks):**
+- Task 2.1b: Mietvertragsnachtrag (non-rent amendments)
+- Task 2.2: end-to-end Paul case test (€525 → €575 supersession through the full chain)
+- Predicate-pair allowlist generator (CI consumer-contract, §6.4) — when it lands,
+  this front-matter's `closes` becomes the source of truth
+- Evidence-row population for closure intents (still null)
+- Indexmiete recomputation jobs (future field-level resolver)
