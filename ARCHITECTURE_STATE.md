@@ -599,3 +599,33 @@ stored, but no claims are persisted until 1.8 ships.
 of joining to `Property` for `"organizationId"`. The original draft used a JOIN
 that referenced non-existent camelCase columns and would have 400'd every bridge
 call. Tenant-isolation annotation reason updated to reflect the direct read.
+
+## Resolver layer (Task 1.10+)
+
+Resolvers are pure functions that answer one question by querying the claim
+store and returning a `ResolvedFact` with full provenance. Architecture §5.1–5.3.
+
+**Shipped:**
+- `src/lib/resolvers/types.ts` — `ResolvedFact<TValue>`, `ResolutionStatus`,
+  `Money`, `Conflict`, `downgradeConfidence`
+- `src/lib/resolvers/rent-for-unit.ts` (Task 1.10) — `rentForUnit({ property_id,
+  unit_ref, as_of_date?, org_id }, { tx? }) → Promise<ResolvedFact<Money>>`.
+  Implements §5.2 algorithm: zero/one/multi-claim handling, sort by (valid_from
+  DESC, created_at DESC), confidence downgrade on conflicts. Writes a
+  DerivationRecord per call (output_type="resolved_fact"); DR write is
+  best-effort and does not block resolution. Org isolation via JOIN to Property
+  with explicit org_id parameter.
+- `src/tests/resolvers/rent-for-unit.test.ts` — 8 scenarios, ≥30 assertions,
+  covers Lena single-claim, Paul/Kuru-style Mieterhöhung, Hofmann, multi-claim
+  conflict, zero-claim, before-any-claim date, org isolation, prefix
+  idempotency
+- `src/tests/resolvers/resolver-purity.test.ts` — CI gate: resolver source
+  contains no LLM/prompt/emitter/extraction imports and no `fetch(` or
+  `https://` literals
+
+**Pending (separate tasks):**
+- Other resolvers (`owner_of_property`, `active_insurance_for_property`,
+  `last_meter_reading_for_unit`) — follow the same template
+- UI surfacing of conflicts (`status === "latest_active_claim_with_conflicts"`
+  should drive a triage banner)
+- Caching/memoization for hot resolvers (not needed pre-customer)
