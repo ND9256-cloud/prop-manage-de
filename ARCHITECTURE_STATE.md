@@ -711,3 +711,36 @@ itself instructs ("verify type alignment ... any mismatch breaks the integration
   this front-matter's `closes` becomes the source of truth
 - Evidence-row population for closure intents (still null)
 - Indexmiete recomputation jobs (future field-level resolver)
+
+## Phase 2 supersession gate + applier hotfix (Task 2.2, 2026-05-27)
+
+Three-case integration test (Paul, Kuru, Weber) verifying the supersession
+chain end-to-end. The Weber case is the original v1 bug that motivated v2;
+the test verifies the architectural fix.
+
+**Shipped:**
+- `tests/fixtures/extraction/supersession/{paul,kuru,weber}-*/` —
+  synthetic Mietvertrag + Mieterhöhung envelopes per case
+- `src/tests/integration/supersession-cases.test.ts` — 54 assertions across
+  3 cases, all rolled back in per-case tx
+- **Applier hotfix (in same PR):**
+  1. Staffelmiete blocker check now excludes the current emission's own
+     claims (filter on source_extraction_run_id != ctx.extraction_run_id).
+     Previously the check found the newly-inserted kaltmiete and falsely
+     blocked the closure.
+  2. close_overlapping_only no longer sets superseded_at +
+     superseded_by_claim_id on closed claims (only close_overlapping_and_supersede_future
+     does, per architecture §5.5.3). Previously the closed claim was hidden
+     from the resolver's historical queries because of the
+     superseded_by_claim_id IS NULL filter.
+
+**Bug class closed:** the historical query `rentForUnit(as_of_date < effective_date)`
+now correctly returns the old rent (€525 for Paul pre-2024, €900 for Weber
+pre-2024-04-01) with `single_active_claim` and `confidence: "high"`.
+
+**Pending (separate tasks):**
+- Task 2.1b: Mietvertragsnachtrag (non-rent amendments)
+- Task 2.3: Übergabeprotokoll schema (now shipped per a separate PR if applicable)
+- Task 2.4: Übergabeprotokoll emitter
+- Task 2.5: Hofmann fixture (Eigentümerwechsel safeguard)
+- Task 2.6: PLZ verifier

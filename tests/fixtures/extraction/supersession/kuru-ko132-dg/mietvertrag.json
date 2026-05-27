@@ -1,0 +1,34 @@
+{
+  "doc_type": "mietvertrag",
+  "schema_version": "2026-05-21-v1",
+  "prompt_version": "2026-05-21-v1",
+  "model": "synthetic-fixture",
+  "fields": {
+    "kaltmiete": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "440,00 €",
+      "normalized_value": { "amount": 44000, "currency": "EUR" }
+    },
+    "unit_ref": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "DG",
+      "normalized_value": "DG"
+    },
+    "tenant_identity": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": { "name": "Kuru, Mehmet", "is_legal_entity": false, "legal_form": null }
+    },
+    "mietbeginn": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "2020-11-01"
+    }
+  },
+  "lifecycle": {
+    "document_status": "executed",
+    "effective_date": "2020-11-01"
+  }
+}

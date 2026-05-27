@@ -262,7 +262,7 @@ async function scenario3_mieterhoeungCloseOverlappingOnly() {
       ? closed.valid_to.toISOString().slice(0, 10)
       : String(closed.valid_to);
     ok(closedValidTo === "2026-01-01", "Base kaltmiete valid_to set to 2026-01-01");
-    ok(closed.superseded_by_claim_id !== null, "Base kaltmiete superseded_by_claim_id set");
+    ok(closed.superseded_by_claim_id === null, "Base kaltmiete superseded_by_claim_id NOT set (close_overlapping_only per §5.5.3)");
 
     // 11. 1 closure row
     ok(result.applied_closure_ids.length === 1, "1 claim_closure inserted");

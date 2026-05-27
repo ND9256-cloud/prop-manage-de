@@ -1,0 +1,34 @@
+{
+  "doc_type": "mietvertrag",
+  "schema_version": "2026-05-21-v1",
+  "prompt_version": "2026-05-21-v1",
+  "model": "synthetic-fixture",
+  "fields": {
+    "kaltmiete": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "900,00 €",
+      "normalized_value": { "amount": 90000, "currency": "EUR" }
+    },
+    "unit_ref": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "OG",
+      "normalized_value": "OG"
+    },
+    "tenant_identity": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": { "name": "Weber, Anna", "is_legal_entity": false, "legal_form": null }
+    },
+    "mietbeginn": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "2018-06-01"
+    }
+  },
+  "lifecycle": {
+    "document_status": "executed",
+    "effective_date": "2018-06-01"
+  }
+}

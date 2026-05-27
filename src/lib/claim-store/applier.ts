@@ -334,16 +334,16 @@ async function applyClosure(
     applied_valid_to: string;
   }
 ): Promise<string> {
-  // All close_modes set valid_to + superseded_at + superseded_by_claim_id.
-  // The trigger function allows the three supersession columns to be set
-  // together. Setting all three uniformly simplifies the model and matches
-  // the migration's intent.
+  // valid_to is set for all close_modes; superseded_at + superseded_by_claim_id
+  // are set only for close_overlapping_and_supersede_future per architecture
+  // §5.5.3. close_overlapping_only sets only valid_to so the closed claim
+  // remains visible to historical resolver queries with as_of_date < valid_to.
   // @tenant-isolation-disable-next-line -- reason: claim-store applier UPDATE warehouse.claims supersession columns, target claim already verified as property-scoped
   await tx.$executeRaw`
     UPDATE warehouse.claims
     SET valid_to = ${args.applied_valid_to}::date,
-        superseded_at = now(),
-        superseded_by_claim_id = ${args.reason_claim_id}::uuid
+        superseded_at = CASE WHEN ${args.close_mode} = 'close_overlapping_and_supersede_future' THEN now() ELSE NULL END,
+        superseded_by_claim_id = CASE WHEN ${args.close_mode} = 'close_overlapping_and_supersede_future' THEN ${args.reason_claim_id}::uuid ELSE NULL END
     WHERE id = ${args.target_claim_id}::uuid
   `;
 
@@ -505,6 +505,7 @@ async function checkStaffelmieteConflict(
       AND subject = ${intent.target_subject}
       AND predicate = 'kaltmiete'
       AND valid_from > ${intent.close_at}::date
+      AND source_extraction_run_id != ${context.extraction_run_id}::uuid
       AND superseded_by_claim_id IS NULL
   `;
   if (futureKaltmiete.length > 0) {
