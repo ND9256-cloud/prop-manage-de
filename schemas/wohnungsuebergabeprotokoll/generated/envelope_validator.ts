@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/wohnungsuebergabeprotokoll/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-08-v1
+// Schema version: 2026-05-27-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -13,9 +13,64 @@ export class EnvelopeValidationError extends Error {
 const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["present","absent","illegible","ambiguous","contradicted","not_applicable","inferred","requires_human_review"];
 
 const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: string[] | null }> = {
-  "doc_type_marker": {
-    type: "string",
+  "uebergabe_typ": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["Einzug","Auszug","Eigentümerwechsel","unklar"],
+  },
+  "unit_ref": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["EG","1.OG","2.OG","3.OG","4.OG","DG","Keller","Souterrain"],
+  },
+  "uebergabe_datum": {
+    type: "date",
+    severity: "critical",
+    enumValues: null,
+  },
+  "kaeufer": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "verkaeufer": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "mieter_in": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "mieter_out": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "vacant_possession_language_present": {
+    type: "boolean",
+    severity: "important",
+    enumValues: null,
+  },
+  "vacant_possession_language_excerpts": {
+    type: "structured_array",
     severity: "nice_to_have",
+    enumValues: null,
+  },
+  "meter_readings": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "damages_noted": {
+    type: "structured",
+    severity: "nice_to_have",
+    enumValues: null,
+  },
+  "signatures": {
+    type: "structured",
+    severity: "important",
     enumValues: null,
   }
 };
@@ -95,5 +150,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-08-v1";
+export const SCHEMA_VERSION = "2026-05-27-v1";
 export const DOC_TYPE = "wohnungsuebergabeprotokoll";

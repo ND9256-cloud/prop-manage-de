@@ -1,7 +1,18 @@
 {
-  "schema_version": "2026-05-08-v1",
+  "schema_version": "2026-05-27-v1",
   "doc_type": "wohnungsuebergabeprotokoll",
   "labels": {
-    "doc_type_marker": "Dokumenttyp-Marker (Stub)"
+    "uebergabe_typ": "Übergabetyp",
+    "unit_ref": "Einheit",
+    "uebergabe_datum": "Übergabedatum",
+    "kaeufer": "Käufer (neuer Eigentümer)",
+    "verkaeufer": "Verkäufer (bisheriger Eigentümer)",
+    "mieter_in": "Einziehender Mieter",
+    "mieter_out": "Ausziehender Mieter",
+    "vacant_possession_language_present": "Mietfrei-Sprache vorhanden",
+    "vacant_possession_language_excerpts": "Mietfrei-Belegstellen",
+    "meter_readings": "Zählerstände",
+    "damages_noted": "Festgestellte Mängel",
+    "signatures": "Unterschriften"
   }
 }
