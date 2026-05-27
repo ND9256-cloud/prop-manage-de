@@ -629,3 +629,28 @@ store and returning a `ResolvedFact` with full provenance. Architecture §5.1–
 - UI surfacing of conflicts (`status === "latest_active_claim_with_conflicts"`
   should drive a triage banner)
 - Caching/memoization for hot resolvers (not needed pre-customer)
+
+## Phase 1: CLOSED (Task 1.11, 2026-05-27)
+
+Phase 1 of the v2 extraction architecture is complete. The full chain —
+extraction envelope → claim emission → applier with closure handling →
+resolver — works end-to-end for the Mietvertrag doc type.
+
+**Phase 1 deliverables:**
+- Task 1.7: pure Mietvertrag claim emitter
+- Task 1.8: transaction applier with closure semantics
+- Task 1.9: Edge Function ↔ Node bridge via /api/pipeline/apply-emission
+- Task 1.10: rent_for_unit resolver
+- Task 1.11: Everding KO132 1.OG end-to-end fixture test (Phase 1 gate)
+
+**The Phase 1 gate test** (`src/tests/integration/everding-end-to-end.test.ts`)
+runs the full chain against a deterministic fixture envelope. If this test
+ever fails, Phase 1 is broken and must be fixed before any Phase 2 work.
+
+**Phase 1 success criterion verified:**
+`rentForUnit({ property_id: KO132, unit_ref: "1.OG" })` returns
+`{ amount: 65000, currency: "EUR" }`, `status: "single_active_claim"`,
+`confidence: "high"`.
+
+**Next:** Phase 2 — extend to other doc types (Mieterhöhung, Kündigung,
+Übergabeprotokoll, Eigentümerwechsel) per the closing-matrix pattern.

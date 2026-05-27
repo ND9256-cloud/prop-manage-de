@@ -1,0 +1,131 @@
+{
+  "doc_type": "mietvertrag",
+  "schema_version": "2026-05-21-v1",
+  "prompt_version": "2026-05-21-v1",
+  "model": "claude-sonnet-4-20250514",
+  "fields": {
+    "kaution": {
+      "evidence": [],
+      "severity": "important",
+      "raw_value": null,
+      "confidence": null,
+      "absence_state": "absent",
+      "normalized_value": null,
+      "validation_status": "valid"
+    },
+    "mietende": {
+      "evidence": [],
+      "severity": "important",
+      "raw_value": null,
+      "confidence": null,
+      "absence_state": "not_applicable",
+      "normalized_value": null,
+      "validation_status": "valid"
+    },
+    "unit_ref": {
+      "evidence": [
+        {
+          "bbox": null,
+          "page": 2,
+          "quote": "Wohnfläche ca. Geschoss Zimmer Küche Diele/Flur Bad Toilette Keller Bodenraum Abstellraum\n100,00 m² 1 3,5 1 1 0 1 – Mitte 0"
+        }
+      ],
+      "severity": "critical",
+      "raw_value": "1",
+      "confidence": "high",
+      "absence_state": "present",
+      "normalized_value": "1.OG",
+      "validation_status": "valid"
+    },
+    "kaltmiete": {
+      "evidence": [
+        {
+          "bbox": null,
+          "page": 3,
+          "quote": "Die Grundmiete (Grundmiete, d. h. ohne Betriebskosten und Heizkosten) beträgt monatlich 650,00 Euro"
+        }
+      ],
+      "severity": "critical",
+      "raw_value": "650,00 Euro",
+      "confidence": "high",
+      "absence_state": "present",
+      "normalized_value": {
+        "amount": 65000,
+        "currency": "EUR"
+      },
+      "validation_status": "valid"
+    },
+    "mietbeginn": {
+      "evidence": [
+        {
+          "bbox": null,
+          "page": 2,
+          "quote": "Der Mietvertrag läuft auf unbstimmte Zeit und beginnt am 01.04.2025"
+        }
+      ],
+      "severity": "critical",
+      "raw_value": "01.04.2025",
+      "confidence": "high",
+      "absence_state": "present",
+      "normalized_value": "2025-04-01",
+      "validation_status": "valid"
+    },
+    "tenant_identity": {
+      "evidence": [
+        {
+          "bbox": null,
+          "page": 1,
+          "quote": "Name, Vorname\nEverding, Lena"
+        }
+      ],
+      "severity": "critical",
+      "raw_value": "Everding, Lena",
+      "confidence": "high",
+      "absence_state": "present",
+      "normalized_value": {
+        "name": "Everding, Lena",
+        "legal_form": null,
+        "is_legal_entity": false
+      },
+      "validation_status": "valid"
+    },
+    "landlord_identity": {
+      "evidence": [
+        {
+          "bbox": null,
+          "page": 1,
+          "quote": "Vertretungsberechtigte bei Firma\nDenn & Denn Verwaltungs GbR"
+        }
+      ],
+      "severity": "critical",
+      "raw_value": "Denn & Denn Verwaltungs GbR",
+      "confidence": "high",
+      "absence_state": "present",
+      "normalized_value": {
+        "name": "Denn & Denn Verwaltungs GbR",
+        "legal_form": "GbR",
+        "is_legal_entity": true
+      },
+      "validation_status": "valid"
+    },
+    "nebenkostenvorauszahlung": {
+      "evidence": [],
+      "severity": "important",
+      "raw_value": null,
+      "confidence": null,
+      "absence_state": "absent",
+      "normalized_value": null,
+      "validation_status": "valid"
+    }
+  },
+  "lifecycle": {
+    "issue_date": "2025-04-01",
+    "expiry_date": null,
+    "signed_date": null,
+    "effective_date": "2025-04-01",
+    "document_status": "active",
+    "lifecycle_evidence": null,
+    "amended_by_document_id": null,
+    "supersedes_document_id": null
+  }
+}
