@@ -1,0 +1,61 @@
+{
+  "doc_type": "mieterhoehung",
+  "schema_version": "2026-05-27-v1",
+  "prompt_version": "2026-05-27-v1",
+  "model": "synthetic-fixture",
+  "fields": {
+    "new_kaltmiete": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "575,00 €",
+      "normalized_value": { "amount": 57500, "currency": "EUR" }
+    },
+    "previous_kaltmiete": {
+      "absence_state": "present",
+      "confidence": "high",
+      "raw_value": "525,00 €",
+      "normalized_value": { "amount": 52500, "currency": "EUR" }
+    },
+    "effective_date": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "2024-01-01"
+    },
+    "notice_date": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "2023-09-15"
+    },
+    "unit_ref": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "EG"
+    },
+    "tenant_identity": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": { "name": "Paul, Friedrich", "is_legal_entity": false, "legal_form": null }
+    },
+    "landlord_signature_present": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": true
+    },
+    "document_status": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "signed"
+    },
+    "rechtsgrundlage": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "§558"
+    },
+    "staffelmiete_context": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": false
+    }
+  },
+  "lifecycle": {}
+}
