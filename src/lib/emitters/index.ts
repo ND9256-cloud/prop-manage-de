@@ -10,6 +10,7 @@
 // value shape, new field consumed). Don't bump for non-behavioral changes.
 
 import { emitMietvertragClaims } from "./mietvertrag.ts";
+import { emitMieterhoehungClaims } from "./mieterhoehung.ts";
 import type { EmissionResult, EmitterContext } from "./types.ts";
 
 export type EmitterFn = (envelope: any, context: EmitterContext) => EmissionResult;
@@ -21,6 +22,7 @@ export interface EmitterEntry {
 
 export const EMITTERS: Record<string, EmitterEntry> = {
   mietvertrag: { fn: emitMietvertragClaims as EmitterFn, version: "1.0.0" },
+  mieterhoehung: { fn: emitMieterhoehungClaims as EmitterFn, version: "1.0.0" },
 };
 
 export function getEmitter(doc_type: string): EmitterEntry | null {

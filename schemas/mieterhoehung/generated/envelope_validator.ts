@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mieterhoehung/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-08-v1
+// Schema version: 2026-05-27-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -13,8 +13,78 @@ export class EnvelopeValidationError extends Error {
 const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["present","absent","illegible","ambiguous","contradicted","not_applicable","inferred","requires_human_review"];
 
 const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: string[] | null }> = {
-  "doc_type_marker": {
-    type: "string",
+  "nachtrag_typ": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["mieterhoehung","mietvertragsnachtrag_rent_change","mietvertragsnachtrag_other"],
+  },
+  "rechtsgrundlage": {
+    type: "enum",
+    severity: "important",
+    enumValues: ["§558","§559","indexmiete","staffelmiete","bilateral","unspecified"],
+  },
+  "new_kaltmiete": {
+    type: "money",
+    severity: "critical",
+    enumValues: null,
+  },
+  "previous_kaltmiete": {
+    type: "money",
+    severity: "important",
+    enumValues: null,
+  },
+  "effective_date": {
+    type: "date",
+    severity: "critical",
+    enumValues: null,
+  },
+  "notice_date": {
+    type: "date",
+    severity: "nice_to_have",
+    enumValues: null,
+  },
+  "unit_ref": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["EG","1.OG","2.OG","3.OG","4.OG","DG","Keller","Souterrain"],
+  },
+  "tenant_identity": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "landlord_signature_present": {
+    type: "boolean",
+    severity: "critical",
+    enumValues: null,
+  },
+  "tenant_signature_present": {
+    type: "boolean",
+    severity: "important",
+    enumValues: null,
+  },
+  "document_status": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["draft","unsigned","signed","executed"],
+  },
+  "staffelmiete_context": {
+    type: "boolean",
+    severity: "important",
+    enumValues: null,
+  },
+  "paragraph_558_basis": {
+    type: "structured",
+    severity: "nice_to_have",
+    enumValues: null,
+  },
+  "paragraph_559_basis": {
+    type: "structured",
+    severity: "nice_to_have",
+    enumValues: null,
+  },
+  "indexmiete_basis": {
+    type: "structured",
     severity: "nice_to_have",
     enumValues: null,
   }
@@ -95,5 +165,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-08-v1";
+export const SCHEMA_VERSION = "2026-05-27-v1";
 export const DOC_TYPE = "mieterhoehung";

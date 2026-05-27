@@ -1,16 +1,350 @@
 doc_type: mieterhoehung
-schema_version: "2026-05-08-v1"
+schema_version: "2026-05-27-v1"
 claim_kind: assertion
 domain_knowledge_ref: domain_knowledge/mieterhoehung.md
+
 prompt_fragment_template: |
-  TODO: populated in Task 2.1
+  ## Mieterhöhung — extract the following fields
+
+  For each field, return:
+  - raw_value: verbatim text from the document
+  - normalized_value: typed canonical form (see per-field instructions)
+  - evidence: array of { quote: <verbatim quote>, page: <number>, bbox: null }. At least one entry required when absence_state == "present".
+  - confidence: high | medium | low
+  - absence_state: present | absent | illegible | ambiguous | contradicted | not_applicable | inferred | requires_human_review
+  - validation_status: valid (set this; verifiers run separately)
+
+  Evidence is MANDATORY when absence_state == present. The evidence array must contain at least one entry. Do not set a value without supporting evidence quotes.
+
+  ### nachtrag_typ (document classification marker)
+
+  Classify the document into exactly one of:
+  - "mieterhoehung" — a unilateral §558/§559 rent-increase notice from the landlord.
+  - "mietvertragsnachtrag_rent_change" — a bilateral amendment (both parties sign) that changes the rent.
+  - "mietvertragsnachtrag_other" — a non-rent amendment (pet clause, parking, ancillary-cost reallocation). This should NOT reach the Mieterhöhung emitter; flag it for reclassification.
+
+  ### rechtsgrundlage (legal grounds for the increase)
+
+  One of: "§558" (Vergleichsmieten), "§559" (Modernisierung), "indexmiete" (§560), "staffelmiete" (§557a), "bilateral" (both-party signed amendment), "unspecified". Drives downstream cap-rule and form-requirement interpretation; not used by the emitter for emission decisions.
+
+  ### new_kaltmiete (the new base rent after the increase, EUR)
+
+  The new Kaltmiete that takes effect on effective_date. Base rent only, excluding Nebenkosten.
+  normalized_value: integer in minor units (cents) + currency code, e.g. { amount: 57500, currency: "EUR" } for €575.00.
+
+  ### previous_kaltmiete (the base rent being superseded, EUR, optional)
+
+  The prior Kaltmiete the increase supersedes. Used downstream for Kappungsgrenze evaluation.
+  normalized_value: { amount: <cents>, currency: "EUR" }.
+
+  ### effective_date (date the new rent takes effect)
+
+  The date from which the new Kaltmiete applies. normalized_value: ISO 8601 (YYYY-MM-DD). Source is typically DD.MM.YYYY — normalize. Drives the new claim's valid_from and the closure edge (effective_date - 1 day). Do NOT substitute notice_date when this is missing.
+
+  ### notice_date (date the increase notice was issued, optional)
+
+  Informational only; never used for emission. normalized_value: ISO 8601 (YYYY-MM-DD).
+
+  ### unit_ref (Einheit — normalized floor/position identifier)
+
+  Normalize to one of: EG, 1.OG, 2.OG, 3.OG, 4.OG, DG, Keller, Souterrain. Must match the unit_ref of the Mietvertrag being amended. Extract from the filled-in unit specification, not from template boilerplate.
+
+  ### tenant_identity (Mieter — the tenant party to the lease being amended)
+
+  normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal_form: <optional string for entities> }. Used for closure match (optional strictness).
+
+  ### landlord_signature_present (boolean)
+
+  true if the document carries a landlord signature. For §558/§559 this is the legally-required signature and the emitter's closure prerequisite.
+
+  ### tenant_signature_present (boolean)
+
+  true if the document carries a tenant signature. Required only for bilateral rent-change amendments; informational for §558/§559.
+
+  ### document_status (lifecycle state)
+
+  One of: draft, unsigned, signed, executed. The emitter requires "signed" or "executed" to emit a closure intent.
+
+  ### staffelmiete_context (boolean heuristic)
+
+  true if the document text indicates the unit is on a Staffelmiete schedule (references a Staffelplan, or explicitly supersedes a Staffel step). The emitter uses this to pre-flag the closure for review; the applier also re-checks the claim store independently.
+
 fields:
-  - id: doc_type_marker
-    german_label: "Dokumenttyp-Marker (Stub)"
+  - id: nachtrag_typ
+    german_label: "Dokumenttyp"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "mieterhoehung"
+      - "mietvertragsnachtrag_rent_change"
+      - "mietvertragsnachtrag_other"
+    verifier_refs:
+      - enum
+    classification_hints: |
+      mieterhoehung = unilateral §558/§559 landlord notice;
+      mietvertragsnachtrag_rent_change = bilateral amendment that happens to
+      change rent; mietvertragsnachtrag_other = non-rent amendment (should not
+      reach this emitter).
+    description: |
+      Discriminates Mieterhöhung from Mietvertragsnachtrag and from bilateral
+      rent-change amendments. Misclassification (a non-rent Nachtrag routed
+      here) causes silent data loss — see gotcha scope_narrowed_to_rent_change.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: rechtsgrundlage
+    german_label: "Rechtsgrundlage"
+    severity: important
+    requiredness: optional
+    type: enum
+    enum_values:
+      - "§558"
+      - "§559"
+      - "indexmiete"
+      - "staffelmiete"
+      - "bilateral"
+      - "unspecified"
+    verifier_refs:
+      - enum
+    description: |
+      Legal grounds for the rent increase. Drives downstream interpretation
+      (cap rules, form requirements). Not used by the emitter for emission
+      decisions. §558 = Vergleichsmieten; §559 = Modernisierung;
+      indexmiete = §560; staffelmiete = §557a; bilateral = both-party signed.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: new_kaltmiete
+    german_label: "Neue Kaltmiete"
+    severity: critical
+    requiredness: required
+    type: money
+    verifier_refs:
+      - monetary-verbatim
+    description: |
+      The new Kaltmiete after this Mieterhöhung takes effect, EUR, base rent
+      only (excluding Nebenkosten). normalized_value: integer minor units +
+      currency, e.g. { amount: 57500, currency: "EUR" } for €575.00. Absent
+      new_kaltmiete is a hard error in the emitter — without it the document
+      is not a Mieterhöhung.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: previous_kaltmiete
+    german_label: "Bisherige Kaltmiete"
+    severity: important
+    requiredness: optional
+    type: money
+    verifier_refs:
+      - monetary-verbatim
+    description: |
+      The Kaltmiete being superseded. Used downstream for Kappungsgrenze
+      evaluation (§558). Not required for emission. normalized_value:
+      integer minor units + currency.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: effective_date
+    german_label: "Wirksam ab"
+    severity: critical
+    requiredness: required
+    type: date
+    verifier_refs:
+      - date-format
+    normalization_rule_ref: effective_date_required_for_closure
+    description: |
+      Date the new rent takes effect. ISO 8601 (YYYY-MM-DD). Drives the new
+      claim's valid_from and the closure edge (effective_date - 1 day). The
+      emitter never substitutes notice_date for a missing effective_date.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: notice_date
+    german_label: "Datum des Erhöhungsschreibens"
     severity: nice_to_have
     requiredness: optional
-    type: string
+    type: date
+    verifier_refs:
+      - date-format
     description: |
-      Placeholder field so the stub validates against the meta-schema's
-      "fields must contain at least one entry" rule. Replaced with real
-      fields in the per-doc-type tasks.
+      Date the increase notice was issued. NOT used for emission;
+      informational. ISO 8601 (YYYY-MM-DD).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: unit_ref
+    german_label: "Einheit"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "EG"
+      - "1.OG"
+      - "2.OG"
+      - "3.OG"
+      - "4.OG"
+      - "DG"
+      - "Keller"
+      - "Souterrain"
+    verifier_refs:
+      - enum
+    description: |
+      Normalized unit reference matching the Mietvertrag's unit_ref. Required
+      for claim subject construction (subject = "unit:<unit_ref>"). Map common
+      variants: "Erdgeschoss" → "EG"; "1. Obergeschoss" → "1.OG"; "Dachgeschoss"
+      → "DG". Extract from the filled-in unit field, not from boilerplate.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: tenant_identity
+    german_label: "Mieter"
+    severity: important
+    requiredness: optional
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      The tenant party to the lease being amended. Same shape as the
+      Mietvertrag's tenant_identity. Used for the closure match with optional
+      strictness — the closure still applies if the tenant name does not match,
+      but a match raises confidence.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: landlord_signature_present
+    german_label: "Vermieter-Unterschrift vorhanden"
+    severity: critical
+    requiredness: required
+    type: boolean
+    description: |
+      true if the document carries a landlord signature. For §558/§559 this is
+      the legally-required signature and the emitter's closure prerequisite.
+      For bilateral amendments both signatures are required; this is one of two.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: tenant_signature_present
+    german_label: "Mieter-Unterschrift vorhanden"
+    severity: important
+    requiredness: optional
+    type: boolean
+    normalization_rule_ref: signature_requirements_per_grundlage
+    description: |
+      true if the document carries a tenant signature. Required only for
+      bilateral rent-change amendments; informational for §558/§559. Preserved
+      for downstream legal review of the consent path.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: document_status
+    german_label: "Dokumentstatus"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "draft"
+      - "unsigned"
+      - "signed"
+      - "executed"
+    verifier_refs:
+      - enum
+    description: |
+      Lifecycle state of the document. The emitter requires "signed" or
+      "executed" (i.e. not "draft" or "unsigned") to emit a closure intent.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: staffelmiete_context
+    german_label: "Staffelmiete-Kontext erkannt"
+    severity: important
+    requiredness: optional
+    type: boolean
+    description: |
+      true if the source extraction detected language indicating the unit is
+      on a Staffelmiete schedule (references to a Staffelplan in the original
+      Mietvertrag context, or the Mieterhöhung explicitly superseding a Staffel
+      step). A HEURISTIC signal — the emitter sets blocker_status on the
+      closure intent when true; the applier ALSO independently checks the claim
+      store for open future-dated kaltmiete claims (§5.5.5).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: paragraph_558_basis
+    german_label: "§558 Vergleichsmieten-Begründung"
+    severity: nice_to_have
+    requiredness: conditional
+    condition: "rechtsgrundlage == '§558'"
+    type: structured
+    item_schema:
+      - field: vergleichswohnungen
+        type: array_of_strings
+        required: false
+      - field: mietspiegel_reference
+        type: string
+        required: false
+      - field: consent_deadline
+        type: date
+        required: false
+    description: |
+      Present only when rechtsgrundlage == "§558". Carries the comparable-rent
+      justification (Vergleichswohnungen, Mietspiegel reference, Zustimmungsfrist
+      deadline). Extractor-side only — the emitter ignores it; downstream
+      presenters surface the legal context.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: paragraph_559_basis
+    german_label: "§559 Modernisierungs-Begründung"
+    severity: nice_to_have
+    requiredness: conditional
+    condition: "rechtsgrundlage == '§559'"
+    type: structured
+    item_schema:
+      - field: modernization_cost_total
+        type: money
+        required: false
+      - field: annual_cost_share_percentage
+        type: number
+        required: false
+      - field: modernization_completed_on
+        type: date
+        required: false
+    description: |
+      Present only when rechtsgrundlage == "§559". Carries the modernization
+      basis (total cost, annual cost share, completion date). Extractor-side
+      only — the emitter ignores it.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: indexmiete_basis
+    german_label: "Indexmiete-Begründung"
+    severity: nice_to_have
+    requiredness: conditional
+    condition: "rechtsgrundlage == 'indexmiete'"
+    type: structured
+    item_schema:
+      - field: index_reference_old
+        type: number
+        required: false
+      - field: index_reference_new
+        type: number
+        required: false
+      - field: index_publisher
+        type: string
+        required: false
+    description: |
+      Present only when rechtsgrundlage == "indexmiete". Carries the index
+      reference for downstream recomputation. Extractor-side only — the emitter
+      does not produce recomputation claims; that is a later field-level
+      resolver.
+    used_in_resolvers: false
+    customer_visible: true
