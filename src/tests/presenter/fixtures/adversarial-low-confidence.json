@@ -1,0 +1,34 @@
+{
+  "kind": "ResolvedFact",
+  "scenario": "low-confidence claim; presenter must surface the low confidence",
+  "must_contain_any": [
+    "niedrige Konfidenz",
+    "geringe Konfidenz",
+    "Vorbehalt",
+    "geringer Zuverlässigkeit",
+    "niedrig"
+  ],
+  "must_contain_all": ["480"],
+  "must_not_contain": [
+    "hohe Konfidenz",
+    "sicher",
+    "verifiziert",
+    "bestätigt"
+  ],
+  "fact": {
+    "query": {
+      "property_id": "00000000-0000-0000-0000-000000000001",
+      "unit_ref": "DG"
+    },
+    "value": { "amount": 48000, "currency": "EUR" },
+    "confidence": "low",
+    "status": "single_active_claim",
+    "source_claim_ids": ["claim-low-conf-id"],
+    "source_document_ids": ["doc-faded-scan-id"],
+    "conflicts": [],
+    "derivation_record_id": null,
+    "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+    "generated_at": "2026-05-28T10:00:00Z"
+  },
+  "hints": null
+}
