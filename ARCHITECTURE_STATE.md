@@ -1008,3 +1008,49 @@ an address field is added — registered and unit-tested, ready when needed.
 Mieterhöhung, Übergabeprotokoll, Mietvertragsnachtrag emitters shipped;
 supersession + Hofmann + PLZ guards in place. Next: Phase 3 (composer + brain
 replacement).
+
+## Composer core shipped (Task 3.1, 2026-05-28) — Phase 3 begins
+
+The deterministic brain-replacement foundation (architecture §5.4.3). Pure
+TypeScript: `src/lib/composer/property-snapshot.ts` assembles a
+`PropertySnapshot { core, modules, metadata }` by dispatching requested
+modules to a registry. No LLM, no prompts — the CI purity gate
+(`src/tests/composer/composer-purity.test.ts`) enforces this. DB access via
+Prisma is permitted (resolvers do the same); reasoning is not.
+
+- `composePropertySnapshot({ property_id, org_id, modules }, { tx? }): Promise<PropertySnapshot>`
+- `CorePropertySnapshot`: short_code, address, total_sqm, unit_count, unit_refs,
+  org_id. Always composed from `Property` + `Unit` (unit_count is computed
+  from the Unit table — `Property.unit_count` is nullable and unused).
+- Module registry: rent_roll / ownership / insurance / costs / handover.
+  Every module is registered as a stub returning `completeness: "unavailable"`
+  with a `not_implemented` warning. Task 3.2 replaces the rent_roll entry with
+  the real implementation; later tasks slot in the others.
+- Unknown module names → `completeness: "unavailable"` + `unknown_module`
+  warning (graceful — never throws on unknown names).
+- Metadata: `composed_at` (ISO), `claim_snapshot_version` (stable SHA-256 over
+  sorted relevant claim IDs — the cache-invalidation key per §5.4),
+  `resolver_versions`, `completeness` per module, `warnings`.
+- Writes one `warehouse.derivation_records` row per call with
+  `output_type='property_snapshot'`, `composer_version='1.0.0'`,
+  `input_claim_ids` (union over modules), `resolver_version` (comma-joined
+  `name@version` pairs or NULL when no resolvers ran). Best-effort write
+  (logs and returns on failure) mirroring the resolver's audit-row policy.
+- Consumes the SHIPPED `ResolvedFact<T>` from `src/lib/resolvers/types.ts` —
+  NOT the idealized §5.4.4 status enum. The composer is a pass-through for
+  resolver output; status remapping is deliberately out of scope.
+
+**DerivationRecord CHECK confirmed:** `output_type='property_snapshot'` is
+already allowed by the Phase 0 claim-store migration
+(`supabase/migrations/20260510080000_v2_claim_store.sql`). `composer_version`
+column exists. No migration needed.
+
+**Tests:** 31 assertions across 7 scenarios in
+`src/tests/composer/property-snapshot.test.ts` (KO132 core, HHS55 core,
+unknown module, rent_roll stub, hash determinism, derivation record write,
+cross-org access denied). 16 assertions in the purity gate.
+
+**Pending Phase 3:** 3.2 (rent_roll module — replaces the stub), 3.3
+(dashboard renders from the composer), 3.4 (legacy brain shadow mode + kill
+switch), 3.5 (presenter, LLM render-only). Blackstone-compatible projection
+(§5.4.8) deferred until a surface needs it.
