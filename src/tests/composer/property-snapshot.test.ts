@@ -87,9 +87,9 @@ async function main() {
   }
 
   // =========================================================================
-  // Scenario 3 — rent_roll stub returns unavailable (until Task 3.2)
+  // Scenario 3 — rent_roll module returns real data (Task 3.2 shipped)
   // =========================================================================
-  console.log("\n--- Scenario 3: rent_roll stub (flips to 'complete' when 3.2 lands) ---");
+  console.log("\n--- Scenario 3: rent_roll module (Task 3.2 — real composer module) ---");
   {
     const snap = await composePropertySnapshot({
       property_id: KO132_ID,
@@ -98,8 +98,8 @@ async function main() {
     });
     const m = snap.modules.rent_roll;
     ok(m !== undefined, "modules.rent_roll exists");
-    ok(m!.completeness === "unavailable", "rent_roll completeness === unavailable (3.1 stub)");
-    ok(m!.warnings.some((w) => w.code === "not_implemented"), "rent_roll warning code === not_implemented");
+    ok(m!.completeness !== "unavailable", "rent_roll completeness !== unavailable (3.2 implemented)");
+    ok(m!.warnings.every((w) => w.code !== "not_implemented"), "rent_roll no longer carries 'not_implemented' warning");
   }
 
   // =========================================================================
