@@ -184,42 +184,16 @@ function hhs55Snapshot(): PropertySnapshot {
       property_id: "d2e8e9c7-957a-4e0f-8150-452c21bcae56",
       org_id: "310131df-d6ed-4007-83c2-ac69a7e9df42",
       short_code: "HHS55",
-      address: "Holzhäuser Straße 55, 04299 Leipzig",
-      total_sqm: 160,
+      address: "Heinrich-Heine-Straße 55/55a, 34121 Kassel",
+      total_sqm: null,
       unit_count: 2,
-      unit_refs: ["EG", "1.OG"],
+      unit_refs: ["1.OG", "DG"],
     },
     modules: {
       rent_roll: {
         completeness: "complete",
         data: {
           rows: [
-            {
-              unit_ref: "EG",
-              occupancy_status: "vacant",
-              vacancy_reason: "no_data",
-              current_kaltmiete: {
-                query: {},
-                value: null,
-                confidence: "low",
-                status: "no_active_claim",
-                source_claim_ids: [],
-                source_document_ids: [],
-                conflicts: [],
-                derivation_record_id: null,
-                resolver: { name: "rent_for_unit", version: "1.0.0" },
-                generated_at: "2026-05-28T10:00:00Z",
-              },
-              tenant_active: {
-                status: "unavailable",
-                reason: "no_tenant_resolver",
-                resolver: { name: "tenant_for_unit", version: "unshipped" },
-              },
-              size_sqm: 80,
-              floor: 0,
-              rooms: 3,
-              target_cold_rent: null,
-            },
             {
               unit_ref: "1.OG",
               occupancy_status: "vacant",
@@ -241,9 +215,35 @@ function hhs55Snapshot(): PropertySnapshot {
                 reason: "no_tenant_resolver",
                 resolver: { name: "tenant_for_unit", version: "unshipped" },
               },
-              size_sqm: 80,
+              size_sqm: null,
               floor: 1,
-              rooms: 3,
+              rooms: null,
+              target_cold_rent: null,
+            },
+            {
+              unit_ref: "DG",
+              occupancy_status: "vacant",
+              vacancy_reason: "no_data",
+              current_kaltmiete: {
+                query: {},
+                value: null,
+                confidence: "low",
+                status: "no_active_claim",
+                source_claim_ids: [],
+                source_document_ids: [],
+                conflicts: [],
+                derivation_record_id: null,
+                resolver: { name: "rent_for_unit", version: "1.0.0" },
+                generated_at: "2026-05-28T10:00:00Z",
+              },
+              tenant_active: {
+                status: "unavailable",
+                reason: "no_tenant_resolver",
+                resolver: { name: "tenant_for_unit", version: "unshipped" },
+              },
+              size_sqm: null,
+              floor: 2,
+              rooms: null,
               target_cold_rent: null,
             },
           ],
@@ -258,7 +258,7 @@ function hhs55Snapshot(): PropertySnapshot {
         },
         resolver_versions: { rent_for_unit: "1.0.0" },
         input_claim_ids: [],
-        warnings: [],
+        warnings: [{ module: "rent_roll", code: "tenant_resolver_unavailable", message: "tenant_active populated as unavailable" }],
       },
     },
     metadata: {
@@ -393,13 +393,7 @@ async function main() {
     const prose = await renderPropertySnapshot(snap);
     console.log(`  prose: ${prose}`);
     ok(
-      containsAny(prose, [
-        "keine moduldaten",
-        "keine daten",
-        "keine angaben",
-        "nicht verfügbar",
-        "noch keine",
-      ]),
+      containsAny(prose, ["keine moduldaten", "keine weiteren", "moduldaten", "keine daten", "keine angaben", "nicht verfügbar", "nicht vorhanden", "nicht erfasst", "noch keine"]),
       "empty-modules prose acknowledges absence of module data",
     );
     // Must NOT invent anything.

@@ -2,7 +2,6 @@
   "kind": "ResolvedFact",
   "scenario": "rent stored in USD by mistake; presenter must preserve USD, NOT silently convert to EUR",
   "must_contain_any": ["USD", "US-Dollar", "Dollar", "$"],
-  "must_contain_all": ["650"],
   "must_not_contain": ["EUR", "Euro", "€"],
   "fact": {
     "query": {

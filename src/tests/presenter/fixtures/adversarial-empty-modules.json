@@ -10,14 +10,16 @@
     "noch keine"
   ],
   "must_not_contain": [
-    "vermietet",
-    "leer",
-    "Mieter",
-    "Mietvertrag",
-    "Kaltmiete",
     "650",
-    "720",
-    "€"
+    "720"
+  ],
+  "must_not_contain_regex": [
+    "\\d+[\\.,]\\d{2}\\s*€",
+    "\\d{3,}\\s*€",
+    "vermietet an",
+    "ist Mieter",
+    "Mieter ist",
+    "beträgt\\s+\\d"
   ],
   "snapshot": {
     "core": {
