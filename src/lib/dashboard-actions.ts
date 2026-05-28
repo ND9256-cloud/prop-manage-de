@@ -188,7 +188,6 @@ export interface ProvenanceClaim {
     source_document_id: string | null;
 }
 
-export type { LegacyRentRollRow };
 
 export interface RentRollSnapshotPayload {
     propertyId: string;
