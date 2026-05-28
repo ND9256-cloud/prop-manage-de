@@ -1201,3 +1201,55 @@ vacancy CTA, Vermietungsquote stat present.
 **Unblocks Task 3.4** (composer / legacy brain shadow-mode parity check,
 then legacy fallback removal).
 
+
+## Task 3.3 shipped — first customer-facing surface from the composer (2026-05-28)
+
+The dashboard rent roll at /dashboard/warehouse now renders from
+composePropertySnapshot(rent_roll) instead of document_intelligence. The
+three product decisions held in implementation: composer-first with legacy
+fallback ("Legacy" cell tag during 3.4 transition), phantom vacancy as
+actionable worklist item ("Kein Mietvertrag hinterlegt" + upload affordance),
+understated Vermietungsquote. Lena Everding's €650 appears as a clean row
+with click-through provenance (underlined value links to source document).
+EG renders as phantom vacancy (no claim ever ingested).
+
+The trust proposition ("evidence chains as legal shields") becomes tangible
+here: every resolved number traces to its source document in one click.
+
+**Follow-ups surfaced by 3.3 (not blocking merge):**
+
+1. **Top stat bar still legacy-sourced.** The dashboard header still shows
+   100% Vermietungsquote / €3.595/Monat — sourced from the legacy aggregate,
+   contradicted by the composer's 33% / €650 directly below. Two paths:
+   migrate top stats to composer (right long-term answer; needs an
+   org-level aggregate snapshot, not just per-property rent_roll), or
+   label them "Legacy" until 3.4 retires the legacy read. Decide in 3.4.
+
+2. **DG renders as phantom vacancy despite known Kuru claim.** We have a
+   €470 Saniye Kuru claim for KO132 DG in the test fixtures, but the
+   dashboard shows DG as "Kein Mietvertrag hinterlegt." Same class as EG —
+   the v2 claims pipeline has no kaltmiete claim for unit:DG in the live
+   data, only in test fixtures. The rent roll is correctly surfacing the
+   ingestion gap. Action: ingest Kuru's lease through the v2 pipeline (or
+   verify why her real lease document hasn't produced a claim).
+
+3. **The "Mietübersicht" duplication.** Both the composer rent roll AND
+   the legacy Immobilien-Analyse render on the same page. 3.4 shadow mode
+   keeps them parallel by design; once parity is proven, the legacy
+   Mietübersicht table is retired (the narrative/insights from the legacy
+   brain may stay until 3.5 replaces with the deterministic Presenter).
+
+4. **Upload-action wiring.** The phantom-vacancy upload affordance has a
+   data hook (`data-action="upload-lease"`) but is not yet wired to the
+   upload flow. Small follow-up.
+
+## Cleanup note (2026-05-28)
+
+KO132 1.OG had 3 identical €650 kaltmiete claims from re-processing the same
+Lena document across 3 extraction runs during May 25 bridge debugging.
+Manually cleaned: kept canonical run 883934f6 (claim 8fd74446), superseded
+the two duplicates via direct UPDATE (superseded_at + superseded_by_claim_id
+pointing at canonical) since no GoBD correction flow exists yet. Latent bug:
+the applier dedups only on source_extraction_run_id, so re-processing the
+same document stacks duplicate active claims. Fix before first customer:
+dedup on (source_document_id, subject, predicate, value, valid_from).
