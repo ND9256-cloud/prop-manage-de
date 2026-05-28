@@ -779,3 +779,74 @@ closure rule (in domain knowledge front-matter) is the structural backstop;
   `close_overlapping_only` for Eigentümerwechsel, but architecture §5.5.2
   specifies `close_overlapping_and_supersede_future`. Pick one when
   implementing the emitter; the architecture spec should win.
+
+## Übergabeprotokoll emitter shipped (Task 2.4, 2026-05-28)
+
+Third emitter. Dispatches on `uebergabe_typ` into four branches. The Hofmann
+safeguard is now **structural code**: the Eigentümerwechsel branch has no code
+path that produces a tenant-related closure intent.
+
+**Files:**
+- `src/lib/emitters/wohnungsuebergabeprotokoll.ts` — emitter
+- `src/lib/emitters/index.ts` — registered in EMITTERS map (version "1.0.0")
+- `src/tests/emitter-wohnungsuebergabeprotokoll.test.ts` — 82 assertions across
+  6 scenarios
+
+**Behavior:**
+- **Einzug** → 1 `tenant_active` event claim (subject `unit:<unit_ref>`,
+  value.tenants=[mieter_in], valid_from=uebergabe_datum), no closures
+- **Auszug** → 1 `lease_terminated` event claim (subject `unit:<unit_ref>`,
+  value.terminating_parties=[mieter_out]) + 4 closure intents on
+  `unit:<unit_ref>` for predicates `kaltmiete`, `tenant_active`, `kaution`,
+  `nebenkostenvorauszahlung`; `close_overlapping_and_future`,
+  `close_at = uebergabe_datum`. tenant_active closure carries
+  `match.tenant_identity = mieter_out.name` with `match_strictness="required"`;
+  the other three use `match_strictness="absent"` (their value shapes have no
+  `tenants[]` array, so a required tenant-identity match would filter every
+  candidate out).
+- **Eigentümerwechsel** → 1 `ownership_transferred` event claim (subject
+  `"property"`) + 1 new `owner` assertion claim (subject `"property"`,
+  value.owner=kaeufer, valid_from=uebergabe_datum) + 1 closure intent for the
+  previous owner (target_predicate `owner`, `close_overlapping_and_supersede_future`,
+  `close_at = uebergabe_datum - 1 day`, match.tenant_identity=verkaeufer.name
+  with `match_strictness="optional"` since the shipped ClaimClosure.match
+  shape has no dedicated owner_identity slot). **NEVER** closes tenant /
+  kaltmiete / kaution / nebenkostenvorauszahlung claims.
+- **unklar / unrecognized / missing required field** → empty EmissionResult
+  (defers to triage; does NOT throw, unlike Mieterhöhung where missing
+  new_kaltmiete is a hard error)
+
+**Resolved inconsistency (Task 2.3 carry-over):** the domain knowledge file
+(`closes` array, Task 1.4) declared `close_overlapping_only` for the
+Eigentümerwechsel owner closure; architecture §5.5.2 / §5.5.3 specify
+`close_overlapping_and_supersede_future`. The emitter uses the architecture
+value — the previous owner is genuinely superseded by the new owner, so
+`superseded_by_claim_id` preserves the ownership chain for audit. The
+domain knowledge file should be aligned in a cosmetic follow-up.
+
+**Hofmann safeguard, two layers:**
+1. **Emitter:** the `emitEigentuemerwechsel` function in
+   `wohnungsuebergabeprotokoll.ts` only ever constructs an `owner` closure.
+   There is no flag or condition that gates tenant closures — those intents
+   are simply never built.
+2. **Applier:** `checkVacantPossessionWarning` in `claim-store/applier.ts`
+   rejects any ownership→tenant closure as `vacant_possession_warning` (the
+   backstop, verified in Scenario 7 of the applier tests).
+
+**Verification:**
+- 82 emitter assertions pass (6 scenarios incl. explicit Hofmann assertion)
+- 32 purity assertions pass (no DB / fetch / fs / env in emitter)
+- All other emitter, claim-store, and integration tests still pass
+  (Mieterhöhung 46, Mietvertrag 37, applier 39, fuzzy 12,
+  Everding end-to-end 25, supersession-cases 54)
+- Tenant-isolation lint: 0 violations
+- tsc clean
+
+**Pending:**
+- Task 2.5: Hofmann fixture (the Phase 2 gate that exercises this end-to-end
+  through emitter + applier with the real Hofmann case data)
+- Task 2.6: PLZ verifier
+- `owner_of_property` resolver (later — owner claims are emitted now but the
+  resolver does not yet read them)
+- Cosmetic follow-up: align `domain_knowledge/wohnungsuebergabeprotokoll.md`
+  `closes` close_mode with the architecture value
