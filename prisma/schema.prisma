@@ -384,3 +384,15 @@ model Invitation {
 //   // warehouse.document_extractions_v2 — tenant-scoped via source_document_id → documents.property_id → Property
 //   // Accessed via warehouseDb() service-role client, not Prisma.
 // }
+
+// =============================================================================
+// Warehouse Brain Shadow Comparison — SQL-only table (NOT managed by Prisma).
+// This stub exists solely for the tenant-isolation lint gate.
+// Actual schema is in supabase/migrations/20260528201627_brain_shadow_comparison.sql.
+// =============================================================================
+
+// /// @tenant-scoped
+// model WarehouseBrainShadowComparison {
+//   // warehouse.brain_shadow_comparison — tenant-scoped directly via org_id column
+//   // Accessed via warehouseDb() service-role client from nightly shadow-mode job, not Prisma.
+// }
