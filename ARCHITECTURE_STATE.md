@@ -1054,3 +1054,37 @@ cross-org access denied). 16 assertions in the purity gate.
 (dashboard renders from the composer), 3.4 (legacy brain shadow mode + kill
 switch), 3.5 (presenter, LLM render-only). Blackstone-compatible projection
 (§5.4.8) deferred until a surface needs it.
+
+## Authoritative Unit inventory seeded (Task 3.1b, 2026-05-28)
+
+Architecture decision: **unit existence is structural truth (Unit table); unit
+facts are temporal truth (claims).** The rent_roll module (3.2) enumerates ALL
+units from the Unit table and resolves each via `rentForUnit`; a unit with no
+active claim is a VACANCY — a signal only an authoritative inventory can
+surface. Claim-derived unit enumeration was rejected: vacant units produce no
+claims and would be invisible, making Vermietungsquote / vacancy-detection
+structurally impossible.
+
+- Unit table seeded: KO132 {EG, 1.OG, DG}, HHS55 {1.OG, DG} — 5 units total
+- Schema migration `supabase/migrations/20260528115252_add_unit_structural_fields.sql`:
+  relaxed `sizeSqm` to nullable so unknown values can be stored as NULL (the
+  spec forbids fabricating m²); added compound unique on
+  (`propertyId`, `unitNumber`) for safe upsert and to prevent duplicates.
+  `floor` (int?) and `rooms` (float?) already nullable. Prisma schema mirrored.
+- Seed script `scripts/seed-units.ts` is idempotent (upsert keyed on
+  `propertyId, unitNumber`) and also migrates the three legacy KO132 rows from
+  German labels ("Erdgeschoss" / "1. Obergeschoss" / "Dachgeschoss") to the
+  canonical `EG / 1.OG / DG` form in place — preserves Unit IDs so existing
+  leases stay intact. Seeds the known values (KO132 1.OG = 100 m² / 3.5 Zi
+  from the Everding Mietvertrag); leaves the four unknown size_sqm/rooms as
+  NULL pending Nils. Re-runs are no-ops.
+- **JOIN INVARIANT:** `unitNumber` holds canonical values (`EG`, `1.OG`, `DG`)
+  matching claim subjects (`unit:<ref>`). Divergence would silently break
+  `rentForUnit` and render occupied units as false vacancies. The seed script
+  also asserts the invariant at run time by joining `warehouse.claims` against
+  the seeded inventory and failing on any orphan `unit:*` subject.
+- `composePropertySnapshot` now reports `KO132 unit_count = 3`,
+  `HHS55 unit_count = 2`; the 3.1 test assertions were flipped accordingly
+  (HHS55 from 0→2; both properties now also assert canonical `unit_refs`).
+
+**Unblocks Task 3.2** (rent_roll module enumerates this inventory).
