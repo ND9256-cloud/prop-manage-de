@@ -1,11 +1,12 @@
 import { getWarehouseOverview } from '@/lib/warehouse-actions';
-import { getBrainSummaries } from '@/lib/dashboard-actions';
+import { getBrainSummaries, getRentRollSnapshots } from '@/lib/dashboard-actions';
 import PropertySelection from '@/components/warehouse/property-selection';
 
 export default async function WarehousePage() {
-    const [{ stats, propertyCards, role }, brainSummaries] = await Promise.all([
+    const [{ stats, propertyCards, role }, brainSummaries, rentRollSnapshots] = await Promise.all([
         getWarehouseOverview(),
         getBrainSummaries(),
+        getRentRollSnapshots(),
     ]);
 
     return (
@@ -14,6 +15,7 @@ export default async function WarehousePage() {
             propertyCards={propertyCards}
             role={role}
             brainSummaries={brainSummaries}
+            rentRollSnapshots={rentRollSnapshots}
             appVersion={process.env.VERCEL_GIT_COMMIT_SHA ?? 'unknown'}
         />
     );

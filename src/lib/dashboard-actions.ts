@@ -3,6 +3,8 @@
 import { getOrgContext } from '@/lib/org';
 import { prisma } from '@/lib/db';
 import { warehouseDb } from '@/lib/warehouse/db';
+import { composePropertySnapshot } from '@/lib/composer/property-snapshot';
+import type { RentRollSnapshot, RentRollRow } from '@/lib/composer/modules/rent-roll';
 
 export interface LastVisitStats {
     newDocs: number;
@@ -153,4 +155,219 @@ function extractRentRoll(analysis: Record<string, unknown>): RentRoll {
         monthly_gross_cold: 0,
         annual_gross_cold: 0,
     };
+}
+
+// ---------------------------------------------------------------------------
+// Composer-driven rent roll (Task 3.3)
+// ---------------------------------------------------------------------------
+//
+// The first customer-facing surface that renders from resolved facts. For each
+// property in the org we compose a RentRollSnapshot and surface enough
+// provenance metadata for the click-through modal in the UI.
+//
+// "Composer-first, legacy fallback" — if the composer has no resolved value
+// for a unit but the legacy document_intelligence brain has a tenant for that
+// same unit_ref, the dashboard renders the legacy value with a "Legacy" tag.
+// This is the dark-launch path during the 3.4 shadow-mode transition and
+// gets removed once parity is proven.
+
+export interface ProvenanceDocument {
+    id: string;
+    file_name: string;
+    doc_type: string | null;
+    category: string | null;
+    status: string | null;
+}
+
+export interface ProvenanceClaim {
+    id: string;
+    valid_from: string | null;
+    confidence: 'high' | 'medium' | 'low' | null;
+    source_field_path: string | null;
+    source_document_id: string | null;
+}
+
+export interface LegacyRentRollRow {
+    unit_ref: string;
+    tenant_name: string | null;
+    monthly_rent: number | null;
+}
+
+export interface RentRollSnapshotPayload {
+    propertyId: string;
+    propertyName: string;
+    shortCode: string | null;
+    address: string;
+    city: string;
+    zip: string;
+    snapshot: RentRollSnapshot;
+    legacyByUnitRef: Record<string, LegacyRentRollRow>;
+    provenance: {
+        documents: Record<string, ProvenanceDocument>;
+        claims: Record<string, ProvenanceClaim>;
+    };
+}
+
+interface LegacyBrainAnalysis {
+    rent_roll?: {
+        current_tenants?: unknown;
+        tenants?: unknown;
+    };
+}
+
+interface LegacyTenantEntry {
+    name?: unknown;
+    unit_ref?: unknown;
+    monthly_rent?: unknown;
+}
+
+function extractLegacyTenants(analysis: Record<string, unknown>): LegacyRentRollRow[] {
+    const rent = (analysis as LegacyBrainAnalysis).rent_roll;
+    if (!rent) return [];
+    const list = Array.isArray(rent.current_tenants)
+        ? (rent.current_tenants as LegacyTenantEntry[])
+        : Array.isArray(rent.tenants)
+            ? (rent.tenants as LegacyTenantEntry[])
+            : [];
+    return list
+        .map<LegacyRentRollRow | null>(t => {
+            const unit = typeof t.unit_ref === 'string' ? t.unit_ref : null;
+            if (!unit) return null;
+            return {
+                unit_ref: unit,
+                tenant_name: typeof t.name === 'string' ? t.name : null,
+                monthly_rent: typeof t.monthly_rent === 'number' ? t.monthly_rent : null,
+            };
+        })
+        .filter((r): r is LegacyRentRollRow => r !== null);
+}
+
+function collectIds(rows: RentRollRow[]): { docIds: string[]; claimIds: string[] } {
+    const docs = new Set<string>();
+    const claims = new Set<string>();
+    for (const r of rows) {
+        for (const id of r.current_kaltmiete.source_document_ids) docs.add(id);
+        for (const id of r.current_kaltmiete.source_claim_ids) claims.add(id);
+    }
+    return { docIds: [...docs], claimIds: [...claims] };
+}
+
+export async function getRentRollSnapshots(): Promise<RentRollSnapshotPayload[]> {
+    const ctx = await getOrgContext();
+    if (!ctx) return [];
+
+    // @tenant-isolation-disable-next-line -- reason: dashboard 3.3 enumerates Property rows for the current org via explicit organizationId parameter; composer downstream re-verifies org_id before reading units/claims
+    const properties = await prisma.$queryRaw<{
+        id: string;
+        name: string;
+        address: string;
+        city: string | null;
+        zip: string | null;
+        short_code: string | null;
+    }[]>`
+        SELECT id, name, address, city, zip, short_code
+        FROM "Property"
+        WHERE "organizationId" = ${ctx.orgId}::uuid
+        ORDER BY short_code NULLS LAST, name
+    `.catch(() => [] as { id: string; name: string; address: string; city: string | null; zip: string | null; short_code: string | null }[]);
+
+    if (properties.length === 0) return [];
+
+    // Legacy brain map for fallback per (property_id, unit_ref).
+    const db = warehouseDb(ctx.orgId);
+    const brainRes = await db
+        .from('property_intelligence')
+        .select('property_id, analysis')
+        .eq('org_id', ctx.orgId)
+        .eq('is_current', true);
+
+    const legacyByProperty = new Map<string, Map<string, LegacyRentRollRow>>();
+    if (brainRes.data) {
+        for (const row of brainRes.data as { property_id: string; analysis: Record<string, unknown> }[]) {
+            const tenants = extractLegacyTenants(row.analysis ?? {});
+            const m = new Map<string, LegacyRentRollRow>();
+            for (const t of tenants) m.set(t.unit_ref, t);
+            legacyByProperty.set(row.property_id, m);
+        }
+    }
+
+    const payloads: RentRollSnapshotPayload[] = [];
+
+    for (const p of properties) {
+        let snapshot: RentRollSnapshot;
+        try {
+            const composed = await composePropertySnapshot({
+                property_id: p.id,
+                org_id: ctx.orgId,
+                modules: ['rent_roll'],
+            });
+            const m = composed.modules.rent_roll;
+            if (!m || !m.data) continue;
+            snapshot = m.data as RentRollSnapshot;
+        } catch (err) {
+            console.warn(`[dashboard] composePropertySnapshot failed for ${p.id}`, err);
+            continue;
+        }
+
+        const { docIds, claimIds } = collectIds(snapshot.rows);
+
+        const documents: Record<string, ProvenanceDocument> = {};
+        if (docIds.length > 0) {
+            const docRes = await db
+                .from('documents')
+                .select('id, file_name, doc_type, category, status')
+                .eq('org_id', ctx.orgId)
+                .in('id', docIds);
+            if (docRes.data) {
+                for (const d of docRes.data as ProvenanceDocument[]) {
+                    documents[d.id] = d;
+                }
+            }
+        }
+
+        const claims: Record<string, ProvenanceClaim> = {};
+        if (claimIds.length > 0) {
+            // @tenant-isolation-disable-next-line -- reason: dashboard 3.3 provenance read; claim ids are derived from a snapshot whose property was already org-verified by composer buildCore; JOIN to Property re-enforces org isolation
+            const claimRows = await prisma.$queryRaw<{
+                id: string;
+                valid_from: Date | null;
+                confidence: 'high' | 'medium' | 'low' | null;
+                source_field_path: string | null;
+                source_document_id: string | null;
+            }[]>`
+                SELECT c.id, c.valid_from, c.confidence, c.source_field_path, c.source_document_id
+                FROM warehouse.claims c
+                JOIN "Property" prop ON prop.id = c.property_id
+                WHERE c.id = ANY(${claimIds}::uuid[])
+                  AND prop."organizationId" = ${ctx.orgId}::uuid
+            `.catch(() => [] as never);
+            for (const c of claimRows) {
+                claims[c.id] = {
+                    id: c.id,
+                    valid_from: c.valid_from ? c.valid_from.toISOString().slice(0, 10) : null,
+                    confidence: c.confidence,
+                    source_field_path: c.source_field_path,
+                    source_document_id: c.source_document_id,
+                };
+            }
+        }
+
+        const legacyMap = legacyByProperty.get(p.id) ?? new Map();
+        const legacyByUnitRef: Record<string, LegacyRentRollRow> = {};
+        for (const [k, v] of legacyMap) legacyByUnitRef[k] = v;
+
+        payloads.push({
+            propertyId: p.id,
+            propertyName: p.name,
+            shortCode: p.short_code,
+            address: p.address,
+            city: p.city ?? '',
+            zip: p.zip ?? '',
+            snapshot,
+            legacyByUnitRef,
+            provenance: { documents, claims },
+        });
+    }
+
+    return payloads;
 }

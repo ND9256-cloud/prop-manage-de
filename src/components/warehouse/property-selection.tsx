@@ -10,7 +10,8 @@ import {
     Brain,
     ChevronDown,
 } from 'lucide-react';
-import type { BrainSummary } from '@/lib/dashboard-actions';
+import type { BrainSummary, RentRollSnapshotPayload } from '@/lib/dashboard-actions';
+import RentRollComposer from './rent-roll-composer';
 
 type PropertyCard = {
     id: string;
@@ -47,10 +48,11 @@ type Props = {
     propertyCards: PropertyCard[];
     role: string;
     brainSummaries?: BrainSummary[];
+    rentRollSnapshots?: RentRollSnapshotPayload[];
     appVersion?: string;
 };
 
-export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [], appVersion = 'unknown' }: Props) {
+export default function PropertySelection({ stats, propertyCards, role, brainSummaries = [], rentRollSnapshots = [], appVersion = 'unknown' }: Props) {
     const router = useRouter();
     const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
 
@@ -171,6 +173,11 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                 })()}
             </div>
 
+            {/* Composer-driven rent roll (Task 3.3) */}
+            {rentRollSnapshots.length > 0 && (
+                <RentRollComposer payloads={rentRollSnapshots} role={role} />
+            )}
+
             {/* Immobilien-Analyse section */}
             {brainSummaries.length > 0 && (() => {
                 const defaultBrain = brainSummaries.find((b) => {
@@ -180,19 +187,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
                 const selectedBrain = brainSummaries.find((b) => b.propertyId === selectedPropertyId) ?? defaultBrain;
                 const analysis = selectedBrain.analysis as Record<string, unknown>;
-
-                // Rent roll tenants
-                const rentRollData = analysis?.rent_roll as {
-                    current_tenants?: number | { name?: string; unit_ref?: string; monthly_rent?: number; lease_start?: string }[];
-                    tenants?: { name?: string; unit_ref?: string; monthly_rent?: number; lease_start?: string }[];
-                    monthly_gross_cold?: number;
-                } | undefined;
-                const tenants = Array.isArray(rentRollData?.current_tenants)
-                    ? rentRollData.current_tenants
-                    : Array.isArray(rentRollData?.tenants)
-                        ? rentRollData.tenants
-                        : [];
-                const totalKaltmiete = tenants.reduce((sum, t) => sum + (typeof t.monthly_rent === 'number' ? t.monthly_rent : 0), 0);
 
                 // Property overview
                 const overview = analysis?.property_overview as { summary?: string } | undefined;
@@ -204,8 +198,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
                 // Action items
                 const actionItems = analysis?.action_items as { urgent?: { action?: string; reason?: string; deadline?: string }[] } | undefined;
                 const urgentActions = actionItems?.urgent ?? [];
-
-                const fmtEur = (v: number) => v.toLocaleString('de-DE', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
                 return (
                     <div>
@@ -235,52 +227,6 @@ export default function PropertySelection({ stats, propertyCards, role, brainSum
 
                         <Card>
                             <CardContent className="p-4 space-y-4">
-                                {/* Mietübersicht rent roll table */}
-                                <div>
-                                    <h3 className="text-sm font-semibold mb-2">Mietübersicht</h3>
-                                    {tenants.length > 0 ? (
-                                        <div className="rounded-md border">
-                                            <table className="w-full text-sm">
-                                                <thead>
-                                                    <tr className="border-b bg-muted/50">
-                                                        <th className="text-left font-medium px-3 py-1.5">Einheit</th>
-                                                        <th className="text-left font-medium px-3 py-1.5">Mieter</th>
-                                                        <th className="text-right font-medium px-3 py-1.5">Mietfläche</th>
-                                                        <th className="text-right font-medium px-3 py-1.5">Kaltmiete</th>
-                                                        <th className="text-right font-medium px-3 py-1.5">NK-Vorauszahlung</th>
-                                                        <th className="text-left font-medium px-3 py-1.5">Mietbeginn</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {tenants.map((t, i) => {
-                                                        const area = (t as { area_sqm?: unknown }).area_sqm;
-                                                        const nk = (t as { nk_prepayment?: unknown }).nk_prepayment;
-                                                        return (
-                                                        <tr key={i} className="border-b last:border-0">
-                                                            <td className="px-3 py-1.5">{t.unit_ref ?? '–'}</td>
-                                                            <td className="px-3 py-1.5">{t.name ?? '–'}</td>
-                                                            <td className="text-right px-3 py-1.5">{typeof area === 'number' ? `${area.toLocaleString('de-DE')} m²` : '–'}</td>
-                                                            <td className="text-right px-3 py-1.5">{typeof t.monthly_rent === 'number' ? fmtEur(t.monthly_rent) : '–'}</td>
-                                                            <td className="text-right px-3 py-1.5">{typeof nk === 'number' ? fmtEur(nk) : '–'}</td>
-                                                            <td className="px-3 py-1.5">{t.lease_start ? new Date(t.lease_start).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '–'}</td>
-                                                        </tr>
-                                                        );
-                                                    })}
-                                                </tbody>
-                                                <tfoot>
-                                                    <tr className="border-t bg-muted/50 font-semibold">
-                                                        <td className="px-3 py-1.5" colSpan={3}>Gesamt</td>
-                                                        <td className="text-right px-3 py-1.5">{fmtEur(totalKaltmiete)}</td>
-                                                        <td colSpan={2} />
-                                                    </tr>
-                                                </tfoot>
-                                            </table>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">Keine Mietdaten verfügbar.</p>
-                                    )}
-                                </div>
-
                                 {/* Property status description */}
                                 {overview?.summary && (
                                     <p className="text-sm text-muted-foreground line-clamp-2">

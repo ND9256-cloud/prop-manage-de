@@ -1143,3 +1143,61 @@ registry-replacement (no `not_implemented` warning, completeness not
 **Unblocks Task 3.3** (dashboard renders the rent roll with click-through
 provenance to claims and documents).
 
+## Dashboard rent roll renders from composer (Task 3.3, 2026-05-28)
+
+The first customer-facing surface that renders from resolved facts instead of
+the legacy `document_intelligence` brain. Lena Everding's €650 now appears as
+a clean row on `/dashboard/warehouse` with a click-through provenance modal
+naming the source Mietvertrag.
+
+- `src/lib/dashboard-actions.ts` adds `getRentRollSnapshots()`: composes
+  `RentRollSnapshot` per property via `composePropertySnapshot({ modules:
+  ["rent_roll"] })` and side-loads provenance (document file_name / doc_type
+  / category for `source_document_ids`; valid_from / confidence /
+  source_field_path for `source_claim_ids`). Legacy `document_intelligence`
+  tenants are returned alongside as a per-(property, unit_ref) fallback map.
+- `src/components/warehouse/rent-roll-composer.tsx`: one row per unit from
+  the composer.
+  - `occupied` → kaltmiete as a click target (provenance modal); confidence
+    chip if not high.
+  - `vacant + no_data` (phantom vacancy) → "Kein Mietvertrag hinterlegt"
+    with an actionable upload affordance (`data-action="upload-lease"`,
+    links to the existing property page). KO132 EG.
+  - `vacant + tenancy_ended` → "Leerstand".
+  - `needs_review` → "Prüfen" chip; excluded from the displayed total.
+  - Composer-first / legacy-fallback: if the composer has no value but the
+    legacy brain has a tenant for the same unit_ref, the cell renders the
+    legacy amount with a small "Legacy" tag. The legacy read is the
+    dark-launch safety net and is removed after 3.4 shadow mode proves
+    parity.
+  - Vermietungsquote rendered as an understated header stat
+    (`data-testid="vermietungsquote-stat"`), not a hero number — at 5 units
+    a single vacancy swings it 20 points.
+- `src/components/warehouse/provenance-modal.tsx`: opens on cell click.
+  Shows the resolved value, confidence + status, the source document(s)
+  (file name, doc_type, category, link into the inbox), and the claim chain
+  (first claim marked ★, claim id prefix, source_field_path, valid_from).
+  Resolver name@version printed at the bottom. This is the visible
+  embodiment of "evidence chains as legal shields."
+- `tenant_active` is rendered as a gracefully-absent "—" — no fake data.
+  Wiring the real tenant column waits for the tenant resolver follow-up.
+- Loading skeleton at
+  `src/app/(dashboard)/dashboard/warehouse/loading.tsx` while the composer
+  runs.
+- `data-testid="warehouse-properties-loaded"` preserved on the same
+  PropertySelection root — the Tier B synthetic monitor invariant is intact.
+- The legacy brain-driven "Mietübersicht" sub-table inside the
+  Immobilien-Analyse card has been removed (replaced by the composer-driven
+  section above it). The brain card still renders the property overview
+  summary, risks, and urgent action.
+- Wiring a NEW upload action is out of scope; the row carries the hook for
+  the follow-up.
+
+Tests: `e2e/rent-roll-composer.spec.ts` — warehouse-properties-loaded
+testid present, KO132 1.OG Lena €650 visible, clicking €650 opens the
+provenance modal with a source document, KO132 EG renders the phantom
+vacancy CTA, Vermietungsquote stat present.
+
+**Unblocks Task 3.4** (composer / legacy brain shadow-mode parity check,
+then legacy fallback removal).
+
