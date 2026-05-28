@@ -890,3 +890,99 @@ reconciled to the shipped emitter's `{ owner: { name, ... } }`.
 
 **Phase 2 core thesis verified.** Remaining Phase 2: Task 2.1b
 (Mietvertragsnachtrag), Task 2.6 (PLZ verifier).
+
+## Mietvertragsnachtrag emitter live (Task 2.1b, 2026-05-28)
+
+New doc_type `mietvertragsnachtrag` catches the ~15-20% of Nachträge that
+change NON-rent terms (pet clauses, parking, deposit, ancillary cost, term,
+party identity). Previously these were funneled into the Mieterhöhung
+doc_type and either dropped (no `new_kaltmiete` → emitter throw) or, worse,
+risked silent rent corruption when a stray figure was present. The split
+makes the failure mode explicit: misclassified non-rent Nachträge surface in
+triage rather than silently corrupting rent.
+
+**Files shipped:**
+- `domain_knowledge/mietvertragsnachtrag.md` — front-matter
+  (default_claim_kind=reference, five gotchas, empty `closes` array — the
+  rent_change closure is owned by the delegate, not declared here).
+- `schemas/mietvertragsnachtrag/schema.yaml` — 14 fields: `nachtrag_scope`
+  enum (7 values) + common fields (unit_ref, effective_date, tenant_identity,
+  signatures, document_status) + six per-scope conditional structured
+  payloads (rent_change, tenant_identity_change, deposit_change,
+  ancillary_cost_change, term_change, usage_right_change) +
+  `other_change_descriptor`. schema_version `2026-05-28-v1`. Generated
+  outputs regenerated.
+- `src/lib/emitters/mietvertragsnachtrag.ts` — pure function, no DB / fetch
+  / fs / env. Dispatches on `nachtrag_scope`:
+  - `rent_change` → reshape `rent_change_payload` + common fields into a
+    Mieterhöhung-shaped envelope and DELEGATE to `emitMieterhoehungClaims`.
+    Single source of truth for kaltmiete `close_overlapping_only`
+    supersession — a bilateral rent-change Nachtrag and a unilateral §558
+    notice produce byte-identical claim shapes and identical close edges
+    (`effective_date - 1 day`).
+  - `tenant_identity_change` / `deposit_change` / `ancillary_cost_change` /
+    `term_change` / `usage_right_change` / `other` → ONE reference-kind
+    `amendment_present` claim with `value.status =
+    "unsupported_requires_review"` and the per-scope payload. NO closures.
+    Critically, `tenant_identity_change` does NOT close `tenant_active` —
+    the tenancy continues; only a party detail changes.
+  - Missing or unknown scope → empty `EmissionResult` (defers to triage).
+- `src/lib/emitters/index.ts` — `mietvertragsnachtrag` registered in
+  EMITTERS map, version 1.0.0.
+- `supabase/functions/process-document/index.ts` — classifier prompt
+  amended additively: paragraph distinguishing `mieterhoehung` from
+  `mietvertragsnachtrag` by WHAT the document changes, not by document
+  title. `mietvertragsnachtrag` added to the example doc-types list.
+- `src/tests/emitter-mietvertragsnachtrag.test.ts` — 47 assertions across
+  5 scenarios: pet-clause (usage_right_change reference claim), tenant
+  identity change (reference claim + explicit no-tenant-active-closure
+  safety assertion), bilateral rent change (delegation produces Mieterhöhung-
+  shaped result), misclassification rejection (non-rent envelope fed to
+  Mieterhöhung emitter throws — the safe loud failure), determinism.
+
+**Delegation safety property:** the rent_change branch produces Mieterhöhung
+output by calling the Mieterhöhung emitter directly — not by reimplementing
+its closure logic. If the Mieterhöhung emitter is ever updated, both paths
+move together. The misclassification rejection test (Scenario 4) asserts
+that feeding a non-rent envelope to `emitMieterhoehungClaims` throws on
+absent `new_kaltmiete` — the safety property that protects against silent
+rent corruption when Step 4 misroutes.
+
+**Reconciliation from brief:**
+- The brief's illustrative `closes` entry for the domain knowledge
+  front-matter used keys (`trigger_predicate`, `delegates_to`) that do not
+  match the shipped CloseEntry Zod contract (`src/tests/domain-knowledge.test.ts`:
+  `target_predicate`, `target_subject_pattern`, `close_mode`, `when`,
+  `valid_to_source`, `match_requirements`). The actual closure is produced
+  by the Mieterhöhung emitter via delegation, so the shipped front-matter
+  uses `closes: []` and documents the delegation in the body prose +
+  `rent_change_delegates_to_mieterhoehung` gotcha. This is more truthful
+  than declaring a malformed close entry.
+- The brief's reference to `schemas/index.ts` registration was not applied:
+  neither Task 2.1 (Mieterhöhung) nor Task 2.3 (Übergabeprotokoll) modified
+  `V2_SCHEMA_DOC_TYPES`, and adding a doc_type there gates the v2 extraction
+  path which is not yet wired for `mietvertragsnachtrag` end-to-end.
+  Shipped pattern preserved.
+
+**Verification:**
+- emitter tests 47 assertions
+- purity gate 40 assertions across 5 emitter files (the new emitter is
+  picked up automatically by the directory walk; cross-emitter import
+  `./mieterhoehung` is not flagged because mieterhoehung itself is pure)
+- schemas test: 5 schemas validated
+- domain-knowledge test: 5 files validated
+- regression: all other emitter and integration tests still pass
+  (Mietvertrag 37, Mieterhöhung 46, Übergabeprotokoll 82, Everding 25,
+  Hofmann 22, supersession-cases 54)
+- tenant-isolation lint: 0 violations
+- tsc clean
+
+**Pending:**
+- Task 2.6: PLZ verifier
+- Resolvers for `amendment_present` claims — at launch these are
+  informational; no resolver consumes them yet.
+- Multi-scope documents that change both rent and a non-rent term in one
+  Nachtrag are deferred to a later task (flag for review).
+- Adversarial fixture `nachtrag_misclassified_as_mieterhoehung_at_step4`
+  as a full Step-4 classifier eval is a separate harness; this task
+  verifies only the emitter's rejection behavior in unit tests.

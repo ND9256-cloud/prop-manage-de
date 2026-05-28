@@ -1,6 +1,6 @@
 // DO NOT EDIT — generated from schemas/mietvertragsnachtrag/schema.yaml
 // Generator: scripts/gen-schemas.ts
-// Schema version: 2026-05-08-v1
+// Schema version: 2026-05-28-v1
 // Run `npm run gen:schemas` to regenerate.
 
 export class EnvelopeValidationError extends Error {
@@ -13,9 +13,74 @@ export class EnvelopeValidationError extends Error {
 const VALID_ABSENCE_STATES: ReadonlyArray<string> = ["present","absent","illegible","ambiguous","contradicted","not_applicable","inferred","requires_human_review"];
 
 const FIELD_DEFS: Record<string, { type: string; severity: string; enumValues: string[] | null }> = {
-  "doc_type_marker": {
+  "nachtrag_scope": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["rent_change","tenant_identity_change","deposit_change","ancillary_cost_change","term_change","usage_right_change","other"],
+  },
+  "unit_ref": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["EG","1.OG","2.OG","3.OG","4.OG","DG","Keller","Souterrain"],
+  },
+  "effective_date": {
+    type: "date",
+    severity: "critical",
+    enumValues: null,
+  },
+  "tenant_identity": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "landlord_signature_present": {
+    type: "boolean",
+    severity: "critical",
+    enumValues: null,
+  },
+  "tenant_signature_present": {
+    type: "boolean",
+    severity: "critical",
+    enumValues: null,
+  },
+  "document_status": {
+    type: "enum",
+    severity: "critical",
+    enumValues: ["draft","unsigned","signed","executed"],
+  },
+  "rent_change_payload": {
+    type: "structured",
+    severity: "critical",
+    enumValues: null,
+  },
+  "tenant_identity_change_payload": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "deposit_change_payload": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "ancillary_cost_change_payload": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "term_change_payload": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "usage_right_change_payload": {
+    type: "structured",
+    severity: "important",
+    enumValues: null,
+  },
+  "other_change_descriptor": {
     type: "string",
-    severity: "nice_to_have",
+    severity: "important",
     enumValues: null,
   }
 };
@@ -95,5 +160,5 @@ export function validateEnvelope(envelope: unknown): void {
   }
 }
 
-export const SCHEMA_VERSION = "2026-05-08-v1";
+export const SCHEMA_VERSION = "2026-05-28-v1";
 export const DOC_TYPE = "mietvertragsnachtrag";
