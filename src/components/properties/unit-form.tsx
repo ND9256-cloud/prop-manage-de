@@ -22,7 +22,7 @@ interface UnitFormProps {
         id: string;
         unitNumber: string;
         floor: number | null;
-        sizeSqm: number;
+        sizeSqm: number | null;
         rooms: number | null;
         targetColdRent: number | null;
     };
@@ -87,7 +87,7 @@ export default function UnitForm({ children, propertyId, unit }: UnitFormProps) 
                                 type="number"
                                 step="0.1"
                                 placeholder="75.5"
-                                defaultValue={unit?.sizeSqm}
+                                defaultValue={unit?.sizeSqm ?? ''}
                                 required
                             />
                         </div>

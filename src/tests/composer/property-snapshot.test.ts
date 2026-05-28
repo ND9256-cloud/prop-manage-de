@@ -56,6 +56,13 @@ async function main() {
     ok(snap.core.total_sqm === 280, "core.total_sqm === 280 (parsed from Decimal)");
     ok(snap.core.unit_count === 3, "core.unit_count === 3 (computed from Unit table)");
     ok(Array.isArray(snap.core.unit_refs) && snap.core.unit_refs.length === 3, "unit_refs has 3 entries");
+    {
+      const sorted = [...snap.core.unit_refs].sort();
+      ok(
+        sorted.join(",") === ["1.OG", "DG", "EG"].sort().join(","),
+        "unit_refs === {EG, 1.OG, DG} (canonical values matching claim subjects)"
+      );
+    }
 
     ok(typeof snap.metadata.composed_at === "string" && !isNaN(Date.parse(snap.metadata.composed_at)), "metadata.composed_at parseable");
     ok(Object.keys(snap.metadata.completeness).length === 0, "metadata.completeness empty (no modules requested)");
@@ -162,8 +169,15 @@ async function main() {
       modules: [],
     });
     ok(snap.core.short_code === "HHS55", "core.short_code === HHS55");
-    ok(snap.core.unit_count === 0, "core.unit_count === 0 (no Unit rows)");
-    ok(snap.core.unit_refs.length === 0, "core.unit_refs is empty array");
+    ok(snap.core.unit_count === 2, "core.unit_count === 2 (Task 3.1b authoritative inventory)");
+    ok(snap.core.unit_refs.length === 2, "core.unit_refs has 2 entries");
+    {
+      const sorted = [...snap.core.unit_refs].sort();
+      ok(
+        sorted.join(",") === ["1.OG", "DG"].sort().join(","),
+        "core.unit_refs === {1.OG, DG} (canonical values matching claim subjects)"
+      );
+    }
     ok(snap.core.total_sqm === null, "core.total_sqm === null (HHS55 has no total_sqm)");
   }
 

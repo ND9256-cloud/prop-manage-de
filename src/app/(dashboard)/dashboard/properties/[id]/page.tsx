@@ -64,7 +64,7 @@ export default async function PropertyDetailPage({ params }: PageProps) {
         orderBy: { lastName: 'asc' },
     });
 
-    const totalSqm = property.units.reduce((sum, u) => sum + u.sizeSqm, 0);
+    const totalSqm = property.units.reduce((sum, u) => sum + (u.sizeSqm ?? 0), 0);
     const occupiedUnits = property.units.filter(u => u.leases.length > 0).length;
     const totalRent = property.units.reduce((sum, u) => {
         const lease = u.leases[0];

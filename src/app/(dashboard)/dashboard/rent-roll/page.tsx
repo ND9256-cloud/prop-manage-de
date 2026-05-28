@@ -78,11 +78,11 @@ export default async function RentRollPage() {
             .replace(/(\d+)\. OG/i, '$1OG');
         return `${streetAbbr}·${house}·${floor}`;
     };
-    const totalArea = leases.reduce((sum, l) => sum + l.unit.sizeSqm, 0);
+    const totalArea = leases.reduce((sum, l) => sum + (l.unit.sizeSqm ?? 0), 0);
     const erv = leases.length > 0
-        ? Math.max(...leases.map(l => l.coldRent / l.unit.sizeSqm * 12))
+        ? Math.max(...leases.map(l => l.unit.sizeSqm ? l.coldRent / l.unit.sizeSqm * 12 : 0))
         : 0;
-    const totalErvTotal = leases.reduce((sum, l) => sum + erv * l.unit.sizeSqm, 0);
+    const totalErvTotal = leases.reduce((sum, l) => sum + erv * (l.unit.sizeSqm ?? 0), 0);
 
     const fmt = (n: number) =>
         n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
@@ -212,16 +212,16 @@ export default async function RentRollPage() {
                                                 </Link>
                                             </td>
                                             <td className="p-3 whitespace-nowrap">{lease.unit.unitNumber}</td>
-                                            <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm} m²</td>
+                                            <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm != null ? `${lease.unit.sizeSqm} m²` : '—'}</td>
                                             <td className="p-3 whitespace-nowrap">{fmtDate(lease.startDate)}</td>
                                             <td className="p-3 text-right whitespace-nowrap">{fmt(lease.coldRent)}</td>
-                                            <td className="p-3 text-right whitespace-nowrap">{fmt(lease.coldRent / lease.unit.sizeSqm * 12)}</td>
+                                            <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm ? fmt(lease.coldRent / lease.unit.sizeSqm * 12) : '—'}</td>
                                             <td className="p-3 text-right whitespace-nowrap">{fmt(lease.utilityAdvance)}</td>
                                             <td className="p-3 text-right whitespace-nowrap font-medium">
                                                 {fmt(lease.coldRent + lease.utilityAdvance)}
                                             </td>
                                             <td className="p-3 text-right whitespace-nowrap">{fmt(erv)}</td>
-                                            <td className="p-3 text-right whitespace-nowrap">{fmt(erv * lease.unit.sizeSqm)}</td>
+                                            <td className="p-3 text-right whitespace-nowrap">{lease.unit.sizeSqm != null ? fmt(erv * lease.unit.sizeSqm) : '—'}</td>
                                             <td className="p-3 whitespace-nowrap">{lease.rentIncreaseRule || '—'}</td>
                                             <td className="p-3 whitespace-nowrap">
                                                 {lease.lastRentIncreaseAt

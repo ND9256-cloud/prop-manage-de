@@ -116,22 +116,24 @@ model Property {
 /// @tenant-scoped-via: propertyId
 model Unit {
   id           String  @id @default(uuid()) @db.Uuid
-  unitNumber   String  // E.g. "Top 12", "Apt 4B"
+  unitNumber   String  // Canonical unit_ref matching claim subjects: EG, 1.OG, DG, etc.
   floor        Int?
-  sizeSqm      Float   // Square meters (German standard)
+  sizeSqm      Float?  // Square meters (German standard); nullable when unknown — never fabricate
   rooms        Float?  // E.g. 2.5 rooms
-  
+
   // Base rent configuration
   targetColdRent Float? // Kaltmiete prediction
-  
+
   propertyId   String   @db.Uuid
   property     Property @relation(fields: [propertyId], references: [id])
 
   leases       Lease[]
   currentTenant Lease? @relation("CurrentLease")
-  
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  @@unique([propertyId, unitNumber])
 }
 
 // Person - A repository of people (Tenants, Vendors contacts, etc.)
