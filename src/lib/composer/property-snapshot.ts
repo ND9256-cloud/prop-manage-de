@@ -27,6 +27,7 @@ import type {
   Warning,
 } from "./types";
 import { COMPOSER_VERSION } from "./types";
+import { composeRentRoll } from "./modules/rent-roll";
 
 export { COMPOSER_VERSION } from "./types";
 export type { PropertySnapshot, ComposeRequest } from "./types";
@@ -40,7 +41,7 @@ export type { PropertySnapshot, ComposeRequest } from "./types";
 // from ./modules/rent-roll.ts). Until then, every module returns "unavailable".
 
 const MODULE_REGISTRY: Record<string, ModuleComposer> = {
-  rent_roll: stubModule("rent_roll", "Task 3.2 implements rent_roll"),
+  rent_roll: composeRentRoll,
   ownership: stubModule("ownership", "ownership module not yet implemented"),
   insurance: stubModule("insurance", "insurance module not yet implemented"),
   costs: stubModule("costs", "costs module not yet implemented"),
@@ -83,7 +84,7 @@ export async function composePropertySnapshot(
       property_id: req.property_id,
       org_id: req.org_id,
       core,
-      tx: opts.tx,
+      tx: db,
     };
 
     let result: ModuleResult;

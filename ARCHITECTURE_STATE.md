@@ -1088,3 +1088,58 @@ structurally impossible.
   (HHS55 from 0→2; both properties now also assert canonical `unit_refs`).
 
 **Unblocks Task 3.2** (rent_roll module enumerates this inventory).
+
+## RentRollSnapshot module shipped (Task 3.2, 2026-05-28)
+
+The first real composer module. Enumerates every unit from the authoritative
+Unit inventory (3.1b) and resolves each via `rentForUnit` (Task 1.10),
+producing one row per unit — occupied or vacant. End-to-end proof: Lena's €650
+now flows OCR → extraction → claim → applier → resolver → composer → row.
+
+- `src/lib/composer/modules/rent-roll.ts`: `composeRentRoll(ctx) => ModuleResult`
+- `RentRollRow`: `unit_ref`, `occupancy_status`, `vacancy_reason`,
+  `current_kaltmiete` (passes the resolver's `ResolvedFact<Money>` through
+  unchanged — value, status, confidence, source_claim_ids, source_document_ids,
+  derivation_record_id, resolver version), structural passthrough
+  (`size_sqm`, `floor`, `rooms`, `target_cold_rent` from the Unit table),
+  and `tenant_active`.
+- **Vacancy distinction** (a design requirement, mapped from resolver status):
+  - `single_active_claim` → `occupied`
+  - `no_claim_for_date` → `vacant` + `tenancy_ended` (closed claim in history)
+  - `no_active_claim` → `vacant` + `no_data` (phantom vacancy — no lease on
+    file; KO132 EG today)
+  - `latest_active_claim_with_conflicts` → `needs_review` (resolver picked
+    latest, but rent is ambiguous; excluded from `resolved_kaltmiete_total`)
+- Summary: `total_units`, `occupied_units`, `vacant_units`,
+  `needs_review_units`, `resolved_kaltmiete_total` (Money — sum of OCCUPIED
+  rows only, conflict rows excluded so the headline number stays honest), and
+  `vermietungsquote` (occupied / total).
+- Registered in `MODULE_REGISTRY`, replacing the 3.1 `rent_roll` stub.
+- `composePropertySnapshot` now passes `db` (`opts.tx ?? prisma`) into
+  `ctx.tx` so modules always have a usable Prisma client.
+- KO132 → 3 rows (EG vacant/no_data, 1.OG carries Lena's €65000 cents,
+  DG depends on shipped claims); HHS55 → 2 rows.
+- **`tenant_active` typed-but-unavailable.** No `tenantForUnit` resolver
+  exists yet. Per the architectural rule "don't duplicate resolver logic
+  outside the resolver layer," the column is populated with a sentinel
+  `{ status: "unavailable", reason: "no_tenant_resolver", resolver: { name: "tenant_for_unit", version: "unshipped" } }`
+  and the module emits a `tenant_resolver_unavailable` warning. **Follow-up
+  task:** ship a `tenantForUnit` resolver and swap the sentinel for a real
+  `ResolvedFact<Tenant>`.
+
+**Vermietungsquote falls out for free** — total/occupied is computable only
+because the inventory is authoritative (3.1b). The roadmap's
+"vacancy-detection / Vermietungsquote" feature lands here as a side effect of
+correct architecture, ahead of schedule.
+
+Tests: `src/tests/composer/rent-roll.test.ts` — 46 assertions across
+KO132 full roll (occupancy, provenance, phantom vacancy, structural
+passthrough, tenant sentinel, module aggregation), HHS55 (2 rows),
+provenance-on-resolved-rows, the full `mapOccupancy` mapping table (every
+resolver status including a defensive fallback), summary math, and
+registry-replacement (no `not_implemented` warning, completeness not
+`unavailable`).
+
+**Unblocks Task 3.3** (dashboard renders the rent roll with click-through
+provenance to claims and documents).
+
