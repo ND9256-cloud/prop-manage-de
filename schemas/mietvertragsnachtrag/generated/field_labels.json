@@ -1,7 +1,20 @@
 {
-  "schema_version": "2026-05-08-v1",
+  "schema_version": "2026-05-28-v1",
   "doc_type": "mietvertragsnachtrag",
   "labels": {
-    "doc_type_marker": "Dokumenttyp-Marker (Stub)"
+    "nachtrag_scope": "Änderungsumfang",
+    "unit_ref": "Einheit",
+    "effective_date": "Wirksam ab",
+    "tenant_identity": "Mieter",
+    "landlord_signature_present": "Vermieter-Unterschrift vorhanden",
+    "tenant_signature_present": "Mieter-Unterschrift vorhanden",
+    "document_status": "Dokumentstatus",
+    "rent_change_payload": "Mietänderungs-Details",
+    "tenant_identity_change_payload": "Mieter-Identitäts-Änderung",
+    "deposit_change_payload": "Kautions-Änderung",
+    "ancillary_cost_change_payload": "Nebenkosten-Änderung",
+    "term_change_payload": "Vertragslaufzeit-Änderung",
+    "usage_right_change_payload": "Nutzungsrechts-Änderung",
+    "other_change_descriptor": "Andere Änderung (Beschreibung)"
   }
 }

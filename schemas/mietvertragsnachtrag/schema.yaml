@@ -1,16 +1,405 @@
 doc_type: mietvertragsnachtrag
-schema_version: "2026-05-08-v1"
+schema_version: "2026-05-28-v1"
 claim_kind: reference
 domain_knowledge_ref: domain_knowledge/mietvertragsnachtrag.md
+
 prompt_fragment_template: |
-  TODO: populated in Task 2.1b
+  ## Mietvertragsnachtrag — extract the following fields
+
+  A Mietvertragsnachtrag is a bilateral amendment to an existing Mietvertrag
+  signed by BOTH parties. It can change any term: rent, deposit, ancillary
+  costs, lease duration, permitted use, or party details. Classify by WHAT
+  the document changes — never by the document title alone.
+
+  For each field, return:
+  - raw_value: verbatim text from the document
+  - normalized_value: typed canonical form (see per-field instructions)
+  - evidence: array of { quote: <verbatim quote>, page: <number>, bbox: null }. At least one entry required when absence_state == "present".
+  - confidence: high | medium | low
+  - absence_state: present | absent | illegible | ambiguous | contradicted | not_applicable | inferred | requires_human_review
+  - validation_status: valid (set this; verifiers run separately)
+
+  Evidence is MANDATORY when absence_state == present.
+
+  ### nachtrag_scope (CRITICAL discriminator — drives all downstream behavior)
+
+  Normalize to EXACTLY one of:
+  - "rent_change" — the amendment changes the Kaltmiete. Triggers delegation to the Mieterhöhung emitter for kaltmiete supersession.
+  - "tenant_identity_change" — a party detail changes (marriage name change, co-tenant added/removed). The tenancy CONTINUES; only a detail changes.
+  - "deposit_change" — the Kaution amount or terms change.
+  - "ancillary_cost_change" — Nebenkosten allocation or prepayment changes.
+  - "term_change" — lease duration, notice period, or end date changes.
+  - "usage_right_change" — permitted use changes (pets, subletting, parking, commercial use).
+  - "other" — anything not covered above, OR multi-scope documents that change several terms at once and need human adjudication.
+
+  Classify by content, not the title. When multiple scopes are present, set "rent_change" if rent is among them (rent supersession is the highest-stakes action); otherwise set "other".
+
+  ### unit_ref (Einheit — normalized floor/position identifier)
+
+  Normalize to one of: EG, 1.OG, 2.OG, 3.OG, 4.OG, DG, Keller, Souterrain. Must match the unit_ref of the Mietvertrag being amended. Common variants: "Erdgeschoss" → "EG"; "1. Obergeschoss" → "1.OG"; "Dachgeschoss" → "DG".
+
+  ### effective_date (date the amendment takes effect)
+
+  ISO 8601 (YYYY-MM-DD). Source is typically DD.MM.YYYY — normalize. For rent_change scope this drives the new kaltmiete claim's valid_from and the closure edge (effective_date - 1 day) via the Mieterhöhung delegation.
+
+  ### tenant_identity (Mieter — the tenant party to the lease being amended)
+
+  normalized_value: { name: <full name as written>, is_legal_entity: <bool>, legal_form: <optional string for entities> }.
+
+  ### landlord_signature_present (boolean)
+
+  true if the document carries a landlord signature. Required for any bilateral amendment to be legally effective.
+
+  ### tenant_signature_present (boolean)
+
+  true if the document carries a tenant signature. Required for any bilateral amendment to be legally effective.
+
+  ### document_status (lifecycle state)
+
+  One of: draft, unsigned, signed, executed.
+
+  ### rent_change_payload (CONDITIONAL — only when nachtrag_scope == "rent_change")
+
+  Structured payload carrying enough to reshape into a Mieterhöhung extraction:
+  - new_kaltmiete: { amount: <cents>, currency: "EUR" } (REQUIRED for this scope)
+  - previous_kaltmiete: { amount: <cents>, currency: "EUR" } (optional)
+  - rechtsgrundlage: typically "bilateral" for Nachträge; may also be "indexmiete" or "staffelmiete" if the amendment activates such a clause. Defaults to "bilateral" if not stated.
+  - staffelmiete_context: boolean — true if the document references a Staffelplan.
+
+  ### tenant_identity_change_payload (CONDITIONAL — only when nachtrag_scope == "tenant_identity_change")
+
+  Structured payload describing the change:
+  - old_tenant_identity: { name, is_legal_entity, legal_form }
+  - new_tenant_identity: { name, is_legal_entity, legal_form }
+  - change_reason: short string (e.g. "Heirat", "Wohngemeinschaftswechsel", "Sterbefall")
+
+  ### deposit_change_payload (CONDITIONAL — only when nachtrag_scope == "deposit_change")
+
+  - new_kaution: { amount: <cents>, currency: "EUR" }
+  - previous_kaution: { amount: <cents>, currency: "EUR" } (optional)
+  - change_notes: short string (optional)
+
+  ### ancillary_cost_change_payload (CONDITIONAL — only when nachtrag_scope == "ancillary_cost_change")
+
+  - new_nebenkostenvorauszahlung: { amount: <cents>, currency: "EUR" } (optional)
+  - previous_nebenkostenvorauszahlung: { amount: <cents>, currency: "EUR" } (optional)
+  - umlagefaehige_kosten_changed: boolean
+  - change_notes: short string (optional)
+
+  ### term_change_payload (CONDITIONAL — only when nachtrag_scope == "term_change")
+
+  - new_term_end: ISO 8601 date (optional — null for indefinite)
+  - previous_term_end: ISO 8601 date (optional)
+  - new_notice_period_months: number (optional)
+  - change_notes: short string (optional)
+
+  ### usage_right_change_payload (CONDITIONAL — only when nachtrag_scope == "usage_right_change")
+
+  - usage_right_type: one of "Tierhaltung" | "Untervermietung" | "Stellplatz" | "Gewerbenutzung" | "Sonstiges"
+  - permitted: boolean (true = now permitted; false = now prohibited)
+  - change_notes: short string describing the precise text of the new clause
+
+  ### other_change_descriptor (CONDITIONAL — only when nachtrag_scope == "other")
+
+  Free-text description of the amendment. Required when scope is "other" because that scope is the multi-scope / unsupported bucket and a human reviewer needs the document's gist.
+
 fields:
-  - id: doc_type_marker
-    german_label: "Dokumenttyp-Marker (Stub)"
-    severity: nice_to_have
+  - id: nachtrag_scope
+    german_label: "Änderungsumfang"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "rent_change"
+      - "tenant_identity_change"
+      - "deposit_change"
+      - "ancillary_cost_change"
+      - "term_change"
+      - "usage_right_change"
+      - "other"
+    verifier_refs:
+      - enum
+    normalization_rule_ref: nachtrag_scope_canonical_values
+    classification_hints: |
+      rent_change = Kaltmiete changes;
+      tenant_identity_change = Mieter party detail changes (name, co-tenant);
+      deposit_change = Kaution changes;
+      ancillary_cost_change = Nebenkosten changes;
+      term_change = lease duration / end date / notice period changes;
+      usage_right_change = pets / parking / subletting / commercial use changes;
+      other = anything else, or multi-scope (rent + non-rent) documents.
+    description: |
+      Critical scope discriminator. The emitter dispatches on this value:
+      "rent_change" delegates to the Mieterhöhung emitter (full kaltmiete
+      supersession via close_overlapping_only); all other scopes emit a
+      single reference-kind "amendment_present" claim with status
+      "unsupported_requires_review" and produce NO closures.
+      Misclassification corrupts rent or loses the amendment record — see
+      gotcha scope_classification_accuracy_critical.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: unit_ref
+    german_label: "Einheit"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "EG"
+      - "1.OG"
+      - "2.OG"
+      - "3.OG"
+      - "4.OG"
+      - "DG"
+      - "Keller"
+      - "Souterrain"
+    verifier_refs:
+      - enum
+    description: |
+      Normalized unit reference matching the Mietvertrag's unit_ref. Required
+      for claim subject construction (subject = "unit:<unit_ref>"). Map common
+      variants: "Erdgeschoss" → "EG"; "1. Obergeschoss" → "1.OG";
+      "Dachgeschoss" → "DG".
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: effective_date
+    german_label: "Wirksam ab"
+    severity: critical
+    requiredness: required
+    type: date
+    verifier_refs:
+      - date-format
+    description: |
+      Date the amendment takes effect. ISO 8601 (YYYY-MM-DD). For rent_change
+      scope this drives valid_from on the new kaltmiete claim and the closure
+      edge (effective_date - 1 day) via the Mieterhöhung delegation. For
+      non-rent scopes the reference claim's valid_from is this date.
+    used_in_resolvers: true
+    customer_visible: true
+
+  - id: tenant_identity
+    german_label: "Mieter"
+    severity: important
     requiredness: optional
+    type: structured
+    item_schema:
+      - field: name
+        type: string
+        required: true
+      - field: is_legal_entity
+        type: boolean
+        required: false
+      - field: legal_form
+        type: string
+        required: false
+    description: |
+      The tenant party to the lease being amended. Same shape as the
+      Mietvertrag's tenant_identity.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: landlord_signature_present
+    german_label: "Vermieter-Unterschrift vorhanden"
+    severity: critical
+    requiredness: required
+    type: boolean
+    description: |
+      true if the document carries a landlord signature. Required for any
+      bilateral amendment to be legally effective. For rent_change scope this
+      is also the Mieterhöhung emitter's closure prerequisite.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: tenant_signature_present
+    german_label: "Mieter-Unterschrift vorhanden"
+    severity: critical
+    requiredness: required
+    type: boolean
+    description: |
+      true if the document carries a tenant signature. Required for any
+      bilateral amendment to be legally effective.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: document_status
+    german_label: "Dokumentstatus"
+    severity: critical
+    requiredness: required
+    type: enum
+    enum_values:
+      - "draft"
+      - "unsigned"
+      - "signed"
+      - "executed"
+    verifier_refs:
+      - enum
+    description: |
+      Lifecycle state of the document. For rent_change scope the Mieterhöhung
+      emitter requires "signed" or "executed" to emit a closure intent.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: rent_change_payload
+    german_label: "Mietänderungs-Details"
+    severity: critical
+    requiredness: conditional
+    condition: "nachtrag_scope == 'rent_change'"
+    type: structured
+    item_schema:
+      - field: new_kaltmiete
+        type: money
+        required: true
+      - field: previous_kaltmiete
+        type: money
+        required: false
+      - field: rechtsgrundlage
+        type: string
+        required: false
+      - field: staffelmiete_context
+        type: boolean
+        required: false
+    description: |
+      Rent-change details. When nachtrag_scope == "rent_change", the emitter
+      reshapes this payload + common fields (effective_date, unit_ref,
+      tenant_identity, signatures, document_status) into a Mieterhöhung-shaped
+      extraction and delegates to emitMieterhoehungClaims. This keeps a single
+      source of truth for kaltmiete close_overlapping_only supersession.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: tenant_identity_change_payload
+    german_label: "Mieter-Identitäts-Änderung"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'tenant_identity_change'"
+    type: structured
+    item_schema:
+      - field: old_tenant_identity
+        type: structured
+        required: false
+      - field: new_tenant_identity
+        type: structured
+        required: true
+      - field: change_reason
+        type: string
+        required: false
+    description: |
+      Tenant party detail change (marriage name change, co-tenant
+      added/removed). The tenancy CONTINUES — this scope never closes
+      tenant_active. The reference claim records the change for triage.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: deposit_change_payload
+    german_label: "Kautions-Änderung"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'deposit_change'"
+    type: structured
+    item_schema:
+      - field: new_kaution
+        type: money
+        required: true
+      - field: previous_kaution
+        type: money
+        required: false
+      - field: change_notes
+        type: string
+        required: false
+    description: |
+      Kaution (deposit) amount or terms change. Reference-only at launch;
+      actionable kaution claims are a later task.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: ancillary_cost_change_payload
+    german_label: "Nebenkosten-Änderung"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'ancillary_cost_change'"
+    type: structured
+    item_schema:
+      - field: new_nebenkostenvorauszahlung
+        type: money
+        required: false
+      - field: previous_nebenkostenvorauszahlung
+        type: money
+        required: false
+      - field: umlagefaehige_kosten_changed
+        type: boolean
+        required: false
+      - field: change_notes
+        type: string
+        required: false
+    description: |
+      Nebenkosten allocation or prepayment change. Reference-only at launch;
+      actionable nebenkostenvorauszahlung claims are a later task.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: term_change_payload
+    german_label: "Vertragslaufzeit-Änderung"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'term_change'"
+    type: structured
+    item_schema:
+      - field: new_term_end
+        type: date
+        required: false
+      - field: previous_term_end
+        type: date
+        required: false
+      - field: new_notice_period_months
+        type: number
+        required: false
+      - field: change_notes
+        type: string
+        required: false
+    description: |
+      Lease duration / end date / notice period change. Reference-only at
+      launch; actionable term claims are a later task.
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: usage_right_change_payload
+    german_label: "Nutzungsrechts-Änderung"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'usage_right_change'"
+    type: structured
+    item_schema:
+      - field: usage_right_type
+        type: string
+        required: true
+      - field: permitted
+        type: boolean
+        required: true
+      - field: change_notes
+        type: string
+        required: false
+    description: |
+      Permitted-use change (Tierhaltung / Untervermietung / Stellplatz /
+      Gewerbenutzung / Sonstiges). Reference-only — no resolver consumes
+      usage rights at launch. usage_right_type takes free-form German labels;
+      "permitted" carries the direction of change (newly permitted vs newly
+      prohibited).
+    used_in_resolvers: false
+    customer_visible: true
+
+  - id: other_change_descriptor
+    german_label: "Andere Änderung (Beschreibung)"
+    severity: important
+    requiredness: conditional
+    condition: "nachtrag_scope == 'other'"
     type: string
     description: |
-      Placeholder field so the stub validates against the meta-schema's
-      "fields must contain at least one entry" rule. Replaced with real
-      fields in the per-doc-type tasks.
+      Free-text description of the amendment. Required when scope is
+      "other" because that scope is the multi-scope / unsupported bucket —
+      a human reviewer needs the gist to triage. Multi-scope Nachträge
+      (changing both rent and a non-rent term) set scope to rent_change
+      (rent is highest-stakes) and flag review for the secondary term via
+      this descriptor when applicable.
+    used_in_resolvers: false
+    customer_visible: true
