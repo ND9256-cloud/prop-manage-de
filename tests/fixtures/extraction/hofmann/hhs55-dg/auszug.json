@@ -1,0 +1,29 @@
+{
+  "doc_type": "wohnungsuebergabeprotokoll",
+  "schema_version": "2026-05-27-v1",
+  "prompt_version": "2026-05-27-v1",
+  "model": "synthetic-fixture",
+  "fields": {
+    "uebergabe_typ": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "Auszug"
+    },
+    "uebergabe_datum": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "2026-02-28"
+    },
+    "unit_ref": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": "DG"
+    },
+    "mieter_out": {
+      "absence_state": "present",
+      "confidence": "high",
+      "normalized_value": { "name": "Hofmann, Hellen", "is_legal_entity": false, "legal_form": null }
+    }
+  },
+  "lifecycle": {}
+}
