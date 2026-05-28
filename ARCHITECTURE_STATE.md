@@ -843,10 +843,50 @@ domain knowledge file should be aligned in a cosmetic follow-up.
 - tsc clean
 
 **Pending:**
-- Task 2.5: Hofmann fixture (the Phase 2 gate that exercises this end-to-end
-  through emitter + applier with the real Hofmann case data)
 - Task 2.6: PLZ verifier
 - `owner_of_property` resolver (later — owner claims are emitted now but the
   resolver does not yet read them)
 - Cosmetic follow-up: align `domain_knowledge/wohnungsuebergabeprotokoll.md`
   `closes` close_mode with the architecture value
+
+## Phase 2 GATE PASSED — Hofmann case (Task 2.5, 2026-05-28)
+
+The second of the two original v1 bugs is structurally fixed.
+
+`src/tests/integration/hofmann-case.test.ts` runs two transactions against
+HHS55 DG (per-transaction rollback, no production residue):
+
+- **Positive (Transaction A):** an Eigentümerwechsel-Übergabeprotokoll
+  (Bernhardt → Denn Immobilienverwaltung eGbR, handover 2025-11-15) transfers
+  ownership — new `owner` claim created, previous owner closed with
+  `valid_to = 2025-11-14` (`close_overlapping_and_supersede_future`) — but
+  leaves Hofmann's `tenant_active` and `kaltmiete` claims ACTIVE.
+  `rentForUnit(HHS55, DG)` still returns €900 with status
+  `single_active_claim`. The Hofmann safeguard holds.
+- **Negative control (Transaction B):** an Auszug for the same unit
+  (Hofmann moving out, handover 2026-02-28) closes the `kaltmiete` and
+  `tenant_active` claims. `rentForUnit` then returns `null` with status
+  `no_claim_for_date` (the closed claim still exists in history, so the
+  resolver distinguishes this from "no claim ever existed"). The system
+  CAN close tenancy when appropriate — proving the positive result above
+  is meaningful.
+
+**Both original bugs now have verified structural fixes:**
+- Weber (supersession): Task 2.2 (54 assertions across Paul / Kuru / Weber)
+- Hofmann (ownership ≠ tenancy): Task 2.5 (22 assertions)
+
+**Test-setup note:** HHS55 DG has pre-existing committed claims from the
+real `20210412_Mietvertrag Dachgeschoss.pdf`. The test transaction first
+runs a `valid_to = valid_from` UPDATE on them (allowed by the supersession
+triggers, GoBD-safe) so the resolver sees only test-seeded state.
+Transaction rollback restores production data.
+
+**Reconciliation from brief:** the brief's draft asserted resolver status
+`no_active_claim` after Auszug; the shipped resolver returns
+`no_claim_for_date` whenever a closed claim still exists for
+(subject, predicate) (`src/lib/resolvers/rent-for-unit.ts`). The brief's
+sample owner-claim value shape (`{ name: "Bernhardt, ..." }`) was likewise
+reconciled to the shipped emitter's `{ owner: { name, ... } }`.
+
+**Phase 2 core thesis verified.** Remaining Phase 2: Task 2.1b
+(Mietvertragsnachtrag), Task 2.6 (PLZ verifier).
