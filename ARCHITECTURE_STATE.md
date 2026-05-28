@@ -1253,3 +1253,56 @@ pointing at canonical) since no GoBD correction flow exists yet. Latent bug:
 the applier dedups only on source_extraction_run_id, so re-processing the
 same document stacks duplicate active claims. Fix before first customer:
 dedup on (source_document_id, subject, predicate, value, valid_from).
+
+
+## Brain shadow mode shipped (Task 3.4, 2026-05-28)
+
+Parallel-run safety net. A nightly GitHub Actions job
+(`.github/workflows/brain-shadow-comparison.yml`, 02:00 UTC) runs the composer
+and legacy brain side-by-side per property, classifies divergences, writes
+them to `warehouse.brain_shadow_comparison`, and posts a Discord alert when
+any divergence falls into the alert classes
+(`kaltmiete_amount_mismatch`, `composer_missing_unit`, `unknown`).
+
+The framing: shadow mode is NOT "wait for identical output." Composer and
+legacy SHOULD diverge in known ways (composer is more honest about ingestion
+gaps; composer rejects bad data legacy accepted). Stable = every divergence
+falls into a known class. Unknown classes alert.
+
+**Known informational classes** (no Discord):
+- `composer_vacant_legacy_occupied` — ingestion gap. Composer correctly says
+  "no lease on file"; legacy hallucinated occupancy from stale data.
+- `composer_occupied_legacy_vacant` — legacy stale.
+- `legacy_missing_unit` — legacy didn't know about a unit in the inventory.
+- `vermietungsquote_mismatch`, `total_kaltmiete_mismatch` — aggregate math
+  consequences of the per-unit differences (composer denominator includes
+  unclaimed units; legacy had no inventory-as-truth).
+
+**Alert classes** (Discord summary posted with run timestamp and counts):
+- `kaltmiete_amount_mismatch` — both sides occupied, different rent.
+- `composer_missing_unit` — composer's Unit table lacks a unit legacy knew.
+- `unknown` — genuinely unclassified.
+
+**First run results (2026-05-28T20:28Z, 2 properties):** 7 divergences total,
+0 alerts. KO132 EG + DG classify as `composer_vacant_legacy_occupied`; the
+33%-vs-100% Vermietungsquote case classifies as `vermietungsquote_mismatch`.
+The three already-known divergences from 3.3 are recorded as informational.
+
+**Files:**
+- `supabase/migrations/20260528201627_brain_shadow_comparison.sql` (table + RLS)
+- `scripts/brain-shadow-comparison.ts` (the job)
+- `scripts/lib/brain-shadow-classify.ts` (pure classifier; 42 test assertions)
+- `scripts/lib/discord-notify.ts` (thin webhook POST; no-op without secret)
+- `src/lib/legacy-brain/extract-tenants.ts` (parser extracted from
+  dashboard-actions for reuse by the job; dashboard-actions imports from here)
+- `src/tests/scripts/brain-shadow-classify.test.ts`
+- `.github/workflows/brain-shadow-comparison.yml`
+
+After ~30 days of stable comparison, the legacy brain can be retired
+(separate task, post-launch). The most likely future trigger of a
+`kaltmiete_amount_mismatch` alert is the latent applier dedup bug (same-
+document reprocessing → duplicate active claims → conflict status →
+ambiguous amount); should be fixed pre-customer.
+
+**Unblocks Task 3.5** (presenter, LLM render-only).
+

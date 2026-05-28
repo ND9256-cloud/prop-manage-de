@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { warehouseDb } from '@/lib/warehouse/db';
 import { composePropertySnapshot } from '@/lib/composer/property-snapshot';
 import type { RentRollSnapshot, RentRollRow } from '@/lib/composer/modules/rent-roll';
+import { extractLegacyTenants, type LegacyRentRollRow } from '@/lib/legacy-brain/extract-tenants';
 
 export interface LastVisitStats {
     newDocs: number;
@@ -187,11 +188,7 @@ export interface ProvenanceClaim {
     source_document_id: string | null;
 }
 
-export interface LegacyRentRollRow {
-    unit_ref: string;
-    tenant_name: string | null;
-    monthly_rent: number | null;
-}
+export type { LegacyRentRollRow };
 
 export interface RentRollSnapshotPayload {
     propertyId: string;
@@ -206,40 +203,6 @@ export interface RentRollSnapshotPayload {
         documents: Record<string, ProvenanceDocument>;
         claims: Record<string, ProvenanceClaim>;
     };
-}
-
-interface LegacyBrainAnalysis {
-    rent_roll?: {
-        current_tenants?: unknown;
-        tenants?: unknown;
-    };
-}
-
-interface LegacyTenantEntry {
-    name?: unknown;
-    unit_ref?: unknown;
-    monthly_rent?: unknown;
-}
-
-function extractLegacyTenants(analysis: Record<string, unknown>): LegacyRentRollRow[] {
-    const rent = (analysis as LegacyBrainAnalysis).rent_roll;
-    if (!rent) return [];
-    const list = Array.isArray(rent.current_tenants)
-        ? (rent.current_tenants as LegacyTenantEntry[])
-        : Array.isArray(rent.tenants)
-            ? (rent.tenants as LegacyTenantEntry[])
-            : [];
-    return list
-        .map<LegacyRentRollRow | null>(t => {
-            const unit = typeof t.unit_ref === 'string' ? t.unit_ref : null;
-            if (!unit) return null;
-            return {
-                unit_ref: unit,
-                tenant_name: typeof t.name === 'string' ? t.name : null,
-                monthly_rent: typeof t.monthly_rent === 'number' ? t.monthly_rent : null,
-            };
-        })
-        .filter((r): r is LegacyRentRollRow => r !== null);
 }
 
 function collectIds(rows: RentRollRow[]): { docIds: string[]; claimIds: string[] } {
