@@ -1,0 +1,51 @@
+{
+  "kind": "ResolvedFact",
+  "scenario": "two competing rent claims; presenter must NOT pick a winner silently",
+  "must_contain_any": [
+    "Konflikt",
+    "widersprüchlich",
+    "widerspr",
+    "konkurrieren",
+    "Prüfung"
+  ],
+  "must_contain_all": ["650", "720"],
+  "must_not_contain": [
+    "Julija",
+    "Paul",
+    "Müller",
+    "endgültig",
+    "ist 650",
+    "ist 720",
+    "beträgt 650",
+    "beträgt 720"
+  ],
+  "fact": {
+    "query": {
+      "property_id": "00000000-0000-0000-0000-000000000001",
+      "unit_ref": "1.OG"
+    },
+    "value": { "amount": 65000, "currency": "EUR" },
+    "confidence": "low",
+    "status": "latest_active_claim_with_conflicts",
+    "source_claim_ids": [
+      "claim-winner-id-aaaa",
+      "claim-loser-id-bbbb"
+    ],
+    "source_document_ids": [
+      "doc-mietvertrag-id-aaaa",
+      "doc-nachtrag-id-bbbb"
+    ],
+    "conflicts": [
+      {
+        "claim_id": "claim-loser-id-bbbb",
+        "reason": "superseded_by_later_claim",
+        "value": { "amount": 72000, "currency": "EUR" },
+        "valid_from": "2025-01-01"
+      }
+    ],
+    "derivation_record_id": null,
+    "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+    "generated_at": "2026-05-28T10:00:00Z"
+  },
+  "hints": null
+}

@@ -1,0 +1,90 @@
+{
+  "kind": "PropertySnapshot",
+  "scenario": "vacant unit with no claim ever emitted (phantom vacancy)",
+  "must_contain_any": [
+    "kein Mietvertrag",
+    "keine Mietangaben",
+    "keine Mietangabe",
+    "leerstehend",
+    "Leerstand",
+    "nicht erfasst"
+  ],
+  "must_not_contain": [
+    "650",
+    "Julija",
+    "Paul",
+    "Müller",
+    "Schmidt",
+    "Hofmann"
+  ],
+  "must_not_contain_regex": [
+    "\\d+[\\.,]\\d{2}\\s*€",
+    "\\d{3,}\\s*€",
+    "EUR\\s*\\d+",
+    "Einheit\\s+EG[^.]{0,80}(ist|wird|sei)\\s+vermietet"
+  ],
+  "snapshot": {
+    "core": {
+      "property_id": "00000000-0000-0000-0000-000000000001",
+      "org_id": "00000000-0000-0000-0000-000000000099",
+      "short_code": "KO132",
+      "address": "Korbacher Straße 132, 34132 Kassel",
+      "total_sqm": null,
+      "unit_count": 1,
+      "unit_refs": ["EG"]
+    },
+    "modules": {
+      "rent_roll": {
+        "completeness": "complete",
+        "data": {
+          "rows": [
+            {
+              "unit_ref": "EG",
+              "occupancy_status": "vacant",
+              "vacancy_reason": "no_data",
+              "current_kaltmiete": {
+                "query": { "property_id": "00000000-0000-0000-0000-000000000001", "unit_ref": "EG" },
+                "value": null,
+                "confidence": "low",
+                "status": "no_active_claim",
+                "source_claim_ids": [],
+                "source_document_ids": [],
+                "conflicts": [],
+                "derivation_record_id": null,
+                "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+                "generated_at": "2026-05-28T10:00:00Z"
+              },
+              "tenant_active": {
+                "status": "unavailable",
+                "reason": "no_tenant_resolver",
+                "resolver": { "name": "tenant_for_unit", "version": "unshipped" }
+              },
+              "size_sqm": null,
+              "floor": 0,
+              "rooms": null,
+              "target_cold_rent": null
+            }
+          ],
+          "summary": {
+            "total_units": 1,
+            "occupied_units": 0,
+            "vacant_units": 1,
+            "needs_review_units": 0,
+            "resolved_kaltmiete_total": null,
+            "vermietungsquote": 0
+          }
+        },
+        "resolver_versions": { "rent_for_unit": "1.0.0" },
+        "input_claim_ids": [],
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "composed_at": "2026-05-28T10:00:00Z",
+      "claim_snapshot_version": "test-fixture",
+      "resolver_versions": { "rent_for_unit": "1.0.0" },
+      "completeness": { "rent_roll": "complete" },
+      "warnings": []
+    }
+  }
+}

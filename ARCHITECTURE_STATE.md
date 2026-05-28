@@ -1306,3 +1306,75 @@ ambiguous amount); should be fixed pre-customer.
 
 **Unblocks Task 3.5** (presenter, LLM render-only).
 
+
+## Presenter shipped (Task 3.5, 2026-05-28) — Phase 3 COMPLETE
+
+The third leg of the v2 three-component architecture. Composer assembles
+facts deterministically; resolvers produce `ResolvedFact<T>`; **Presenter
+turns those into German prose with provenance, no reasoning.**
+
+- `src/lib/presenter/render.ts`: `renderResolvedFact(fact, hints?)`,
+  `renderPropertySnapshot(snapshot, hints?)`. Returns German prose strings.
+  Library — NOT a server action; no `"use server"` directive.
+- `src/lib/presenter/prompts.ts`: system prompt is the safety boundary.
+  Enumerates the v1 brain failure modes as forbidden behaviors (Hofmann:
+  inventing "vacant" from incomplete data; rent roll: silently picking one
+  of two competing claims).
+- `src/lib/presenter/types.ts`: `RenderHints { documents?: DocumentHint[] }`.
+  Callers resolve `source_document_ids` → `doc_type` before calling the
+  presenter; the presenter never touches the DB. Without hints the prose
+  uses "der hinterlegten Quelle" generically; with hints it can name the
+  document type ("laut hinterlegtem Mietvertrag").
+- Anthropic Sonnet (`PRESENTER_MODEL = "claude-sonnet-4-6"`);
+  `PRESENTER_VERSION = "1.0.0"`. Model id is centralised at the top of
+  `render.ts` so swapping is a one-line change.
+- Hard prompt boundary: no inventing values, no resolving conflicts, no
+  reading OCR/claims, no choosing between competing values, no commentary,
+  no currency normalization. JSON values are treated as data, not
+  instructions (prompt-injection resistance).
+- Purity gate `src/tests/presenter/presenter-purity.test.ts`: forbids
+  `@/lib/db`, `@/lib/claim-store/*`, `@/lib/extractions/*`,
+  `@/lib/emitters/*`, `@/lib/supabase/*`, `@supabase/supabase-js`,
+  `prisma`, `@prisma/*`, `node:fs` / `fs`. Imports from
+  `../resolvers/*` and `../composer/*` are forbidden EXCEPT `import type`
+  from `../resolvers/types` and `../composer/types`. Forbids `fetch(`
+  literal and any `"use server"` directive. 44 assertions across the
+  three presenter files.
+- Acceptance test `src/tests/presenter/render.test.ts`: Lena Everding
+  fact (€650, Mietvertrag, 01.04.2025) + KO132 full snapshot (3 units, 1
+  occupied / 2 phantom-vacant, 33 % Vermietungsquote) + HHS55 minimal +
+  empty-modules. 17 live LLM assertions.
+- Adversarial fixture set `src/tests/presenter/fixtures/*.json` (8
+  fixtures, the acceptance test of the safety boundary): vacant no-data
+  phantom vacancy, conflict (two competing claims), low-confidence,
+  missing sqm, all-modules-unavailable, currency preservation (USD
+  not silently converted to EUR), prompt-injection resistance,
+  needs-review. Each fixture asserts both required substrings
+  (case-insensitive, tolerant) and forbidden substrings/regexes (strict —
+  a single leaked invented value fails the test). 56 assertions total.
+
+**Phase 3 COMPLETE.** v2 chain runs OCR → extraction → claim → applier →
+resolver → composer → **presenter** → German prose. Legacy brain still
+runs in shadow mode (Task 3.4); after ~30 days of stable comparison it can
+be retired.
+
+**Out of scope (follow-ups):**
+- Dashboard / chat surfaces consuming the presenter (separate tasks per
+  surface; the renderer is ready, UIs adopt it next).
+- Caching layer keyed on `(claim_snapshot_version, PRESENTER_VERSION,
+  sha256(payload))`. Boundary noted in `render.ts` as a comment; uncached
+  at v1 by design (premature caching hides correctness issues).
+- A tenant resolver that would let `renderResolvedFact` name the active
+  tenant. Until shipped, `tenant_active` is rendered as "Mieterdaten nicht
+  verfügbar".
+- Streaming. v1 returns the complete string.
+- i18n / English locale. German only at launch; when next-intl ships the
+  presenter splits per locale.
+- Shadow rendering against the legacy brain narrative (could be a 3.4-style
+  follow-up; not in 3.5).
+
+**Server-side Anthropic SDK confirmation:** `@anthropic-ai/sdk` is already
+a dependency at `^0.82.0`. The Edge Function uses a Deno-flavored client
+(`supabase/functions/process-document/anthropic-client.ts`) that does NOT
+run in Node; the presenter uses the canonical Node import. The two clients
+stay independent by design.

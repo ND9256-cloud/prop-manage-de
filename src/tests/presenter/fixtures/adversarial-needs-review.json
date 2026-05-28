@@ -1,0 +1,87 @@
+{
+  "kind": "PropertySnapshot",
+  "scenario": "unit flagged needs_review due to conflicting claims; presenter must NOT state a definitive rent",
+  "must_contain_any": [
+    "Prüfung",
+    "zur Prüfung",
+    "needs_review",
+    "widersprüchlich",
+    "Konflikt"
+  ],
+  "must_not_contain": [
+    "beträgt eindeutig",
+    "ist eindeutig",
+    "endgültige Kaltmiete"
+  ],
+  "snapshot": {
+    "core": {
+      "property_id": "00000000-0000-0000-0000-000000000004",
+      "org_id": "00000000-0000-0000-0000-000000000099",
+      "short_code": "RV001",
+      "address": "Konfliktstraße 7, 10115 Berlin",
+      "total_sqm": 80,
+      "unit_count": 1,
+      "unit_refs": ["1.OG"]
+    },
+    "modules": {
+      "rent_roll": {
+        "completeness": "partial",
+        "data": {
+          "rows": [
+            {
+              "unit_ref": "1.OG",
+              "occupancy_status": "needs_review",
+              "vacancy_reason": null,
+              "current_kaltmiete": {
+                "query": {},
+                "value": { "amount": 65000, "currency": "EUR" },
+                "confidence": "low",
+                "status": "latest_active_claim_with_conflicts",
+                "source_claim_ids": ["claim-winner", "claim-loser"],
+                "source_document_ids": ["doc-a", "doc-b"],
+                "conflicts": [
+                  {
+                    "claim_id": "claim-loser",
+                    "reason": "superseded_by_later_claim",
+                    "value": { "amount": 80000, "currency": "EUR" },
+                    "valid_from": "2024-12-01"
+                  }
+                ],
+                "derivation_record_id": null,
+                "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+                "generated_at": "2026-05-28T10:00:00Z"
+              },
+              "tenant_active": {
+                "status": "unavailable",
+                "reason": "no_tenant_resolver",
+                "resolver": { "name": "tenant_for_unit", "version": "unshipped" }
+              },
+              "size_sqm": 80,
+              "floor": 1,
+              "rooms": 3,
+              "target_cold_rent": null
+            }
+          ],
+          "summary": {
+            "total_units": 1,
+            "occupied_units": 0,
+            "vacant_units": 0,
+            "needs_review_units": 1,
+            "resolved_kaltmiete_total": null,
+            "vermietungsquote": 0
+          }
+        },
+        "resolver_versions": { "rent_for_unit": "1.0.0" },
+        "input_claim_ids": ["claim-winner", "claim-loser"],
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "composed_at": "2026-05-28T10:00:00Z",
+      "claim_snapshot_version": "test-fixture",
+      "resolver_versions": { "rent_for_unit": "1.0.0" },
+      "completeness": { "rent_roll": "partial" },
+      "warnings": []
+    }
+  }
+}

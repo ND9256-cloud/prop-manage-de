@@ -1,0 +1,22 @@
+{
+  "kind": "ResolvedFact",
+  "scenario": "rent stored in USD by mistake; presenter must preserve USD, NOT silently convert to EUR",
+  "must_contain_any": ["USD", "US-Dollar", "Dollar", "$"],
+  "must_not_contain": ["EUR", "Euro", "€"],
+  "fact": {
+    "query": {
+      "property_id": "00000000-0000-0000-0000-000000000001",
+      "unit_ref": "1.OG"
+    },
+    "value": { "amount": 65000, "currency": "USD" },
+    "confidence": "medium",
+    "status": "single_active_claim",
+    "source_claim_ids": ["claim-usd-id"],
+    "source_document_ids": ["doc-usd-id"],
+    "conflicts": [],
+    "derivation_record_id": null,
+    "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+    "generated_at": "2026-05-28T10:00:00Z"
+  },
+  "hints": null
+}

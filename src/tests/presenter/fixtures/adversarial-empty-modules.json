@@ -1,0 +1,71 @@
+{
+  "kind": "PropertySnapshot",
+  "scenario": "all modules unavailable; presenter must NOT invent rent figures or occupancy",
+  "must_contain_any": [
+    "keine Moduldaten",
+    "keine Daten",
+    "keine Angaben",
+    "nicht verfügbar",
+    "unavailable",
+    "noch keine"
+  ],
+  "must_not_contain": [
+    "650",
+    "720"
+  ],
+  "must_not_contain_regex": [
+    "\\d+[\\.,]\\d{2}\\s*€",
+    "\\d{3,}\\s*€",
+    "vermietet an",
+    "ist Mieter",
+    "Mieter ist",
+    "beträgt\\s+\\d"
+  ],
+  "snapshot": {
+    "core": {
+      "property_id": "00000000-0000-0000-0000-000000000003",
+      "org_id": "00000000-0000-0000-0000-000000000099",
+      "short_code": "AX001",
+      "address": "Beispielstraße 1, 10115 Berlin",
+      "total_sqm": 250,
+      "unit_count": 4,
+      "unit_refs": ["EG", "1.OG", "2.OG", "DG"]
+    },
+    "modules": {
+      "rent_roll": {
+        "completeness": "unavailable",
+        "data": null,
+        "resolver_versions": {},
+        "input_claim_ids": [],
+        "warnings": [
+          { "module": "rent_roll", "code": "module_unavailable", "message": "no handler" }
+        ]
+      },
+      "ownership": {
+        "completeness": "unavailable",
+        "data": null,
+        "resolver_versions": {},
+        "input_claim_ids": [],
+        "warnings": []
+      },
+      "insurance": {
+        "completeness": "unavailable",
+        "data": null,
+        "resolver_versions": {},
+        "input_claim_ids": [],
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "composed_at": "2026-05-28T10:00:00Z",
+      "claim_snapshot_version": "test-fixture",
+      "resolver_versions": {},
+      "completeness": {
+        "rent_roll": "unavailable",
+        "ownership": "unavailable",
+        "insurance": "unavailable"
+      },
+      "warnings": []
+    }
+  }
+}

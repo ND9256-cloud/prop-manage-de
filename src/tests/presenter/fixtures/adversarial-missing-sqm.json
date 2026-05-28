@@ -1,0 +1,102 @@
+{
+  "kind": "PropertySnapshot",
+  "scenario": "every size field is null; presenter must NOT invent square meters",
+  "must_contain_any": [
+    "Wohnfläche nicht erfasst",
+    "Mietfläche nicht erfasst",
+    "Fläche nicht erfasst",
+    "keine Angabe",
+    "nicht erfasst"
+  ],
+  "must_not_contain_regex": ["\\d+\\s*m²", "\\d+\\s*qm", "\\d+\\s*Quadratmeter"],
+  "snapshot": {
+    "core": {
+      "property_id": "00000000-0000-0000-0000-000000000002",
+      "org_id": "00000000-0000-0000-0000-000000000099",
+      "short_code": "HHS55",
+      "address": "Holzhäuser Straße 55, 04299 Leipzig",
+      "total_sqm": null,
+      "unit_count": 2,
+      "unit_refs": ["EG", "1.OG"]
+    },
+    "modules": {
+      "rent_roll": {
+        "completeness": "complete",
+        "data": {
+          "rows": [
+            {
+              "unit_ref": "EG",
+              "occupancy_status": "vacant",
+              "vacancy_reason": "no_data",
+              "current_kaltmiete": {
+                "query": {},
+                "value": null,
+                "confidence": "low",
+                "status": "no_active_claim",
+                "source_claim_ids": [],
+                "source_document_ids": [],
+                "conflicts": [],
+                "derivation_record_id": null,
+                "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+                "generated_at": "2026-05-28T10:00:00Z"
+              },
+              "tenant_active": {
+                "status": "unavailable",
+                "reason": "no_tenant_resolver",
+                "resolver": { "name": "tenant_for_unit", "version": "unshipped" }
+              },
+              "size_sqm": null,
+              "floor": 0,
+              "rooms": null,
+              "target_cold_rent": null
+            },
+            {
+              "unit_ref": "1.OG",
+              "occupancy_status": "vacant",
+              "vacancy_reason": "no_data",
+              "current_kaltmiete": {
+                "query": {},
+                "value": null,
+                "confidence": "low",
+                "status": "no_active_claim",
+                "source_claim_ids": [],
+                "source_document_ids": [],
+                "conflicts": [],
+                "derivation_record_id": null,
+                "resolver": { "name": "rent_for_unit", "version": "1.0.0" },
+                "generated_at": "2026-05-28T10:00:00Z"
+              },
+              "tenant_active": {
+                "status": "unavailable",
+                "reason": "no_tenant_resolver",
+                "resolver": { "name": "tenant_for_unit", "version": "unshipped" }
+              },
+              "size_sqm": null,
+              "floor": 1,
+              "rooms": null,
+              "target_cold_rent": null
+            }
+          ],
+          "summary": {
+            "total_units": 2,
+            "occupied_units": 0,
+            "vacant_units": 2,
+            "needs_review_units": 0,
+            "resolved_kaltmiete_total": null,
+            "vermietungsquote": 0
+          }
+        },
+        "resolver_versions": { "rent_for_unit": "1.0.0" },
+        "input_claim_ids": [],
+        "warnings": []
+      }
+    },
+    "metadata": {
+      "composed_at": "2026-05-28T10:00:00Z",
+      "claim_snapshot_version": "test-fixture",
+      "resolver_versions": { "rent_for_unit": "1.0.0" },
+      "completeness": { "rent_roll": "complete" },
+      "warnings": []
+    }
+  }
+}
