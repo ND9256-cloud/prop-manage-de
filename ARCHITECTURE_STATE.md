@@ -986,3 +986,25 @@ rent corruption when Step 4 misroutes.
 - Adversarial fixture `nachtrag_misclassified_as_mieterhoehung_at_step4`
   as a full Step-4 classifier eval is a separate harness; this task
   verifies only the emitter's rejection behavior in unit tests.
+
+## PLZ verifier shipped (Task 2.6, 2026-05-28) — Phase 2 COMPLETE
+
+Deterministic verifier guarding against hallucinated German addresses (the
+Kuru bug class). Static lookup of 8,298 valid German PLZs → Bundesland
+(point-in-polygon of PLZ coordinates against dissolved official Bundesland
+boundaries).
+
+- data/plz-bundesland.json: 8,298 PLZ → Bundesland
+- verifiers/plz.ts: checkPlz (pure core) + plzVerifier wrapper. On failure
+  (PLZ not found OR Bundesland mismatch) → confidence "low",
+  validation_status "requires_human_review" per §10. No model identifiers (§9.3).
+- 28 assertions; the Kuru case (36270 — a non-existent PLZ) is structurally caught.
+
+Runs on address-typed fields in extraction post-processing. Address fields are
+not critical-severity in the launch slice, so the verifier may be dormant until
+an address field is added — registered and unit-tested, ready when needed.
+
+**Phase 2 COMPLETE.** Both original v1 bugs gate-tested (Weber 2.2, Hofmann 2.5);
+Mieterhöhung, Übergabeprotokoll, Mietvertragsnachtrag emitters shipped;
+supersession + Hofmann + PLZ guards in place. Next: Phase 3 (composer + brain
+replacement).
