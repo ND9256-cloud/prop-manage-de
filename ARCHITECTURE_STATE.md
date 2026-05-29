@@ -1378,3 +1378,140 @@ a dependency at `^0.82.0`. The Edge Function uses a Deno-flavored client
 (`supabase/functions/process-document/anthropic-client.ts`) that does NOT
 run in Node; the presenter uses the canonical Node import. The two clients
 stay independent by design.
+
+---
+
+## Phase 3 COMPLETE (2026-05-28)
+
+The v2 three-component architecture is fully wired end-to-end:
+
+  Document → OCR → Extraction (Sonnet) → Envelope → Emitters → Applier
+    → Claim Store (GoBD append-only) → Resolvers (ResolvedFact<T>)
+    → Composer (PropertySnapshot) → **Presenter (German prose)**
+
+What this means for the product:
+- The dashboard rent roll renders from composer output, not from
+  document_intelligence. Lena Everding's €650 traces, in one click, to the
+  source Mietvertrag. The trust proposition (evidence chains as legal
+  shields) is now tangible to the user.
+- All units are visible — occupied, vacant-tenancy-ended, and phantom-vacant
+  ("no lease on file → upload"). The rent roll is a worklist, not a report.
+- Vermietungsquote falls out for free from the inventory-as-truth decision
+  (3.1b). Currently shown understated.
+- Legacy brain still runs in shadow mode (3.4), but only as a comparison
+  signal — customer-facing surfaces read composer only.
+
+**Tasks completed in Phase 3:**
+- 3.1   Composer core (PropertySnapshot, registry pattern)
+- 3.1b  Unit inventory as authoritative structural truth
+- 3.2   RentRollSnapshot module (phantom vs real vacancy distinction)
+- 3.3   Dashboard renders from composer with provenance click-through
+- 3.4   Shadow-mode nightly comparison (composer vs legacy, alert classes)
+- 3.5   Presenter — LLM render-only with hard prompt boundary + adversarial
+        fixtures + purity gate
+
+The PR numbering for the record: #51 (3.1b), #52 (3.2), #53 (3.3), #54 (3.4),
+#55 (3.5) all on main.
+
+## 30-day shadow-mode countdown started (2026-05-28)
+
+The legacy brain (scripts/generate-brain.js) continues to run on its existing
+schedule and write to property_intelligence. The nightly comparison job runs
+at 02:00 UTC, classifies divergences, and posts Discord alerts only on alert
+classes (kaltmiete_amount_mismatch, composer_missing_unit, unknown).
+
+Current known divergences classify as informational and do NOT alert:
+- KO132 EG, KO132 DG: composer_vacant_legacy_occupied (legacy knows the
+  tenant from document_intelligence; composer correctly shows phantom
+  vacancy because no claim was ever ingested for those units)
+- Top dashboard stats (100% Vermietungsquote, €3.595/Monat): legacy-sourced;
+  composer says 33% / €650. Recorded as vermietungsquote_mismatch and
+  total_kaltmiete_mismatch — informational.
+
+After ~30 days of stable comparison (no unexplained divergence class), the
+legacy brain can be retired (separate post-launch task).
+
+## Today's-lessons follow-ups (record for pre-customer fixes)
+
+### Presenter minor-units inconsistency (Task 3.5 follow-up)
+
+The presenter prompt's amount-formatting rule is currency-specific (EUR
+examples). LLM correctly renders amount: 65000 EUR → 650,00 € (divides by
+100), but for USD renders 65000 → 65.000 USD (treats as literal, no
+division). Surfaced by adversarial-mismatched-currency fixture.
+
+The LLM should never do arithmetic. Fix: pre-format the amount in the caller
+(server action) and pass a formatted string to the presenter. Prompt only
+needs to render strings, not interpret minor-units conventions.
+
+Small v1.1 task before any non-EUR property onboards.
+
+### Test-assertion discipline (Task 3.5 lessons)
+
+Lessons codified by adversarial fixtures and the render.test.ts HHS55 incident:
+
+- **Positive assertions tolerant.** Accept any honest phrasing the LLM
+  legitimately produces. The empty-modules positive check only matched
+  "keine moduldaten" / "keine daten" verbatim; LLM said "keine weiteren
+  Moduldaten vorhanden" — equally honest, missed by the check. Broaden lists
+  to include legitimate variations.
+
+- **Negative assertions precise about invention, not broad against
+  vocabulary.** Forbid specific tenant names ("Julija", "Saniye"), specific
+  monetary values via regex (\d+,\d{2}\s*€), and occupancy *assertions*
+  ("vermietet an", "ist Mieter"). Do NOT forbid vocabulary roots
+  ("Mieter", "Mietvertrag", "Kaltmiete") — these are legitimate domain
+  words the presenter must use in section headers like "Mieterliste: nicht
+  verfügbar."
+
+- **Fixtures must use real data, not fake data labeled with real
+  identifiers.** The HHS55 fixture passed structural assertions while
+  containing completely fabricated address, units, and sizes — because the
+  assertions never checked facts. Integration-style fixtures use real
+  composer output where possible; synthetic fixtures should not use real
+  property short_codes/IDs.
+
+### Applier dedup-by-identity fix shipped (2026-05-29, Tier 0 gate)
+
+The applier no longer dedups on source_extraction_run_id alone. Identity for
+a fact is now (source_document_id, subject, predicate, value, valid_from) —
+re-processing a document is structurally idempotent.
+
+`src/lib/claim-store/applier.ts`:
+- `findExistingClaim` keys on (source_document_id, subject, predicate,
+  valid_from) and filters `valid_to IS NULL AND superseded_by_claim_id IS NULL`
+  (currently-active claims only). Value equality computed in SQL via Postgres
+  `jsonb = jsonb` (canonical: sorted keys, normalized whitespace, numeric
+  scalars compared by value).
+- Insert loop:
+  - identical re-emission (value matches) → skip, no insert, no UPDATE to
+    superseded_at (true no-op).
+  - same identity, value differs → insert new claim AND supersede the prior
+    active claim via the existing `applyClosure` path with
+    `close_overlapping_and_supersede_future` (sets valid_to, superseded_at,
+    superseded_by_claim_id, writes claim_closures audit row). Exactly one
+    active claim remains per fact.
+- Human adjudication path (`source_extraction_run_id IS NULL`) is unchanged —
+  no dedup, by design.
+
+Test: `src/tests/integration/applier-dedup.test.ts` — 26 assertions on real
+Lena fixture, three cases per the task brief (first apply, identical re-apply,
+value-corrected re-apply). Per-test Prisma transaction rollback (GoBD blocks
+DELETE).
+
+Out of scope (separate tasks): partial unique index migration enforcing this
+at the DB layer; backfill/supersession of pre-existing duplicate active claims
+in production (Lena KO132 1.OG had 3 duplicates manually cleaned 2026-05-28).
+
+### Operational lesson: where browser judgment happens
+
+Several hours today were lost to viewing the Vercel production deployment
+while believing it was the local dev branch. Then to viewing localhost on
+the laptop while the dev server ran on the Mac Mini. Then to viewing the
+Tailscale URL without local session cookies (Unauthorized).
+
+For any browser judgment going forward, the simplest path is the Vercel
+preview URL auto-deployed for each PR — it's authenticated against the
+production session, no localhost dance, and shows exactly what the merge
+would produce. The auto-deploy comments on the PR with the link.
+

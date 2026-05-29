@@ -87,18 +87,27 @@ async function applyEmissionInner(
     );
   }
 
-  // --- Insert claims (with idempotency) ----------------------------------
+  // --- Insert claims (with idempotency + supersession on value change) ---
+  // Fact identity is (source_document_id, subject, predicate, valid_from).
+  // The applier dedups on that tuple, not on source_extraction_run_id, so
+  // re-processing a document doesn't stack parallel active claims.
+  //   identical re-emission (same value)    → no-op (no insert, no supersede)
+  //   same identity, different value         → supersede prior active claim
+  //                                            via close_overlapping_and_supersede_future
+  // Value equality is canonical (Postgres jsonb=jsonb in SQL).
   const inserted_claim_ids: string[] = [];
   const skipped_duplicate_claim_ids: string[] = [];
+  const applied_closure_ids: string[] = [];
   const derivation_record_ids: string[] = [];
   // Map: claim object → its DB id (used by event-claim dispatch later)
   const claimIdByObject = new Map<Claim, string>();
 
   for (const claim of emission.claims_to_insert) {
-    const existingId = await findExistingClaim(tx, claim);
-    if (existingId) {
-      skipped_duplicate_claim_ids.push(existingId);
-      claimIdByObject.set(claim, existingId);
+    const existing = await findExistingClaim(tx, claim);
+    if (existing && existing.value_matches) {
+      // Identical re-application: true no-op.
+      skipped_duplicate_claim_ids.push(existing.id);
+      claimIdByObject.set(claim, existing.id);
       continue;
     }
 
@@ -118,10 +127,36 @@ async function applyEmissionInner(
       emitter_version: context.emitter_version,
     });
     derivation_record_ids.push(drId);
+
+    if (existing && !existing.value_matches) {
+      // Same (source_document_id, subject, predicate, valid_from) but value
+      // changed: supersede the prior active claim. Reuses the closure path
+      // (UPDATE valid_to + superseded_at + superseded_by_claim_id, INSERT
+      // claim_closures audit row) per §5.5.3.
+      const closureId = await applyClosure(tx, {
+        target_claim_id: existing.id,
+        reason_claim_id: insertedId,
+        close_mode: "close_overlapping_and_supersede_future",
+        applied_valid_to: claim.valid_from,
+      });
+      applied_closure_ids.push(closureId);
+
+      const closureDrId = await writeDerivationRecord(tx, {
+        property_id: claim.property_id,
+        output_type: "closure",
+        output_id: closureId,
+        input_claim_ids: [insertedId, existing.id],
+        input_extraction_run_ids: context.extraction_run_id
+          ? [context.extraction_run_id]
+          : [],
+        rule_refs: ["applier-dedup-supersession"],
+        emitter_version: context.emitter_version,
+      });
+      derivation_record_ids.push(closureDrId);
+    }
   }
 
   // --- Apply closures ---------------------------------------------------
-  const applied_closure_ids: string[] = [];
   const blocked_closure_intents: BlockedClosureIntent[] = [];
 
   // Identify triggering event claim (must be exactly one if closure_intents
@@ -223,18 +258,44 @@ async function applyEmissionInner(
 
 // === Helpers ==============================================================
 
-async function findExistingClaim(tx: PrismaTransactionClient, claim: Claim): Promise<string | null> {
-  if (!claim.source_extraction_run_id) return null; // human_adjudication: no idempotency check
-  // @tenant-isolation-disable-next-line -- reason: claim-store applier idempotency SELECT keyed on extraction run, property scoped by caller context verification
-  const rows = await tx.$queryRaw<{ id: string }[]>`
-    SELECT id FROM warehouse.claims
-    WHERE source_extraction_run_id = ${claim.source_extraction_run_id}::uuid
+/**
+ * Look up an active claim with the same fact identity as `claim`:
+ * (source_document_id, subject, predicate, valid_from).
+ *
+ * Returns the matching claim id plus a SQL-computed `value_matches` flag
+ * (Postgres jsonb=jsonb — canonical: keys are sorted, whitespace is normalized,
+ * numeric scalars compare by value not text). The caller uses `value_matches`
+ * to distinguish "identical re-emission (skip)" from "same fact corrected
+ * (supersede)".
+ *
+ * Filter `superseded_by_claim_id IS NULL AND valid_to IS NULL` restricts the
+ * lookup to currently-active claims so that supersession path doesn't try to
+ * re-set the immutable valid_to of an already-closed historical claim.
+ *
+ * Returns null when source_extraction_run_id is null (human_adjudication
+ * path) — those claims never participate in extraction-replay dedup.
+ */
+async function findExistingClaim(
+  tx: PrismaTransactionClient,
+  claim: Claim
+): Promise<{ id: string; value_matches: boolean } | null> {
+  if (!claim.source_extraction_run_id) return null;
+  if (!claim.source_document_id) return null;
+  // @tenant-isolation-disable-next-line -- reason: claim-store applier dedup SELECT keyed on source_document_id which is property-scoped via warehouse.documents, property/org verified at transaction start
+  const rows = await tx.$queryRaw<{ id: string; value_matches: boolean }[]>`
+    SELECT id,
+           value = ${JSON.stringify(claim.value)}::jsonb AS value_matches
+    FROM warehouse.claims
+    WHERE source_document_id = ${claim.source_document_id}::uuid
       AND subject = ${claim.subject}
       AND predicate = ${claim.predicate}
-      AND source_field_path = ${claim.source_field_path}
+      AND valid_from = ${claim.valid_from}::date
+      AND valid_to IS NULL
+      AND superseded_by_claim_id IS NULL
+    ORDER BY created_at DESC
     LIMIT 1
   `;
-  return rows[0]?.id ?? null;
+  return rows[0] ?? null;
 }
 
 async function insertClaim(tx: PrismaTransactionClient, claim: Claim): Promise<string> {
