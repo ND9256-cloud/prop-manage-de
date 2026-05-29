@@ -28,6 +28,20 @@ export interface Money {
   currency: string; // ISO 4217, e.g. "EUR"
 }
 
+/**
+ * Minimal tenant shape built from a tenant_active claim's value JSONB.
+ * Mirrors the tenant_identity normalized_value fields the Mietvertrag schema
+ * emits (schemas/mietvertrag/schema.yaml): name + is_legal_entity + optional
+ * legal_form. The resolver returns the first tenant from value.tenants[]
+ * (single-tenant per claim today; multi-tenant Mietgemeinschaft handling is
+ * a Phase 2 schema change, not a resolver concern).
+ */
+export interface Tenant {
+  name: string;
+  is_legal_entity: boolean;
+  legal_form?: string;
+}
+
 export interface Conflict {
   claim_id: string;
   reason: "superseded_by_later_claim";

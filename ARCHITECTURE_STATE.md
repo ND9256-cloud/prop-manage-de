@@ -607,7 +607,7 @@ store and returning a `ResolvedFact` with full provenance. Architecture §5.1–
 
 **Shipped:**
 - `src/lib/resolvers/types.ts` — `ResolvedFact<TValue>`, `ResolutionStatus`,
-  `Money`, `Conflict`, `downgradeConfidence`
+  `Money`, `Tenant`, `Conflict`, `downgradeConfidence`
 - `src/lib/resolvers/rent-for-unit.ts` (Task 1.10) — `rentForUnit({ property_id,
   unit_ref, as_of_date?, org_id }, { tx? }) → Promise<ResolvedFact<Money>>`.
   Implements §5.2 algorithm: zero/one/multi-claim handling, sort by (valid_from
@@ -615,15 +615,29 @@ store and returning a `ResolvedFact` with full provenance. Architecture §5.1–
   DerivationRecord per call (output_type="resolved_fact"); DR write is
   best-effort and does not block resolution. Org isolation via JOIN to Property
   with explicit org_id parameter.
+- `src/lib/resolvers/tenant-for-unit.ts` (Phase 4 prerequisite) —
+  `tenantForUnit({ property_id, unit_ref, as_of_date?, org_id }, { tx? }) →
+  Promise<ResolvedFact<Tenant>>`. Parallel resolver to rent_for_unit: same
+  shape, status vocabulary, sort order, confidence downgrade, DR write,
+  org-isolation JOIN. Differs only in predicate (`tenant_active` vs
+  `kaltmiete`) and the value extractor (returns first tenant from
+  `value.tenants[]` — emitter only ever puts one tenant in the array; Mietgemeinschaft
+  handling is a Phase 2 schema change).
 - `src/tests/resolvers/rent-for-unit.test.ts` — 8 scenarios, ≥30 assertions,
   covers Lena single-claim, Paul/Kuru-style Mieterhöhung, Hofmann, multi-claim
   conflict, zero-claim, before-any-claim date, org isolation, prefix
   idempotency
+- `src/tests/integration/tenant-for-unit.test.ts` — 28 assertions: full
+  envelope → emitter → applier → resolver chain on real Lena fixture
+  (single_active_claim), phantom-vacancy (no_active_claim), synthetic
+  multi-claim conflict (latest_active_claim_with_conflicts)
 - `src/tests/resolvers/resolver-purity.test.ts` — CI gate: resolver source
   contains no LLM/prompt/emitter/extraction imports and no `fetch(` or
   `https://` literals
 
 **Pending (separate tasks):**
+- Wire `tenant_for_unit` into the composer rent-roll module + dashboard
+  (replaces `TenantUnavailableFact` surrogate in `src/lib/composer/modules/rent-roll.ts`)
 - Other resolvers (`owner_of_property`, `active_insurance_for_property`,
   `last_meter_reading_for_unit`) — follow the same template
 - UI surfacing of conflicts (`status === "latest_active_claim_with_conflicts"`
