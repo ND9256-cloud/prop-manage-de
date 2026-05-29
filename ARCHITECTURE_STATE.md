@@ -130,6 +130,16 @@ All five gates shipped May 2026. These were blocking customer #1.
 - Recovery procedure documented in scripts/restore-drill.md.
 - Cadence: quarterly (next drill: August 2026).
 
+### 6. Eval Harness Scaffolding (Task 4.1)
+- `scripts/eval/` — deterministic metrics module, fixture loader, CLI (`score` + `extract --live`).
+- Metrics (architecture §13.2): exact_match (raw_value), normalized_match (deep-equal, key-sorted), evidence_grounded (verbatim quote in source OCR, whitespace-normalized), absence_state_correct (no hallucinated values on gold-absent), severity_weighted_error_rate (weights from schemas/<doc_type>/schema.yaml).
+- Semantic "does the quote justify the value" is deferred to the Task 4.5 critic — no LLM judgment in the metrics module.
+- `extract --live` is gated behind explicit `--live` + `--fixture-cap N` flags; errors cleanly when fixtures lack OCR text inputs (the case today — Task 4.3 produces those inputs).
+- Fixture loader respects an optional per-fixture `meta.json` (`{ split, tags, notes }`) — default split is `gold`. The gold/dev/test split convention is not yet formalized in architecture; the loader is forward-compatible.
+- Output: `eval/results/<timestamp>.json` with per-fixture and per-doc-type aggregates.
+- Tests: `src/tests/eval/metrics.test.ts` (deterministic, no LLM, 36 assertions), `src/tests/eval/score-smoke.test.ts` (gold-vs-gold across all real fixtures, 81 assertions).
+- 4.2 (CI + Discord regression alert), 4.3 (gold-set + adversarial fixtures), 4.5 (Opus + critic) build on this.
+
 ---
 
 ## Synthetic Monitoring (LIVE, commit 76f18379)
