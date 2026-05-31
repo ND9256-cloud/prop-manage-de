@@ -95,6 +95,11 @@ export interface RunMetadata {
 export interface EvalRunResult {
   meta: RunMetadata;
   per_fixture: DocTypeMetricSummary[];
+  // Fixtures that had no candidate envelope and were SKIPPED (not scored).
+  // These are excluded from per_fixture and from every aggregate below so a
+  // missing candidate cannot be miscounted as a total failure. Empty in
+  // gold self-score mode (gold is always its own candidate).
+  skipped_no_candidate: string[];
   // Roll-up: per doc_type aggregate across all fixtures of that doc_type.
   per_doc_type: Record<string, {
     fixture_count: number;
