@@ -1532,11 +1532,17 @@ would produce. The auto-deploy comments on the PR with the link.
 - `scripts/eval/run.ts`: extract mode runs real Sonnet extraction (Sonnet only; Opus deferred to 4.5), gated behind --live + --fixture-cap, errors cleanly for fixtures lacking source.txt or an extractor config. Candidates written to eval/candidates/<ts>/.
 - source.txt added for the 5 real cases (real OCR). Supersession cases (Paul/Kuru/Weber) ground only partially from one document — full multi-document grounding deferred to Task 4.3. Lena (mietvertrag) is the verified DoD path.
 - Mocked wiring test (src/tests/eval/extract-wiring.test.ts, 20 assertions) is the CI-safe gate; live Sonnet smoke is manual/out-of-CI.
-- KNOWN: CI does not execute eval tests yet (deferred to Task 4.2).
+- Task 4.2a: CI now executes the four DB-free eval tests (see Task 4.2a entry below).
 
 ## Task 4.1b-followup — extractor.ts config drift eliminated (2026-05-31)
 
 - `scripts/gen-schemas.ts` now emits a fourth generated artifact per doc type: `schemas/<doc_type>/generated/field_specs.ts` (`FIELD_SPECS` + `VERIFIER_REFS`, driven from schema.yaml). `npm run gen:schemas:check` (CI: generated-files-fresh.yml) guards it against drift.
 - `scripts/eval/extractor.ts`: the hand-maintained V2_CONFIGS fieldSpecs + verifierRefs are GONE — both now import from the generated field_specs.ts. The eval harness's extractor config can no longer silently diverge from the schema source of truth. Behavior-identical to the old hardcoded table (existing extract-wiring/metrics/score-smoke tests pass unchanged).
 - The German system-prompt wrapper still lives in Deno index.ts (cannot be cleanly imported into Node), so extractor.ts keeps a verbatim copy. New drift-guard test `src/tests/eval/extractor-drift.test.ts` (4 assertions) reads both source files and asserts the wrapper byte-matches (modulo `${...}` interpolation names), plus asserts the schema-driven FIELD_SPECS/VERIFIER_REFS equal the expected mietvertrag set.
-- Out of scope (unchanged): production index.ts still hardcodes its own V2_PROMPTS/V2_VERIFIER_REFS copy; CI does not execute eval tests yet (Task 4.2).
+- Out of scope (unchanged): production index.ts still hardcodes its own V2_PROMPTS/V2_VERIFIER_REFS copy. (CI execution of the eval tests landed in Task 4.2a, below.)
+
+## Task 4.2a — DB-free eval tests wired into CI (2026-05-31)
+
+- `.github/workflows/ci.yml` gains an `eval-tests` job that runs on every `pull_request`. It executes the four DB-free eval harness files via `npx tsx`: `src/tests/eval/metrics.test.ts`, `score-smoke.test.ts`, `extract-wiring.test.ts` (fully mocked `ExtractorDeps` — no live model), and `extractor-drift.test.ts`. The eval regression net is now a real CI gate, not local-only.
+- No secrets: the job needs no Supabase env, no `DATABASE_URL` for the tests, and no `ANTHROPIC_API_KEY`. The only `DATABASE_URL` is a dummy passed to `npm ci` for the prisma generate postinstall, mirroring the existing `check` job. Verified all four pass under a fully stripped environment.
+- Out of scope (deferred): integration/DB eval tests (applier-dedup, tenant-for-unit, everding-end-to-end) need DB secrets and are a separate task; the evidence-grounded metric / `evid` gate and gold-set/fixture-layout work remain in Task 4.3; live extraction is never run in CI.
