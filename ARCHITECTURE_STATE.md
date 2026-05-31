@@ -1525,3 +1525,12 @@ preview URL auto-deployed for each PR — it's authenticated against the
 production session, no localhost dance, and shows exactly what the merge
 would produce. The auto-deploy comments on the PR with the link.
 
+
+## Task 4.1b — Live extract path wired (Sonnet) + real-case OCR inputs (2026-05-31)
+
+- `scripts/eval/extractor.ts`: Node-callable Sonnet Step 8b extractor. Production extractor (supabase/functions/process-document/index.ts) is Deno/HTTP-only, so the eval harness re-hosts the core extraction logic. SHARES production's generated prompt_fragment, envelope_validator, and verifiers (single source of truth). DUPLICATES V2_CONFIGS (field specs + verifier refs) and the system-prompt wrapper — drift risk.
+- `scripts/eval/run.ts`: extract mode runs real Sonnet extraction (Sonnet only; Opus deferred to 4.5), gated behind --live + --fixture-cap, errors cleanly for fixtures lacking source.txt or an extractor config. Candidates written to eval/candidates/<ts>/.
+- source.txt added for the 5 real cases (real OCR). Supersession cases (Paul/Kuru/Weber) ground only partially from one document — full multi-document grounding deferred to Task 4.3. Lena (mietvertrag) is the verified DoD path.
+- Mocked wiring test (src/tests/eval/extract-wiring.test.ts, 20 assertions) is the CI-safe gate; live Sonnet smoke is manual/out-of-CI.
+- FOLLOW-UP: eliminate extractor.ts drift — generate V2_CONFIGS from schemas/<doc_type>/schema.yaml, or add a drift-guard test against production index.ts.
+- KNOWN: CI does not execute eval tests yet (deferred to Task 4.2).
