@@ -22,3 +22,26 @@ jobs:
       - name: Lint
         run: npx eslint .
         continue-on-error: true
+
+  # DB-free eval harness regression tests (Task 4.2a). These run with NO
+  # secrets — no Supabase env, no DATABASE_URL for the tests, no
+  # ANTHROPIC_API_KEY. extract-wiring uses a fully mocked ExtractorDeps, so
+  # no live model is called. The dummy DATABASE_URL below is only for the
+  # prisma generate postinstall during `npm ci`, mirroring the check job.
+  eval-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+        env:
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
+      - name: Run DB-free eval tests
+        run: |
+          npx tsx src/tests/eval/metrics.test.ts
+          npx tsx src/tests/eval/score-smoke.test.ts
+          npx tsx src/tests/eval/extract-wiring.test.ts
+          npx tsx src/tests/eval/extractor-drift.test.ts
