@@ -145,6 +145,50 @@ function aggregateDocType(summaries: DocTypeMetricSummary[]): EvalRunResult["per
   return out;
 }
 
+// Pure scoring core, exported for tests. Iterates fixtures, resolves a
+// candidate envelope per fixture via `getCandidate`, and scores only the
+// fixtures that HAVE a candidate. A fixture with no candidate is NOT scored
+// (scoring it would mark every field a miss and corrupt the aggregates —
+// the 0.96-error-rate bug); it is collected into skipped_no_candidate and
+// the aggregates are computed over scored fixtures alone. Scoring of
+// fixtures that have a candidate is byte-for-byte unchanged.
+export function computeScore(
+  fixtures: LoadedFixture[],
+  getCandidate: (f: LoadedFixture) => ExtractionEnvelope | undefined,
+  opts: { split: string; candidateMode: boolean },
+): EvalRunResult {
+  const summaries: DocTypeMetricSummary[] = [];
+  const skipped: string[] = [];
+  for (const f of fixtures) {
+    const schemaFields = loadSchemaFields(f.doc_type);
+    if (schemaFields.length === 0) {
+      console.warn(`[skip] no schema fields found for doc_type "${f.doc_type}" (${f.fixture_id})`);
+      continue;
+    }
+    const candidate = getCandidate(f);
+    if (!candidate) {
+      // No candidate envelope for this fixture — skip, don't score as a miss.
+      skipped.push(f.fixture_id);
+      continue;
+    }
+    const ocrText = readOcrText(f);
+    summaries.push(scoreFixture(f.fixture_id, f.doc_type, f.envelope, candidate, schemaFields, ocrText));
+  }
+
+  return {
+    meta: {
+      mode: "score",
+      model: opts.candidateMode ? "candidate" : "gold-self-score",
+      ran_at: new Date().toISOString(),
+      split: opts.split,
+      fixture_count: summaries.length,
+    },
+    per_fixture: summaries,
+    skipped_no_candidate: skipped,
+    per_doc_type: aggregateDocType(summaries),
+  };
+}
+
 async function runScore(args: CliArgs): Promise<EvalRunResult> {
   const fixtures = loadFixtures({ split: args.split, docType: args.docType });
   if (fixtures.length === 0) {
@@ -153,31 +197,13 @@ async function runScore(args: CliArgs): Promise<EvalRunResult> {
     );
   }
 
-  const summaries: DocTypeMetricSummary[] = [];
-  for (const f of fixtures) {
-    const schemaFields = loadSchemaFields(f.doc_type);
-    if (schemaFields.length === 0) {
-      console.warn(`[skip] no schema fields found for doc_type "${f.doc_type}" (${f.fixture_id})`);
-      continue;
-    }
-    const candidate = args.candidateDir
-      ? loadCandidateEnvelope(args.candidateDir, f)
-      : f.envelope;
-    const ocrText = readOcrText(f);
-    summaries.push(scoreFixture(f.fixture_id, f.doc_type, f.envelope, candidate, schemaFields, ocrText));
-  }
+  const getCandidate = (f: LoadedFixture): ExtractionEnvelope | undefined =>
+    args.candidateDir ? loadCandidateEnvelope(args.candidateDir, f) : f.envelope;
 
-  return {
-    meta: {
-      mode: "score",
-      model: args.candidateDir ? "candidate" : "gold-self-score",
-      ran_at: new Date().toISOString(),
-      split: args.split,
-      fixture_count: summaries.length,
-    },
-    per_fixture: summaries,
-    per_doc_type: aggregateDocType(summaries),
-  };
+  return computeScore(fixtures, getCandidate, {
+    split: args.split,
+    candidateMode: !!args.candidateDir,
+  });
 }
 
 // Where extract mode writes candidate envelopes when --out is omitted.
@@ -266,6 +292,12 @@ async function main(): Promise<void> {
   console.log(
     `  mode=${result.meta.mode} split=${result.meta.split} fixtures=${result.meta.fixture_count}`,
   );
+  console.log(
+    `  scored=${result.meta.fixture_count} skipped(no candidate)=${result.skipped_no_candidate.length}`,
+  );
+  if (result.skipped_no_candidate.length > 0) {
+    console.log(`  skipped fixture_ids: ${result.skipped_no_candidate.join(", ")}`);
+  }
   for (const [docType, agg] of Object.entries(result.per_doc_type)) {
     console.log(
       `  ${docType}: exact=${agg.exact_match_rate.toFixed(3)} ` +

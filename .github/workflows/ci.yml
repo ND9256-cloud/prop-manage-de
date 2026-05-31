@@ -45,3 +45,4 @@ jobs:
           npx tsx src/tests/eval/score-smoke.test.ts
           npx tsx src/tests/eval/extract-wiring.test.ts
           npx tsx src/tests/eval/extractor-drift.test.ts
+          npx tsx src/tests/eval/score-skip.test.ts
