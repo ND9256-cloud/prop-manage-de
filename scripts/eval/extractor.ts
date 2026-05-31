@@ -11,16 +11,20 @@
 //
 // What is shared with production (single source of truth):
 //   - schemas/<doc_type>/generated/prompt_fragment.ts (PROMPT_FRAGMENT, SCHEMA_VERSION)
+//   - schemas/<doc_type>/generated/field_specs.ts (FIELD_SPECS, VERIFIER_REFS)
 //   - schemas/<doc_type>/generated/envelope_validator.ts (validateEnvelope)
 //   - supabase/functions/process-document/verifiers/* (VERIFIERS, types)
 //
+// The V2_CONFIGS field specs + verifier refs are no longer hand-maintained:
+// they are driven from the generated field_specs.ts, which the schema
+// generator emits from schema.yaml (the same source prompt_fragment comes
+// from). `npm run gen:schemas:check` guards that artifact against drift in CI.
+//
 // What is intentionally duplicated:
-//   - The V2_CONFIGS table (field specs + verifier refs). This is a
-//     short hand-maintained mapping. If the production index.ts ever
-//     starts driving these from the generated schema files, this file
-//     should switch to that source.
-//   - The system-instruction wrapper around PROMPT_FRAGMENT. It is
-//     short and stable; if it ever drifts, drift it in both places.
+//   - The system-instruction wrapper around PROMPT_FRAGMENT. It lives in the
+//     Deno index.ts (production) and cannot be cleanly imported into Node, so
+//     this file keeps a verbatim copy. src/tests/eval/extractor-drift.test.ts
+//     reads both sources and fails if the two wrappers ever diverge.
 //
 // What is intentionally NOT here:
 //   - Persistence to warehouse.document_extractions_v2 (eval writes
@@ -33,6 +37,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { PROMPT_FRAGMENT as MIETVERTRAG_PROMPT, SCHEMA_VERSION as MIETVERTRAG_SCHEMA_VERSION } from "../../schemas/mietvertrag/generated/prompt_fragment.ts";
 import { validateEnvelope as validateMietvertragEnvelope } from "../../schemas/mietvertrag/generated/envelope_validator.ts";
+import { FIELD_SPECS as MIETVERTRAG_FIELD_SPECS, VERIFIER_REFS as MIETVERTRAG_VERIFIER_REFS } from "../../schemas/mietvertrag/generated/field_specs.ts";
 import { VERIFIERS } from "../../supabase/functions/process-document/verifiers/index.ts";
 import type { FieldSpec, FieldEnvelope as VerifierFieldEnvelope } from "../../supabase/functions/process-document/verifiers/types.ts";
 
@@ -55,30 +60,17 @@ interface V2Config {
   verifierRefs: Record<string, string[]>;
 }
 
-// Mirror of V2_PROMPTS + V2_VERIFIER_REFS in supabase/functions/process-document/index.ts.
+// Schema-driven mirror of V2_PROMPTS + V2_VERIFIER_REFS in
+// supabase/functions/process-document/index.ts. fieldSpecs + verifierRefs come
+// from the generated field_specs.ts (source: schema.yaml), so they cannot
+// silently drift from the schema the production pipeline ships against.
 const V2_CONFIGS: Record<string, V2Config> = {
   mietvertrag: {
     prompt: MIETVERTRAG_PROMPT,
     schemaVersion: MIETVERTRAG_SCHEMA_VERSION,
     validate: validateMietvertragEnvelope,
-    fieldSpecs: {
-      kaltmiete: { id: "kaltmiete", type: "money", severity: "critical" },
-      unit_ref: { id: "unit_ref", type: "enum", enum_values: ["EG", "1.OG", "2.OG", "3.OG", "4.OG", "DG", "Keller", "Souterrain"], severity: "critical" },
-      tenant_identity: { id: "tenant_identity", type: "structured", severity: "critical" },
-      landlord_identity: { id: "landlord_identity", type: "structured", severity: "critical" },
-      mietbeginn: { id: "mietbeginn", type: "date", severity: "critical" },
-      mietende: { id: "mietende", type: "date", severity: "important" },
-      nebenkostenvorauszahlung: { id: "nebenkostenvorauszahlung", type: "money", severity: "important" },
-      kaution: { id: "kaution", type: "money", severity: "important" },
-    },
-    verifierRefs: {
-      kaltmiete: ["monetary-verbatim"],
-      unit_ref: ["enum"],
-      mietbeginn: ["date-format"],
-      mietende: ["date-format"],
-      nebenkostenvorauszahlung: ["monetary-verbatim"],
-      kaution: ["monetary-verbatim"],
-    },
+    fieldSpecs: MIETVERTRAG_FIELD_SPECS,
+    verifierRefs: MIETVERTRAG_VERIFIER_REFS,
   },
 };
 
