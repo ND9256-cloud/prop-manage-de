@@ -1532,5 +1532,11 @@ would produce. The auto-deploy comments on the PR with the link.
 - `scripts/eval/run.ts`: extract mode runs real Sonnet extraction (Sonnet only; Opus deferred to 4.5), gated behind --live + --fixture-cap, errors cleanly for fixtures lacking source.txt or an extractor config. Candidates written to eval/candidates/<ts>/.
 - source.txt added for the 5 real cases (real OCR). Supersession cases (Paul/Kuru/Weber) ground only partially from one document — full multi-document grounding deferred to Task 4.3. Lena (mietvertrag) is the verified DoD path.
 - Mocked wiring test (src/tests/eval/extract-wiring.test.ts, 20 assertions) is the CI-safe gate; live Sonnet smoke is manual/out-of-CI.
-- FOLLOW-UP: eliminate extractor.ts drift — generate V2_CONFIGS from schemas/<doc_type>/schema.yaml, or add a drift-guard test against production index.ts.
 - KNOWN: CI does not execute eval tests yet (deferred to Task 4.2).
+
+## Task 4.1b-followup — extractor.ts config drift eliminated (2026-05-31)
+
+- `scripts/gen-schemas.ts` now emits a fourth generated artifact per doc type: `schemas/<doc_type>/generated/field_specs.ts` (`FIELD_SPECS` + `VERIFIER_REFS`, driven from schema.yaml). `npm run gen:schemas:check` (CI: generated-files-fresh.yml) guards it against drift.
+- `scripts/eval/extractor.ts`: the hand-maintained V2_CONFIGS fieldSpecs + verifierRefs are GONE — both now import from the generated field_specs.ts. The eval harness's extractor config can no longer silently diverge from the schema source of truth. Behavior-identical to the old hardcoded table (existing extract-wiring/metrics/score-smoke tests pass unchanged).
+- The German system-prompt wrapper still lives in Deno index.ts (cannot be cleanly imported into Node), so extractor.ts keeps a verbatim copy. New drift-guard test `src/tests/eval/extractor-drift.test.ts` (4 assertions) reads both source files and asserts the wrapper byte-matches (modulo `${...}` interpolation names), plus asserts the schema-driven FIELD_SPECS/VERIFIER_REFS equal the expected mietvertrag set.
+- Out of scope (unchanged): production index.ts still hardcodes its own V2_PROMPTS/V2_VERIFIER_REFS copy; CI does not execute eval tests yet (Task 4.2).

@@ -13,6 +13,7 @@ interface FieldDef {
   condition?: string;
   type: string;
   enum_values?: string[];
+  verifier_refs?: string[];
   item_schema?: Array<{ field: string; type: string; required: boolean }>;
   description?: string;
 }
@@ -83,6 +84,60 @@ function generateFieldLabels(schema: SchemaFile): string {
     labels,
   };
   return JSON.stringify(obj, null, 2) + "\n";
+}
+
+function generateFieldSpecs(schema: SchemaFile): string {
+  const h = header(schema.doc_type, schema.schema_version);
+
+  // FIELD_SPECS: every field, in schema order. Mirror the property order the
+  // extractor's hand-maintained table used (id, type, [enum_values], severity)
+  // so the schema-driven config is value-identical to the old hardcoded one.
+  const specEntries: string[] = [];
+  for (const field of schema.fields) {
+    const parts = [`id: ${JSON.stringify(field.id)}`, `type: ${JSON.stringify(field.type)}`];
+    if ((field.type === "enum" || field.type === "enum_extensible") && field.enum_values) {
+      parts.push(`enum_values: ${JSON.stringify(field.enum_values)}`);
+    }
+    parts.push(`severity: ${JSON.stringify(field.severity)}`);
+    specEntries.push(`  ${JSON.stringify(field.id)}: { ${parts.join(", ")} },`);
+  }
+
+  // VERIFIER_REFS: only fields that declare verifier_refs, in schema order.
+  const verifierEntries: string[] = [];
+  for (const field of schema.fields) {
+    if (field.verifier_refs && field.verifier_refs.length > 0) {
+      verifierEntries.push(`  ${JSON.stringify(field.id)}: ${JSON.stringify(field.verifier_refs)},`);
+    }
+  }
+
+  const fieldSpecsBody = specEntries.length > 0 ? `{\n${specEntries.join("\n")}\n}` : "{}";
+  const verifierRefsBody = verifierEntries.length > 0 ? `{\n${verifierEntries.join("\n")}\n}` : "{}";
+
+  return `${h}
+
+// Field specs + verifier refs for the eval extractor's V2 config, driven from
+// schema.yaml so scripts/eval/extractor.ts cannot drift from the schema source
+// of truth. The FieldSpec shape mirrors the verifier contract in
+// supabase/functions/process-document/verifiers/types.ts.
+
+export interface FieldSpec {
+  id: string;
+  type: string;
+  severity: string;
+  enum_values?: string[];
+  // Index signature mirrors the verifier contract (verifiers/types.ts) so a
+  // FieldSpec from here is directly assignable where a verifier FieldSpec is
+  // expected.
+  [key: string]: unknown;
+}
+
+export const FIELD_SPECS: Record<string, FieldSpec> = ${fieldSpecsBody};
+
+export const VERIFIER_REFS: Record<string, string[]> = ${verifierRefsBody};
+
+export const SCHEMA_VERSION = ${JSON.stringify(schema.schema_version)};
+export const DOC_TYPE = ${JSON.stringify(schema.doc_type)};
+`;
 }
 
 function generateEnvelopeValidator(schema: SchemaFile): string {
@@ -221,6 +276,7 @@ function generateForDocType(
   const outputs: Array<{ filename: string; content: string }> = [
     { filename: "prompt_fragment.ts", content: generatePromptFragment(schema) },
     { filename: "field_labels.json", content: generateFieldLabels(schema) },
+    { filename: "field_specs.ts", content: generateFieldSpecs(schema) },
     { filename: "envelope_validator.ts", content: generateEnvelopeValidator(schema) },
   ];
 
