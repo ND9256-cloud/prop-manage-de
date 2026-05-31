@@ -1546,3 +1546,9 @@ would produce. The auto-deploy comments on the PR with the link.
 - `.github/workflows/ci.yml` gains an `eval-tests` job that runs on every `pull_request`. It executes the four DB-free eval harness files via `npx tsx`: `src/tests/eval/metrics.test.ts`, `score-smoke.test.ts`, `extract-wiring.test.ts` (fully mocked `ExtractorDeps` — no live model), and `extractor-drift.test.ts`. The eval regression net is now a real CI gate, not local-only.
 - No secrets: the job needs no Supabase env, no `DATABASE_URL` for the tests, and no `ANTHROPIC_API_KEY`. The only `DATABASE_URL` is a dummy passed to `npm ci` for the prisma generate postinstall, mirroring the existing `check` job. Verified all four pass under a fully stripped environment.
 - Out of scope (deferred): integration/DB eval tests (applier-dedup, tenant-for-unit, everding-end-to-end) need DB secrets and are a separate task; the evidence-grounded metric / `evid` gate and gold-set/fixture-layout work remain in Task 4.3; live extraction is never run in CI.
+
+## Task 4.2b — score skips fixtures with no candidate (2026-05-31)
+
+- `scripts/eval/run.ts` (`computeScore`): a fixture whose candidate envelope is missing is no longer scored field-by-field against an empty envelope (which marked every field a miss — the misleading 0.96 error rate). Such fixtures are collected into `result.skipped_no_candidate`; aggregates are computed over scored fixtures only. Scoring of fixtures that have a candidate is unchanged.
+- CLI prints `scored=N skipped(no candidate)=M` plus the skipped fixture_ids.
+- New test `src/tests/eval/score-skip.test.ts` (3 fixtures, candidate for 1: asserts scored=1, skipped=2, aggregate equals the single scored fixture's rates), wired into the `eval-tests` CI job.
