@@ -33,6 +33,7 @@ import path from "node:path";
 
 import { loadFixtures, loadSchemaFields, readOcrText, REPO_ROOT, type LoadedFixture, type FixtureSplit } from "./loader.ts";
 import { scoreFixture } from "./metrics.ts";
+import { extractEnvelope, hasExtractorFor, makeAnthropicDeps, SONNET_MODEL, type ExtractorDeps } from "./extractor.ts";
 import type { EvalRunResult, ExtractionEnvelope, DocTypeMetricSummary } from "./types.ts";
 
 interface CliArgs {
@@ -179,63 +180,91 @@ async function runScore(args: CliArgs): Promise<EvalRunResult> {
   };
 }
 
-function runExtract(args: CliArgs): never {
-  // Task 4.1 ships the scaffolding only. extract --live requires:
-  //   1. --live flag (present)
-  //   2. --fixture-cap N (present, positive)
-  //   3. matched fixtures with source.txt OCR inputs (the gap)
-  //
-  // The first two are validated before this function runs. Here we
-  // load fixtures and report whether their OCR inputs exist. If any
-  // do not, we error cleanly (task: "extract mode is blocked until
-  // inputs exist (4.3)").
+// Where extract mode writes candidate envelopes when --out is omitted.
+function defaultExtractOutDir(): string {
+  return path.join(REPO_ROOT, "eval", "candidates", timestamp());
+}
+
+export interface ExtractRunResult {
+  out_dir: string;
+  fixtures: { fixture_id: string; out_path: string }[];
+  model: string;
+}
+
+// Runs Step 8b extraction against each matched fixture and writes the
+// candidate envelope to <out>/<fixture_id>. Exported so the wiring test
+// can drive it with a mocked ExtractorDeps (no API call, deterministic).
+export async function runExtract(args: CliArgs, deps: ExtractorDeps): Promise<ExtractRunResult> {
   if (!args.live) {
     throw new Error("extract mode requires --live flag (gating gateway for spend bound)");
   }
   if (!args.fixtureCap) {
     throw new Error("extract --live requires --fixture-cap N");
   }
+
   const fixtures = loadFixtures({ split: args.split, docType: args.docType }).slice(0, args.fixtureCap);
   if (fixtures.length === 0) {
     throw new Error(`no fixtures matched split=${args.split} doc-type=${args.docType ?? "*"}`);
   }
-  const missing = fixtures.filter((f) => !f.source_text_path);
-  if (missing.length > 0) {
-    const lines = missing.map((f) => `  - ${f.fixture_id} (no source.txt in ${f.case_dir})`);
+
+  const missingOcr = fixtures.filter((f) => !f.source_text_path);
+  if (missingOcr.length > 0) {
+    const lines = missingOcr.map((f) => `  - ${f.fixture_id} (no source.txt in ${f.case_dir})`);
     throw new Error(
-      `extract --live blocked: ${missing.length}/${fixtures.length} fixtures lack OCR input.\n` +
-        `Fixture inputs (OCR text Step 8b consumes) are produced by Task 4.3 gold-set work. ` +
-        `Until then, extract --live cannot run.\n` +
-        `Missing inputs:\n${lines.join("\n")}`
+      `extract --live blocked: ${missingOcr.length}/${fixtures.length} fixtures lack OCR input.\n` +
+        `Add source.txt next to the gold envelope (real OCR text from warehouse.documents.ocr_text).\n` +
+        `Missing inputs:\n${lines.join("\n")}`,
     );
   }
-  // Unreachable today: no fixture has an OCR input file (see Task 4.3).
-  // When 4.3 lands, this is where we'd invoke Step 8b extraction
-  // and write candidate envelopes. The wiring is intentionally out
-  // of scope here to keep 4.1 a pure scaffolding PR.
-  throw new Error(
-    "extract --live reached the extraction step but the live extractor wiring is deferred. " +
-      "Scaffolding only in Task 4.1; Task 4.5 wires the candidate models (Sonnet + Opus)."
-  );
+
+  const missingExtractor = fixtures.filter((f) => !hasExtractorFor(f.doc_type));
+  if (missingExtractor.length > 0) {
+    const lines = missingExtractor.map((f) => `  - ${f.fixture_id} (doc_type "${f.doc_type}")`);
+    throw new Error(
+      `extract --live blocked: no V2 extractor config for these fixtures' doc_types.\n` +
+        `Add the doc_type to scripts/eval/extractor.ts V2_CONFIGS, or filter with --doc-type.\n` +
+        `Unsupported:\n${lines.join("\n")}`,
+    );
+  }
+
+  const outDir = args.out ? path.resolve(args.out) : defaultExtractOutDir();
+  const out: ExtractRunResult = { out_dir: outDir, fixtures: [], model: SONNET_MODEL };
+
+  for (const f of fixtures) {
+    const ocrText = readOcrText(f);
+    if (!ocrText) {
+      throw new Error(`extract --live: source.txt at ${f.source_text_path} returned empty content`);
+    }
+    const envelope = await extractEnvelope(ocrText, f.doc_type, deps);
+    const outPath = path.join(outDir, f.fixture_id);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, JSON.stringify(envelope, null, 2));
+    out.fixtures.push({ fixture_id: f.fixture_id, out_path: outPath });
+    console.log(`  ✓ ${f.fixture_id} -> ${outPath}`);
+  }
+
+  return out;
 }
 
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
 
-  let result: EvalRunResult;
   if (args.mode === "extract") {
-    runExtract(args); // throws
-    return;           // unreachable, satisfies TS
-  } else {
-    result = await runScore(args);
+    const apiKey = process.env.ANTHROPIC_API_KEY ?? "";
+    const result = await runExtract(args, makeAnthropicDeps(apiKey));
+    console.log(
+      `extract complete: wrote ${result.fixtures.length} candidate envelope(s) to ${result.out_dir} (model=${result.model})`,
+    );
+    return;
   }
 
+  const result = await runScore(args);
   const outPath = args.out ? path.resolve(args.out) : defaultOutputPath();
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(result, null, 2));
   console.log(`wrote ${outPath}`);
   console.log(
-    `  mode=${result.meta.mode} split=${result.meta.split} fixtures=${result.meta.fixture_count}`
+    `  mode=${result.meta.mode} split=${result.meta.split} fixtures=${result.meta.fixture_count}`,
   );
   for (const [docType, agg] of Object.entries(result.per_doc_type)) {
     console.log(
@@ -243,12 +272,29 @@ async function main(): Promise<void> {
         `norm=${agg.normalized_match_rate.toFixed(3)} ` +
         `evidence=${agg.evidence_grounded_rate.toFixed(3)} ` +
         `absence=${agg.absence_state_correct_rate.toFixed(3)} ` +
-        `severity_err=${agg.severity_weighted_error_rate.toFixed(3)}`
+        `severity_err=${agg.severity_weighted_error_rate.toFixed(3)}`,
     );
   }
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+// Only auto-run as a CLI when invoked directly. Tests import named
+// exports from this file and must not trigger main() at import time.
+const isCliEntry = (() => {
+  try {
+    const here = new URL(import.meta.url).pathname;
+    const argv1 = process.argv[1] ? path.resolve(process.argv[1]) : "";
+    return argv1 !== "" && path.resolve(here) === argv1;
+  } catch {
+    return false;
+  }
+})();
+
+if (isCliEntry) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}
+
+export type { CliArgs };
+export { parseArgs };

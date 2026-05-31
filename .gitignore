@@ -54,3 +54,4 @@ supabase/.temp/
 
 # Eval harness output (timestamped JSON; never commit local results)
 /eval/results/*.json
+eval/candidates/
