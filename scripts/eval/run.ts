@@ -5,6 +5,7 @@
 //
 //   npx tsx scripts/eval/run.ts score [--split gold|dev|test|all]
 //                                     [--doc-type <id>]
+//                                     [--fixture-id <substr>]
 //                                     [--candidate <dir>]
 //
 //     Scores every fixture's gold envelope (or, if --candidate is given,
@@ -15,12 +16,20 @@
 //   npx tsx scripts/eval/run.ts extract --live --fixture-cap <N>
 //                                     [--split gold|dev|test|all]
 //                                     [--doc-type <id>]
+//                                     [--fixture-id <substr>]
 //                                     [--out <dir>]
 //
 //     Runs Step 8b extraction live against each fixture's OCR text
 //     input. REQUIRES --live and --fixture-cap (no defaults; both must
 //     be explicit) to keep spend bounded. Errors cleanly if any matched
 //     fixture has no source text file (the case at PR time — see 4.3).
+//
+// --fixture-id <substr> (both modes): keep only fixtures whose fixture_id
+//   CONTAINS <substr> (case-sensitive substring), e.g. `--fixture-id lena`
+//   to target a single case directly instead of relying on the
+//   order-dependent --fixture-cap. AND-composes with --split/--doc-type,
+//   and is applied BEFORE --fixture-cap in extract mode. Zero matches is a
+//   hard error (lists the available fixture_ids for the active doc-type).
 //
 // Output:
 //   eval/results/<timestamp>.json (or as --out specifies)
@@ -44,6 +53,7 @@ interface CliArgs {
   out?: string;
   live: boolean;
   fixtureCap?: number;
+  fixtureId?: string;
 }
 
 function parseArgs(argv: string[]): CliArgs {
@@ -85,6 +95,9 @@ function parseArgs(argv: string[]): CliArgs {
         break;
       case "--candidate":
         args.candidateDir = next("--candidate");
+        break;
+      case "--fixture-id":
+        args.fixtureId = next("--fixture-id");
         break;
       case "--out":
         args.out = next("--out");
@@ -189,12 +202,33 @@ export function computeScore(
   };
 }
 
+// Filters an already-loaded (split + doc-type) fixture set down to those
+// whose fixture_id CONTAINS `fixtureId` (case-sensitive substring). Exported
+// for tests. Zero matches is a hard error — never a silent no-op — and the
+// message lists the available fixture_ids for the active doc-type (i.e. the
+// set that was passed in) so the caller can pick a real substring.
+export function applyFixtureId(fixtures: LoadedFixture[], fixtureId: string): LoadedFixture[] {
+  const matched = fixtures.filter((f) => f.fixture_id.includes(fixtureId));
+  if (matched.length === 0) {
+    const available = fixtures.map((f) => f.fixture_id);
+    const list = available.length > 0 ? available.map((id) => `  - ${id}`).join("\n") : "  (none)";
+    throw new Error(
+      `no fixture matches --fixture-id ${fixtureId}\n` +
+        `available fixture_ids for the active doc-type:\n${list}`,
+    );
+  }
+  return matched;
+}
+
 async function runScore(args: CliArgs): Promise<EvalRunResult> {
-  const fixtures = loadFixtures({ split: args.split, docType: args.docType });
+  let fixtures = loadFixtures({ split: args.split, docType: args.docType });
   if (fixtures.length === 0) {
     throw new Error(
       `no fixtures matched split=${args.split} doc-type=${args.docType ?? "*"}`
     );
+  }
+  if (args.fixtureId !== undefined) {
+    fixtures = applyFixtureId(fixtures, args.fixtureId);
   }
 
   const getCandidate = (f: LoadedFixture): ExtractionEnvelope | undefined =>
@@ -228,7 +262,13 @@ export async function runExtract(args: CliArgs, deps: ExtractorDeps): Promise<Ex
     throw new Error("extract --live requires --fixture-cap N");
   }
 
-  const fixtures = loadFixtures({ split: args.split, docType: args.docType }).slice(0, args.fixtureCap);
+  let fixtures = loadFixtures({ split: args.split, docType: args.docType });
+  // --fixture-id is applied BEFORE the cap so the cap slices the targeted
+  // subset, not the original order-dependent load.
+  if (args.fixtureId !== undefined) {
+    fixtures = applyFixtureId(fixtures, args.fixtureId);
+  }
+  fixtures = fixtures.slice(0, args.fixtureCap);
   if (fixtures.length === 0) {
     throw new Error(`no fixtures matched split=${args.split} doc-type=${args.docType ?? "*"}`);
   }
