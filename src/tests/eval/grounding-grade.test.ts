@@ -224,4 +224,138 @@ function money(amount: number, page: number | null): FieldEnvelope {
   eq(GROUNDING_SPECS.tenant_identity.scalar, false, "specs: tenant_identity is non-scalar");
 }
 
+// ══ Identity grounding (Task 4.3a-names) ══════════════════════════════════
+// tenant_identity / landlord_identity now carry a 0–3 grade via person/company
+// grounding on a ROLE anchor (Mieter / Vermieter), same window rules as 4.3a.
+
+function tenantSpec(over: Partial<GroundingSpec> = {}): GroundingSpec {
+  return {
+    id: "tenant_identity",
+    severity: "critical",
+    type: "structured",
+    scalar: false,
+    derived: false,
+    labels: ["Mieter"],
+    ...over,
+  };
+}
+function landlordSpec(over: Partial<GroundingSpec> = {}): GroundingSpec {
+  return {
+    id: "landlord_identity",
+    severity: "critical",
+    type: "structured",
+    scalar: false,
+    derived: false,
+    labels: ["Vermieter"],
+    ...over,
+  };
+}
+// A present person identity. `page` controls the evidence page (null => none).
+function person(name: string, page: number | null): FieldEnvelope {
+  return {
+    raw_value: name,
+    normalized_value: { name, is_legal_entity: false, legal_form: null },
+    absence_state: "present",
+    evidence: [page != null ? { quote: "x", page, bbox: null } : { quote: "x" }],
+  };
+}
+// A present company identity with a legal-form suffix.
+function company(name: string, legalForm: string, page: number | null): FieldEnvelope {
+  return {
+    raw_value: name,
+    normalized_value: { name, is_legal_entity: true, legal_form: legalForm },
+    absence_state: "present",
+    evidence: [page != null ? { quote: "x", page, bbox: null } : { quote: "x" }],
+  };
+}
+
+// ── tenant grounds via the "Mieter" role anchor → grade 3 ──────────────────
+{
+  const ocr = "--- Seite 1 ---\nMieter\nName, Vorname\nEverding, Lena";
+  const r = groundingGrade(tenantSpec(), person("Everding, Lena", 1), ocr);
+  eq(r.grade, 3, "identity: tenant grounds via Mieter role anchor");
+  eq(r.matched_label, "Mieter", "identity: tenant matched role is Mieter");
+  eq(r.value_page, 1, "identity: tenant value located on page 1");
+}
+
+// ── Role-mismatch trap: tenant value under "Vermieter" is NOT grade 3 ──────
+{
+  const ocr = "--- Seite 1 ---\nVermieter\nEverding, Lena";
+  const r = groundingGrade(tenantSpec(), person("Everding, Lena", 1), ocr);
+  ok(r.grade !== 3, "role-mismatch: tenant under Vermieter is not grade 3");
+  eq(r.grade, 2, "role-mismatch: tenant under wrong-side role is weak grade 2");
+  eq(r.matched_label, null, "role-mismatch: no role anchor matched");
+}
+
+// ── Company: distinctive name + GbR suffix grounds under "Vermieter" → 3 ───
+{
+  const ocr = "--- Seite 1 ---\nVermieter\nDenn & Denn Verwaltungs GbR";
+  const r = groundingGrade(landlordSpec(), company("Denn & Denn Verwaltungs GbR", "GbR", 1), ocr);
+  eq(r.grade, 3, "identity: company name + GbR suffix grounds under Vermieter");
+  eq(r.matched_label, "Vermieter", "identity: company matched role is Vermieter");
+}
+// A bare "Denn" surname line (no Verwaltungs/GbR) must NOT match the company.
+{
+  const ocr = "--- Seite 1 ---\nVermieter\nDenn, Thomas";
+  const r = groundingGrade(landlordSpec(), company("Denn & Denn Verwaltungs GbR", "GbR", 1), ocr);
+  ok(r.grade !== 3, "identity: a lone 'Denn' surname does not ground the GbR company");
+}
+
+// ── Bare signature-block name (value present, no role label) → grade 2 ─────
+{
+  const ocr = "--- Seite 1 ---\nUnterschriften\nEverding, Lena";
+  const r = groundingGrade(tenantSpec(), person("Everding, Lena", 1), ocr);
+  eq(r.grade, 2, "identity: bare signature-block name (no role) is grade 2");
+  eq(r.matched_label, null, "identity: signature-only has no role anchor");
+}
+
+// ── Grade 0: identity value not in OCR ─────────────────────────────────────
+{
+  const ocr = "--- Seite 1 ---\nMieter\nSchmidt, Otto";
+  const r = groundingGrade(tenantSpec(), person("Everding, Lena", 1), ocr);
+  eq(r.grade, 0, "identity: tenant value absent from OCR is grade 0");
+}
+
+// ── Umlaut normalization: "Müller" grounds on "Mueller" ────────────────────
+{
+  const ocr = "--- Seite 1 ---\nMieter\nMueller, Anna";
+  const r = groundingGrade(tenantSpec(), person("Müller, Anna", 1), ocr);
+  eq(r.grade, 3, "identity: umlaut-normalized surname (Müller=Mueller) grounds");
+}
+
+// ── "Given Surname" order also grounds (no comma in the value) ─────────────
+{
+  const ocr = "--- Seite 1 ---\nMieter\nLena Everding";
+  const r = groundingGrade(tenantSpec(), person("Lena Everding", 1), ocr);
+  eq(r.grade, 3, "identity: 'Given Surname' order grounds via surname+given tokens");
+}
+
+// ── Critical-field cap: missing evidence.page caps an identity at 2 ────────
+{
+  const ocr = "--- Seite 1 ---\nMieter\nEverding, Lena";
+  const r = groundingGrade(tenantSpec(), person("Everding, Lena", null), ocr);
+  eq(r.grade, 2, "identity cap: missing evidence.page caps critical identity at 2");
+  eq(r.evidence_page_present, false, "identity cap: evidence_page_present is false");
+}
+
+// ── A present but NON-identity value on an identity field stays excluded ───
+// (keeps the 4.3a non_scalar contract for malformed payloads).
+{
+  const money: FieldEnvelope = {
+    raw_value: null,
+    normalized_value: { amount: 65000, currency: "EUR" },
+    absence_state: "present",
+    evidence: [{ quote: "x", page: 1 }],
+  };
+  const r = groundingGrade(tenantSpec(), money, "--- Seite 1 ---\nMieter\n650,00");
+  eq(r.excluded, "non_scalar", "identity: non-identity value falls through to non_scalar");
+}
+
+// ── An absent identity is excluded as absent (not non_scalar) ──────────────
+{
+  const absent: FieldEnvelope = { raw_value: null, normalized_value: null, absence_state: "absent" };
+  const r = groundingGrade(landlordSpec(), absent, "--- Seite 1 ---\nVermieter");
+  eq(r.excluded, "absent", "identity: absent identity excluded as absent");
+}
+
 console.log(`✓ grounding-grade.test.ts: ${assertions} assertions passed`);

@@ -335,6 +335,221 @@ function firstEvidencePage(candidate: FieldEnvelope): number | null {
 
 const NON_SCALAR_TYPES = new Set(["structured", "structured_array"]);
 
+// ── identity grounding (Task 4.3a-names) ─────────────────────────────────
+// tenant_identity & landlord_identity are the two most audit-critical fields
+// in a tenancy document. 4.3a left them `non_scalar` → ungraded; here they are
+// routed through a person/company grounding path that reuses the SAME 0–3 grade
+// and the SAME same-page window rules as the scalar path. Scorer-only: no
+// schema/extractor change, no re-extraction, no LLM.
+//
+// The anchor is the ROLE label, never a generic synonym. Per the brief the role
+// sets are sourced from the generated GROUNDING_SPECS where available (a single
+// positive label each today) and FILLED IN here with the fuller per-field role
+// map — kept explicit and documented because the generated specs carry neither
+// the full positive set nor the wrong-role (negative) set. A field grounds on
+// ITS side's roles only; the other side's roles are deliberately excluded so a
+// tenant name sitting under "Vermieter" cannot reach grade 3 (role-mismatch).
+const IDENTITY_ROLE_ANCHORS: Record<string, { positive: string[]; negative: string[] }> = {
+  // tenant side. Must NOT ground on Vermieter/Empfänger/Eigentümer/witness.
+  tenant_identity: {
+    positive: ["Mieter", "Mieterin", "Mietpartei", "Vertragspartner"],
+    negative: ["Vermieter", "Vermieterin", "Empfänger", "Eigentümer", "Zeuge"],
+  },
+  // landlord side. Must NOT ground on any tenant-side role.
+  landlord_identity: {
+    positive: ["Vermieter", "Vermieterin", "Eigentümer", "vertreten durch"],
+    negative: ["Mieter", "Mieterin", "Mietpartei"],
+  },
+};
+
+// Legal-form suffixes accepted/normalized for a company identity (the brief's
+// GbR/GmbH/UG/KG plus a few common forms). A suffix is folded the same way as
+// the rest of the value, so it never blocks a core-token match.
+const LEGAL_FORMS = new Set([
+  "gbr", "gmbh", "ug", "kg", "ag", "ohg", "mbh", "kgaa", "ev", "eg", "se",
+]);
+
+// Connector tokens dropped from a company's distinctive core ("Denn & Denn" →
+// {denn}). "&" is already stripped by the alphanumeric tokenizer.
+const CONNECTORS = new Set(["und", "u", "co"]);
+
+// Folds German umlauts/ß to their ASCII digraphs so "Müller" == "Mueller". The
+// SAME fold is applied to both the OCR line and the identity tokens.
+function foldGerman(s: string): string {
+  return s
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
+    .replace(/Ä/g, "ae").replace(/Ö/g, "oe").replace(/Ü/g, "ue")
+    .replace(/ß/g, "ss");
+}
+
+function normalizeIdentity(s: string): string {
+  return foldGerman(s.toLowerCase()).replace(/\s+/g, " ").trim();
+}
+
+// Alphanumeric tokens of a (already folded+lowercased) string.
+function tokenizeName(folded: string): string[] {
+  return folded.match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+// Word-boundary presence of an already-normalized token on an already-normalized
+// (folded) line. Mirrors labelOccurs but operates on folded text.
+function identityTokenPresent(normFoldedLine: string, token: string): boolean {
+  if (token === "") return false;
+  const re = new RegExp(`(?<!\\p{L})${escapeRegExp(token)}(?!\\p{L})`, "u");
+  return re.test(normFoldedLine);
+}
+
+interface IdentityValue {
+  isCompany: boolean;
+  surname: string;       // person: the surname core token
+  given: string[];       // person: given name(s)/initial(s)
+  coreTokens: string[];  // company: distinctive tokens (legal form/connectors removed)
+  legalForm: string;     // company: normalized legal-form suffix ("" if none)
+}
+
+// Extracts the name string a candidate asserts for an identity field, from the
+// structured normalized_value.name (the runtime shape) or, failing that, the
+// raw_value. Returns "" when the candidate carries no identity-shaped value
+// (e.g. a money envelope) — the caller treats that as "not an identity value".
+function identityName(candidate: FieldEnvelope): { name: string; isCompany: boolean; legalForm: string } {
+  const nv = candidate.normalized_value;
+  let name = "";
+  let isCompany = false;
+  let legalForm = "";
+  if (nv && typeof nv === "object" && !Array.isArray(nv)) {
+    const o = nv as Record<string, unknown>;
+    if (typeof o.name === "string") name = o.name;
+    isCompany = o.is_legal_entity === true;
+    if (typeof o.legal_form === "string" && o.legal_form.trim() !== "") {
+      legalForm = normalizeIdentity(o.legal_form);
+    }
+  }
+  if (name.trim() === "" && typeof candidate.raw_value === "string") name = candidate.raw_value;
+  return { name: name.trim(), isCompany, legalForm };
+}
+
+function hasIdentityValue(candidate: FieldEnvelope): boolean {
+  return identityName(candidate).name !== "";
+}
+
+// Parses a candidate's identity value into surname/given (person) or distinctive
+// core tokens + legal form (company). Returns null only for an empty name.
+function parseIdentity(candidate: FieldEnvelope): IdentityValue | null {
+  const { name, isCompany, legalForm } = identityName(candidate);
+  if (name === "") return null;
+  const folded = normalizeIdentity(name);
+
+  if (isCompany) {
+    const toks = tokenizeName(folded);
+    const inferredLegal = toks.find((t) => LEGAL_FORMS.has(t)) ?? "";
+    const core = [...new Set(
+      toks.filter((t) => t.length >= 2 && !LEGAL_FORMS.has(t) && !CONNECTORS.has(t)),
+    )];
+    return { isCompany: true, surname: "", given: [], coreTokens: core, legalForm: legalForm || inferredLegal };
+  }
+
+  // Person: "Surname, Given" (comma) vs "Given Surname" (whitespace order).
+  let surname = "";
+  let given: string[] = [];
+  if (folded.includes(",")) {
+    const [before, after] = folded.split(",");
+    const beforeToks = tokenizeName(before);
+    surname = beforeToks[beforeToks.length - 1] ?? "";
+    given = tokenizeName(after ?? "");
+  } else {
+    const toks = tokenizeName(folded);
+    surname = toks[toks.length - 1] ?? "";
+    given = toks.slice(0, -1);
+  }
+  return { isCompany: false, surname, given, coreTokens: [], legalForm: "" };
+}
+
+// A person grounds on a line iff its surname core token AND ≥1 disambiguating
+// token (given name) both occur there.
+function personMatchesLine(normFoldedLine: string, id: IdentityValue): boolean {
+  if (id.surname === "") return false;
+  if (!identityTokenPresent(normFoldedLine, id.surname)) return false;
+  return id.given.some((g) => identityTokenPresent(normFoldedLine, g));
+}
+
+// A company grounds on a line iff its distinctive core tokens are present — all
+// of them, OR at least one together with the accepted legal-form suffix.
+function companyMatchesLine(normFoldedLine: string, id: IdentityValue): boolean {
+  if (id.coreTokens.length === 0) return false;
+  const present = id.coreTokens.filter((t) => identityTokenPresent(normFoldedLine, t));
+  const legalPresent = id.legalForm !== "" && identityTokenPresent(normFoldedLine, id.legalForm);
+  return present.length === id.coreTokens.length || (present.length >= 1 && legalPresent);
+}
+
+function identityMatchesLine(line: string, id: IdentityValue): boolean {
+  const norm = normalizeIdentity(line);
+  return id.isCompany ? companyMatchesLine(norm, id) : personMatchesLine(norm, id);
+}
+
+// Positive role anchors for an identity field: the generated spec's label(s)
+// (4.3a sourcing) unioned with this module's explicit per-field role map.
+function identityRoleAnchors(spec: GroundingSpec): string[] {
+  const map = IDENTITY_ROLE_ANCHORS[spec.id];
+  const positive = map ? map.positive : [];
+  return [...new Set([...(spec.labels ?? []), ...positive])];
+}
+
+// Grades an identity field on the SAME 0–3 scale and window rules as the scalar
+// path, but with identity value-matching and a ROLE anchor (not a value label):
+//   3 — identity value in a same-page window AND a correct-side role anchor in it,
+//   2 — identity value in window, no role anchor (bare signature-block name) or
+//       only a wrong-side role nearby (role-mismatch),
+//   1 — identity value somewhere in OCR but not in the scoped page/window,
+//   0 — identity value not in OCR.
+function gradeIdentity(
+  spec: GroundingSpec,
+  candidate: FieldEnvelope,
+  ocrText: string,
+  base: Omit<FieldGroundingResult, "graded" | "grade" | "excluded">,
+): FieldGroundingResult {
+  const id = parseIdentity(candidate);
+  if (!id) return { ...base, graded: true, grade: 0, excluded: null };
+
+  const anchors = identityRoleAnchors(spec);
+  const pages = parseOcrPages(ocrText);
+  const evPage = firstEvidencePage(candidate);
+  const evidencePagePresent = evPage != null;
+
+  const valueAnywhere = pages.some((p) => p.lines.some((line) => identityMatchesLine(line, id)));
+  const scopePages = evidencePagePresent ? pages.filter((p) => p.page === evPage) : pages;
+
+  let foundValue = false;
+  let matchedRole: string | null = null;
+  let valuePage: number | null = null;
+  for (const p of scopePages) {
+    for (let i = 0; i < p.lines.length; i++) {
+      if (!identityMatchesLine(p.lines[i], id)) continue;
+      foundValue = true;
+      if (valuePage == null) valuePage = p.page;
+      const role = findLabelInWindow(p.lines, i, anchors);
+      if (role) {
+        matchedRole = role;
+        valuePage = p.page;
+        break;
+      }
+    }
+    if (matchedRole) break;
+  }
+
+  let grade: GroundingGrade;
+  if (!foundValue) grade = valueAnywhere ? 1 : 0;
+  else if (matchedRole) grade = 3;
+  else grade = 2;
+
+  // evidence.page missing on a CRITICAL field caps the grade at 2 (as in 4.3a).
+  if (spec.severity === "critical" && !evidencePagePresent && grade > 2) {
+    grade = 2;
+    matchedRole = null;
+  }
+
+  return { ...base, graded: true, grade, excluded: null, matched_label: matchedRole, value_page: valuePage };
+}
+
 // Computes the grounding grade for a single field. Pure: (spec, candidate,
 // ocrText) -> result. Returns an excluded (ungraded) result for derived,
 // non-scalar, absent, or no-OCR cases.
@@ -359,6 +574,20 @@ export function groundingGrade(
 
   // Derived/composite fields (e.g. unit_ref) are deferred to Task 4.3c.
   if (spec.derived) return excluded("derived_pending");
+
+  // Identity fields (tenant_identity/landlord_identity) are routed through
+  // person/company grounding (Task 4.3a-names) — they are non-scalar but carry a
+  // grade. A present, identity-shaped value goes to gradeIdentity; a present but
+  // non-identity value (e.g. a malformed money payload) falls through to the
+  // non_scalar exclusion below; an absent value is excluded as absent.
+  if (spec.id in IDENTITY_ROLE_ANCHORS) {
+    if (!candidate || candidate.absence_state !== "present") return excluded("absent");
+    if (hasIdentityValue(candidate)) {
+      if (!ocrText) return excluded("no_ocr");
+      return gradeIdentity(spec, candidate, ocrText, base);
+    }
+  }
+
   // Only direct scalar fields are graded in v1.
   if (!spec.scalar || NON_SCALAR_TYPES.has(spec.type)) return excluded("non_scalar");
   // No asserted value -> nothing to ground.
