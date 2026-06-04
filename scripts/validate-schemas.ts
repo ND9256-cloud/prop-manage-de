@@ -39,6 +39,9 @@ const FieldDef = z
     verifier_refs: z.array(z.string()).default([]),
     normalization_rule_ref: z.string().optional(),
     description: z.string().optional(),
+    // Task 4.3a grounding scorer metadata (scoring-only; see gen-schemas.ts).
+    grounding_labels: z.array(z.string()).optional(),
+    derived: z.boolean().optional(),
     used_in_resolvers: z.boolean().default(false),
     customer_visible: z.boolean().default(true),
     classification_hints: z.string().optional(),

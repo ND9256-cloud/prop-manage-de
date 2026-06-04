@@ -40,10 +40,10 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { loadFixtures, loadSchemaFields, readOcrText, REPO_ROOT, type LoadedFixture, type FixtureSplit } from "./loader.ts";
+import { loadFixtures, loadGroundingSpecs, loadSchemaFields, readOcrText, REPO_ROOT, type LoadedFixture, type FixtureSplit } from "./loader.ts";
 import { scoreFixture } from "./metrics.ts";
 import { extractEnvelope, hasExtractorFor, makeAnthropicDeps, SONNET_MODEL, type ExtractorDeps } from "./extractor.ts";
-import type { EvalRunResult, ExtractionEnvelope, DocTypeMetricSummary } from "./types.ts";
+import type { EvalRunResult, ExtractionEnvelope, DocTypeMetricSummary, GroundingSpec } from "./types.ts";
 
 interface CliArgs {
   mode: "score" | "extract";
@@ -154,6 +154,20 @@ function aggregateDocType(summaries: DocTypeMetricSummary[]): EvalRunResult["per
       absence_state_correct_rate: mean(items.map((i) => i.absence_state_correct_rate)),
       severity_weighted_error_rate: mean(items.map((i) => i.severity_weighted_error_rate)),
     };
+    // Task 4.3a grounding roll-up: pool graded fields across fixtures so the
+    // mean is field-weighted, not fixture-weighted. Only emitted when at least
+    // one fixture carried a grounding summary.
+    const grounded = items.map((i) => i.grounding).filter((g): g is NonNullable<typeof g> => !!g);
+    if (grounded.length > 0) {
+      const gradedCount = grounded.reduce((acc, g) => acc + g.graded_count, 0);
+      const gradeSum = grounded.reduce((acc, g) => acc + g.grade_mean * g.graded_count, 0);
+      const grade3Sum = grounded.reduce((acc, g) => acc + g.grade3_rate * g.graded_count, 0);
+      const gradeMean = gradedCount === 0 ? 0 : gradeSum / gradedCount;
+      out[docType].grounding_graded_count = gradedCount;
+      out[docType].grounding_grade_mean = gradeMean;
+      out[docType].grounding_grade_rate = gradeMean / 3;
+      out[docType].grounding_grade3_rate = gradedCount === 0 ? 0 : grade3Sum / gradedCount;
+    }
   }
   return out;
 }
@@ -169,6 +183,9 @@ export function computeScore(
   fixtures: LoadedFixture[],
   getCandidate: (f: LoadedFixture) => ExtractionEnvelope | undefined,
   opts: { split: string; candidateMode: boolean },
+  // Task 4.3a: per-doc-type grounding specs (from generated field_specs.ts).
+  // Optional so existing callers/tests get unchanged four-metric behavior.
+  groundingByDocType?: Record<string, Record<string, GroundingSpec>>,
 ): EvalRunResult {
   const summaries: DocTypeMetricSummary[] = [];
   const skipped: string[] = [];
@@ -185,7 +202,8 @@ export function computeScore(
       continue;
     }
     const ocrText = readOcrText(f);
-    summaries.push(scoreFixture(f.fixture_id, f.doc_type, f.envelope, candidate, schemaFields, ocrText));
+    const groundingSpecs = groundingByDocType?.[f.doc_type];
+    summaries.push(scoreFixture(f.fixture_id, f.doc_type, f.envelope, candidate, schemaFields, ocrText, groundingSpecs));
   }
 
   return {
@@ -234,10 +252,20 @@ async function runScore(args: CliArgs): Promise<EvalRunResult> {
   const getCandidate = (f: LoadedFixture): ExtractionEnvelope | undefined =>
     args.candidateDir ? loadCandidateEnvelope(args.candidateDir, f) : f.envelope;
 
-  return computeScore(fixtures, getCandidate, {
-    split: args.split,
-    candidateMode: !!args.candidateDir,
-  });
+  // Preload grounding specs (Task 4.3a) for every doc_type in the matched set,
+  // sourced from the generated field_specs.ts GROUNDING_SPECS.
+  const docTypes = [...new Set(fixtures.map((f) => f.doc_type))];
+  const groundingByDocType: Record<string, Record<string, GroundingSpec>> = {};
+  for (const dt of docTypes) {
+    groundingByDocType[dt] = await loadGroundingSpecs(dt);
+  }
+
+  return computeScore(
+    fixtures,
+    getCandidate,
+    { split: args.split, candidateMode: !!args.candidateDir },
+    groundingByDocType,
+  );
 }
 
 // Where extract mode writes candidate envelopes when --out is omitted.
@@ -346,6 +374,31 @@ async function main(): Promise<void> {
         `absence=${agg.absence_state_correct_rate.toFixed(3)} ` +
         `severity_err=${agg.severity_weighted_error_rate.toFixed(3)}`,
     );
+    if (agg.grounding_grade_mean !== undefined) {
+      console.log(
+        `    grounding: grade_mean=${agg.grounding_grade_mean.toFixed(2)}/3 ` +
+          `rate=${(agg.grounding_grade_rate ?? 0).toFixed(3)} ` +
+          `grade3_rate=${(agg.grounding_grade3_rate ?? 0).toFixed(3)} ` +
+          `graded_fields=${agg.grounding_graded_count ?? 0}`,
+      );
+    }
+  }
+
+  // Per-field grounding grades (Task 4.3a). Printed per fixture so a single
+  // candidate (e.g. Lena) shows its field-level grades directly.
+  const withGrounding = result.per_fixture.filter((s) => s.grounding);
+  if (withGrounding.length > 0) {
+    console.log("\ngrounding grades (per field):");
+    for (const s of withGrounding) {
+      console.log(`  ${s.fixture_id}`);
+      for (const g of s.grounding!.fields) {
+        const verdict = g.graded
+          ? `grade ${g.grade}${g.matched_label ? ` (label: ${g.matched_label})` : ""}` +
+            `${g.value_page != null ? ` [page ${g.value_page}]` : ""}`
+          : `— ${g.excluded}`;
+        console.log(`    ${g.field_id.padEnd(28)} ${verdict}`);
+      }
+    }
   }
 }
 

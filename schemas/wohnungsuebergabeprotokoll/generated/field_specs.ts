@@ -40,5 +40,33 @@ export const VERIFIER_REFS: Record<string, string[]> = {
   "uebergabe_datum": ["date-format"],
 };
 
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
+  "uebergabe_typ": { id: "uebergabe_typ", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Übergabetyp"] },
+  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Einheit"] },
+  "uebergabe_datum": { id: "uebergabe_datum", severity: "critical", type: "date", scalar: true, derived: false, labels: ["Übergabedatum"] },
+  "kaeufer": { id: "kaeufer", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Käufer (neuer Eigentümer)"] },
+  "verkaeufer": { id: "verkaeufer", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Verkäufer (bisheriger Eigentümer)"] },
+  "mieter_in": { id: "mieter_in", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Einziehender Mieter"] },
+  "mieter_out": { id: "mieter_out", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Ausziehender Mieter"] },
+  "vacant_possession_language_present": { id: "vacant_possession_language_present", severity: "important", type: "boolean", scalar: true, derived: false, labels: ["Mietfrei-Sprache vorhanden"] },
+  "vacant_possession_language_excerpts": { id: "vacant_possession_language_excerpts", severity: "nice_to_have", type: "structured_array", scalar: false, derived: false, labels: ["Mietfrei-Belegstellen"] },
+  "meter_readings": { id: "meter_readings", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Zählerstände"] },
+  "damages_noted": { id: "damages_noted", severity: "nice_to_have", type: "structured", scalar: false, derived: false, labels: ["Festgestellte Mängel"] },
+  "signatures": { id: "signatures", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Unterschriften"] },
+};
+
 export const SCHEMA_VERSION = "2026-05-27-v1";
 export const DOC_TYPE = "wohnungsuebergabeprotokoll";

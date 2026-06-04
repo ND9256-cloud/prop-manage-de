@@ -47,3 +47,4 @@ jobs:
           npx tsx src/tests/eval/extractor-drift.test.ts
           npx tsx src/tests/eval/score-skip.test.ts
           npx tsx src/tests/eval/fixture-id.test.ts
+          npx tsx src/tests/eval/grounding-grade.test.ts

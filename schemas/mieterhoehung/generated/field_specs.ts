@@ -48,5 +48,36 @@ export const VERIFIER_REFS: Record<string, string[]> = {
   "document_status": ["enum"],
 };
 
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
+  "nachtrag_typ": { id: "nachtrag_typ", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Dokumenttyp"] },
+  "rechtsgrundlage": { id: "rechtsgrundlage", severity: "important", type: "enum", scalar: true, derived: false, labels: ["Rechtsgrundlage"] },
+  "new_kaltmiete": { id: "new_kaltmiete", severity: "critical", type: "money", scalar: true, derived: false, labels: ["Neue Kaltmiete"] },
+  "previous_kaltmiete": { id: "previous_kaltmiete", severity: "important", type: "money", scalar: true, derived: false, labels: ["Bisherige Kaltmiete"] },
+  "effective_date": { id: "effective_date", severity: "critical", type: "date", scalar: true, derived: false, labels: ["Wirksam ab"] },
+  "notice_date": { id: "notice_date", severity: "nice_to_have", type: "date", scalar: true, derived: false, labels: ["Datum des Erhöhungsschreibens"] },
+  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Einheit"] },
+  "tenant_identity": { id: "tenant_identity", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Mieter"] },
+  "landlord_signature_present": { id: "landlord_signature_present", severity: "critical", type: "boolean", scalar: true, derived: false, labels: ["Vermieter-Unterschrift vorhanden"] },
+  "tenant_signature_present": { id: "tenant_signature_present", severity: "important", type: "boolean", scalar: true, derived: false, labels: ["Mieter-Unterschrift vorhanden"] },
+  "document_status": { id: "document_status", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Dokumentstatus"] },
+  "staffelmiete_context": { id: "staffelmiete_context", severity: "important", type: "boolean", scalar: true, derived: false, labels: ["Staffelmiete-Kontext erkannt"] },
+  "paragraph_558_basis": { id: "paragraph_558_basis", severity: "nice_to_have", type: "structured", scalar: false, derived: false, labels: ["§558 Vergleichsmieten-Begründung"] },
+  "paragraph_559_basis": { id: "paragraph_559_basis", severity: "nice_to_have", type: "structured", scalar: false, derived: false, labels: ["§559 Modernisierungs-Begründung"] },
+  "indexmiete_basis": { id: "indexmiete_basis", severity: "nice_to_have", type: "structured", scalar: false, derived: false, labels: ["Indexmiete-Begründung"] },
+};
+
 export const SCHEMA_VERSION = "2026-05-27-v1";
 export const DOC_TYPE = "mieterhoehung";

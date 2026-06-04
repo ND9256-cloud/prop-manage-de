@@ -43,5 +43,35 @@ export const VERIFIER_REFS: Record<string, string[]> = {
   "document_status": ["enum"],
 };
 
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
+  "nachtrag_scope": { id: "nachtrag_scope", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Änderungsumfang"] },
+  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Einheit"] },
+  "effective_date": { id: "effective_date", severity: "critical", type: "date", scalar: true, derived: false, labels: ["Wirksam ab"] },
+  "tenant_identity": { id: "tenant_identity", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Mieter"] },
+  "landlord_signature_present": { id: "landlord_signature_present", severity: "critical", type: "boolean", scalar: true, derived: false, labels: ["Vermieter-Unterschrift vorhanden"] },
+  "tenant_signature_present": { id: "tenant_signature_present", severity: "critical", type: "boolean", scalar: true, derived: false, labels: ["Mieter-Unterschrift vorhanden"] },
+  "document_status": { id: "document_status", severity: "critical", type: "enum", scalar: true, derived: false, labels: ["Dokumentstatus"] },
+  "rent_change_payload": { id: "rent_change_payload", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Mietänderungs-Details"] },
+  "tenant_identity_change_payload": { id: "tenant_identity_change_payload", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Mieter-Identitäts-Änderung"] },
+  "deposit_change_payload": { id: "deposit_change_payload", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Kautions-Änderung"] },
+  "ancillary_cost_change_payload": { id: "ancillary_cost_change_payload", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Nebenkosten-Änderung"] },
+  "term_change_payload": { id: "term_change_payload", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Vertragslaufzeit-Änderung"] },
+  "usage_right_change_payload": { id: "usage_right_change_payload", severity: "important", type: "structured", scalar: false, derived: false, labels: ["Nutzungsrechts-Änderung"] },
+  "other_change_descriptor": { id: "other_change_descriptor", severity: "important", type: "string", scalar: true, derived: false, labels: ["Andere Änderung (Beschreibung)"] },
+};
+
 export const SCHEMA_VERSION = "2026-05-28-v1";
 export const DOC_TYPE = "mietvertragsnachtrag";

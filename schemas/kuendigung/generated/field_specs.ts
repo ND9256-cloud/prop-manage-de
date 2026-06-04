@@ -25,5 +25,22 @@ export const FIELD_SPECS: Record<string, FieldSpec> = {
 
 export const VERIFIER_REFS: Record<string, string[]> = {};
 
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
+  "doc_type_marker": { id: "doc_type_marker", severity: "nice_to_have", type: "string", scalar: true, derived: false, labels: ["Dokumenttyp-Marker (Stub)"] },
+};
+
 export const SCHEMA_VERSION = "2026-05-08-v1";
 export const DOC_TYPE = "kuendigung";

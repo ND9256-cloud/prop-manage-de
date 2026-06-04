@@ -39,5 +39,29 @@ export const VERIFIER_REFS: Record<string, string[]> = {
   "kaution": ["monetary-verbatim"],
 };
 
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
+  "kaltmiete": { id: "kaltmiete", severity: "critical", type: "money", scalar: true, derived: false, labels: ["Kaltmiete","Grundmiete","Nettokaltmiete","Nettomiete"] },
+  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: true, labels: ["Einheit"] },
+  "tenant_identity": { id: "tenant_identity", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Mieter"] },
+  "mietbeginn": { id: "mietbeginn", severity: "critical", type: "date", scalar: true, derived: false, labels: ["Mietbeginn","Mietzeit"] },
+  "mietende": { id: "mietende", severity: "important", type: "date", scalar: true, derived: false, labels: ["Mietende"] },
+  "nebenkostenvorauszahlung": { id: "nebenkostenvorauszahlung", severity: "important", type: "money", scalar: true, derived: false, labels: ["Nebenkostenvorauszahlung","Betriebskostenvorauszahlung","NK-Vorauszahlung"] },
+  "kaution": { id: "kaution", severity: "important", type: "money", scalar: true, derived: false, labels: ["Kaution","Mietsicherheit","Barkaution","Sicherheitsleistung"] },
+  "landlord_identity": { id: "landlord_identity", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Vermieter"] },
+};
+
 export const SCHEMA_VERSION = "2026-05-21-v1";
 export const DOC_TYPE = "mietvertrag";

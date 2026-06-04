@@ -71,6 +71,49 @@ export interface FieldMetricResult {
   has_error: boolean;
 }
 
+// ── Evidence-grounding grade (Task 4.3a) ──────────────────────────────────
+// A field-aware, same-page, local-window grounding GRADE (0–3) for direct
+// scalar fields. Distinct from normalized_match (value-correctness): this
+// measures whether the claimed value is grounded in the OCR near a
+// field-specific label. The two are never collapsed.
+export type GroundingGrade = 0 | 1 | 2 | 3;
+
+// Why a field was NOT assigned a numeric grade (excluded from the aggregate):
+//   derived_pending — composite/derived field (e.g. unit_ref); deferred to 4.3c
+//   non_scalar      — structured/structured_array field; out of scope for v1
+//   absent          — candidate did not assert a value (nothing to ground)
+//   no_ocr          — no source OCR text available to verify against
+export type GroundingExclusion = "derived_pending" | "non_scalar" | "absent" | "no_ocr";
+
+export interface FieldGroundingResult {
+  field_id: string;
+  severity: Severity;
+  // True iff a numeric grade was assigned (present scalar non-derived field
+  // with OCR). When false, `grade` is null and `excluded` says why.
+  graded: boolean;
+  grade: GroundingGrade | null;
+  excluded: GroundingExclusion | null;
+  // The field-specific label that anchored a grade-3, if any (else null).
+  matched_label: string | null;
+  // The page the value was located on (1-based), if found in scope.
+  value_page: number | null;
+  // Whether the candidate evidence carried a page number at all.
+  evidence_page_present: boolean;
+}
+
+export interface GroundingSummary {
+  fields: FieldGroundingResult[];
+  // Number of fields that received a numeric grade.
+  graded_count: number;
+  // Mean grade over graded fields (0–3), and that mean as a 0–1 rate (mean/3).
+  grade_mean: number;
+  grade_rate: number;
+  // Fraction of graded fields that reached the top grade (3).
+  grade3_rate: number;
+  // Field ids excluded as derived (derived_pending) — surfaced for visibility.
+  derived_pending: string[];
+}
+
 export interface DocTypeMetricSummary {
   doc_type: string;
   fixture_id: string;
@@ -82,6 +125,11 @@ export interface DocTypeMetricSummary {
   evidence_grounded_rate: number;
   absence_state_correct_rate: number;
   severity_weighted_error_rate: number;
+  // Evidence-grounding grade (Task 4.3a). Optional: only populated when
+  // grounding specs are supplied to scoreFixture (the run.ts score path).
+  // Kept separate from the metrics above — value-correctness vs grounding are
+  // never collapsed.
+  grounding?: GroundingSummary;
 }
 
 export interface RunMetadata {
@@ -108,5 +156,23 @@ export interface EvalRunResult {
     evidence_grounded_rate: number;
     absence_state_correct_rate: number;
     severity_weighted_error_rate: number;
+    // Task 4.3a grounding-grade roll-up. Optional (only when grounding specs
+    // were supplied). Mean grade across graded fields of all fixtures, the
+    // matching 0–1 rate, top-grade fraction, and total graded field count.
+    grounding_grade_mean?: number;
+    grounding_grade_rate?: number;
+    grounding_grade3_rate?: number;
+    grounding_graded_count?: number;
   }>;
+}
+
+// Grounding spec consumed by metrics.groundingGrade. Structurally matches the
+// generated GROUNDING_SPECS in schemas/<doc_type>/generated/field_specs.ts.
+export interface GroundingSpec {
+  id: string;
+  severity: Severity;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
 }

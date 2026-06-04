@@ -20,7 +20,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ExtractionEnvelope, SchemaFieldDef } from "./types.ts";
+import { pathToFileURL } from "node:url";
+
+import type { ExtractionEnvelope, GroundingSpec, SchemaFieldDef } from "./types.ts";
 
 // Resolve repo root: scripts/eval/loader.ts → ../../
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -206,6 +208,25 @@ export function parseFieldsSection(text: string): SchemaFieldDef[] {
   }
   if (current && current.id && current.severity) out.push(current as SchemaFieldDef);
   return out;
+}
+
+// ── Grounding specs (Task 4.3a) ──────────────────────────────────────────
+// Loads the per-field grounding label sets from the GENERATED, schema-driven
+// artifact schemas/<doc_type>/generated/field_specs.ts (GROUNDING_SPECS), so
+// the grounding scorer never hardcodes label sets. Async because the generated
+// file is an ES module imported by path. Returns {} when the doc_type has no
+// generated specs (or the import fails) so the score path degrades gracefully.
+export async function loadGroundingSpecs(docType: string): Promise<Record<string, GroundingSpec>> {
+  const specPath = path.join(SCHEMA_ROOT, docType, "generated", "field_specs.ts");
+  if (!fs.existsSync(specPath)) return {};
+  try {
+    const mod = (await import(pathToFileURL(specPath).href)) as {
+      GROUNDING_SPECS?: Record<string, GroundingSpec>;
+    };
+    return mod.GROUNDING_SPECS ?? {};
+  } catch {
+    return {};
+  }
 }
 
 export function readOcrText(fixture: LoadedFixture): string | undefined {
