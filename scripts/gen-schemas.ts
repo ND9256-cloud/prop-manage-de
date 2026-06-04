@@ -16,6 +16,15 @@ interface FieldDef {
   verifier_refs?: string[];
   item_schema?: Array<{ field: string; type: string; required: boolean }>;
   description?: string;
+  // Task 4.3a grounding scorer metadata (scoring-only; does NOT affect the
+  // extraction prompt, envelope validator, or extracted field set).
+  // grounding_labels: field-specific German label/anchor surface forms the
+  //   grounding grade may anchor on (in addition to german_label). NOT broad
+  //   synonyms — e.g. kaltmiete lists Grundmiete/Nettokaltmiete but NOT Miete.
+  // derived: true marks a composite/derived field (e.g. unit_ref) that the
+  //   grounding scorer must NOT grade (derived_pending; see Task 4.3c).
+  grounding_labels?: string[];
+  derived?: boolean;
 }
 
 interface SchemaFile {
@@ -110,8 +119,36 @@ function generateFieldSpecs(schema: SchemaFile): string {
     }
   }
 
+  // GROUNDING_SPECS: per-field grounding metadata for the Task 4.3a grounding
+  // scorer. Kept in a SEPARATE export (not folded into FIELD_SPECS) so the
+  // extractor-drift deep-equal on FIELD_SPECS stays byte-stable. labels =
+  // german_label plus any authored grounding_labels (deduped, schema order).
+  // scalar = type is a direct scalar (not structured/structured_array).
+  const NON_SCALAR_TYPES = new Set(["structured", "structured_array"]);
+  const groundingEntries: string[] = [];
+  for (const field of schema.fields) {
+    const labels: string[] = [];
+    const seen = new Set<string>();
+    for (const label of [field.german_label, ...(field.grounding_labels ?? [])]) {
+      if (label && !seen.has(label)) {
+        seen.add(label);
+        labels.push(label);
+      }
+    }
+    const parts = [
+      `id: ${JSON.stringify(field.id)}`,
+      `severity: ${JSON.stringify(field.severity)}`,
+      `type: ${JSON.stringify(field.type)}`,
+      `scalar: ${!NON_SCALAR_TYPES.has(field.type)}`,
+      `derived: ${field.derived === true}`,
+      `labels: ${JSON.stringify(labels)}`,
+    ];
+    groundingEntries.push(`  ${JSON.stringify(field.id)}: { ${parts.join(", ")} },`);
+  }
+
   const fieldSpecsBody = specEntries.length > 0 ? `{\n${specEntries.join("\n")}\n}` : "{}";
   const verifierRefsBody = verifierEntries.length > 0 ? `{\n${verifierEntries.join("\n")}\n}` : "{}";
+  const groundingBody = groundingEntries.length > 0 ? `{\n${groundingEntries.join("\n")}\n}` : "{}";
 
   return `${h}
 
@@ -134,6 +171,21 @@ export interface FieldSpec {
 export const FIELD_SPECS: Record<string, FieldSpec> = ${fieldSpecsBody};
 
 export const VERIFIER_REFS: Record<string, string[]> = ${verifierRefsBody};
+
+// Grounding scorer metadata (Task 4.3a). Consumed by scripts/eval/metrics.ts
+// (groundingGrade) via scripts/eval/loader.ts (loadGroundingSpecs). Scoring
+// only — no effect on extraction. labels are field-specific anchors, NOT broad
+// synonyms; derived fields are excluded from grading (derived_pending).
+export interface GroundingSpec {
+  id: string;
+  severity: string;
+  type: string;
+  scalar: boolean;
+  derived: boolean;
+  labels: string[];
+}
+
+export const GROUNDING_SPECS: Record<string, GroundingSpec> = ${groundingBody};
 
 export const SCHEMA_VERSION = ${JSON.stringify(schema.schema_version)};
 export const DOC_TYPE = ${JSON.stringify(schema.doc_type)};
