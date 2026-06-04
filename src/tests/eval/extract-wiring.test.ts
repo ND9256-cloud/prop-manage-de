@@ -118,15 +118,18 @@ const lena = fixtures.find((f) => f.fixture_id.startsWith("mietvertrag/everding-
 ok(!!lena, "wiring test: Lena fixture found");
 ok(!!lena!.source_text_path, "wiring test: Lena source.txt exists (Task 4.1b added it)");
 
-// loadFixtures sorts deterministically; with --fixture-cap=1 we take the
-// first matching mietvertrag fixture (whichever it is). What matters for
-// wiring is the candidate envelope shape, not which fixture supplied OCR.
-const expectedFixtureId = fixtures[0]!.fixture_id;
+// Target Lena explicitly via --fixture-id (4.2c). Post Task 4.3b the loader
+// resolves source PER-ENVELOPE, so the multi-envelope mietvertrag fixtures
+// (hofmann, supersession) correctly resolve to null source until WS3 backfills
+// per-doc OCR; Lena (single-envelope dir) is the mietvertrag fixture with a real
+// source.txt. What matters for wiring is the candidate envelope shape; we just
+// need a fixture that supplies OCR.
+const expectedFixtureId = lena!.fixture_id;
 
 const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "eval-extract-wiring-"));
 try {
   const result = await runExtract(
-    { mode: "extract", split: "all", docType: "mietvertrag", live: true, fixtureCap: 1, out: outDir },
+    { mode: "extract", split: "all", docType: "mietvertrag", live: true, fixtureCap: 1, fixtureId: "everding", out: outDir },
     mockDeps,
   );
 

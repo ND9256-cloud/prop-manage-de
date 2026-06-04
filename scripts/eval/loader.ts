@@ -77,19 +77,45 @@ function loadMeta(caseDir: string): FixtureMeta {
   }
 }
 
-function findSourceFiles(caseDir: string): { txt: string | null; pdf: string | null } {
-  const txtCandidates = ["source.txt", "ocr.txt"];
-  const pdfCandidates = ["source.pdf"];
+// Resolves a SINGLE gold envelope's source OCR/PDF, per-envelope (Task 4.3b,
+// Option B — preserve fixture_ids, additive). Multi-envelope case dirs used to
+// share one source.txt, so every secondary envelope scored against the wrong
+// document's OCR. Resolution order:
+//   1. `<envelope_basename>.source.{txt,pdf}` in the same dir — a dedicated
+//      per-envelope source (e.g. mietvertrag.source.txt next to mietvertrag.json).
+//   2. If the dir holds exactly ONE gold envelope, fall back to the dir's
+//      shared `source.txt` / `ocr.txt` / `source.pdf` (the single-envelope case
+//      is unambiguous — Lena keeps resolving to her source.txt).
+//   3. Otherwise null (multi-envelope dir whose per-doc OCR is not yet
+//      backfilled — WS3). null means "pending_source", not a scoring failure.
+function resolveEnvelopeSources(
+  caseDir: string,
+  envelopeFile: string,
+  goldEnvelopeCount: number,
+): { txt: string | null; pdf: string | null } {
+  const base = envelopeFile.replace(/\.json$/, "");
   let txt: string | null = null;
   let pdf: string | null = null;
-  for (const c of txtCandidates) {
-    const p = path.join(caseDir, c);
-    if (fs.existsSync(p)) { txt = p; break; }
+
+  // 1. Dedicated per-envelope source.
+  const dedicatedTxt = path.join(caseDir, `${base}.source.txt`);
+  if (fs.existsSync(dedicatedTxt)) txt = dedicatedTxt;
+  const dedicatedPdf = path.join(caseDir, `${base}.source.pdf`);
+  if (fs.existsSync(dedicatedPdf)) pdf = dedicatedPdf;
+
+  // 2. Single-envelope dir → fall back to the shared dir-level source.
+  if (txt === null && goldEnvelopeCount === 1) {
+    for (const c of ["source.txt", "ocr.txt"]) {
+      const p = path.join(caseDir, c);
+      if (fs.existsSync(p)) { txt = p; break; }
+    }
   }
-  for (const c of pdfCandidates) {
-    const p = path.join(caseDir, c);
-    if (fs.existsSync(p)) { pdf = p; break; }
+  if (pdf === null && goldEnvelopeCount === 1) {
+    const p = path.join(caseDir, "source.pdf");
+    if (fs.existsSync(p)) pdf = p;
   }
+
+  // 3. Otherwise null (multi-envelope dir, secondary not yet backfilled).
   return { txt, pdf };
 }
 
@@ -108,20 +134,28 @@ export function loadFixtures(options: {
     const entries = fs.readdirSync(caseDir).filter((f) => f.endsWith(".json") && f !== "meta.json");
     const meta = loadMeta(caseDir);
     if (split !== "all" && meta.split !== split) return;
-    const sources = findSourceFiles(caseDir);
+    // Parse every envelope in the dir once. The gold-envelope COUNT drives the
+    // single-dir source fallback (resolveEnvelopeSources), so it is computed
+    // over ALL gold envelopes in the dir, independent of the docType/split
+    // filters applied to the emitted fixtures below.
+    const parsedEntries: { entry: string; envelope: ExtractionEnvelope }[] = [];
     for (const entry of entries) {
-      const envelopePath = path.join(caseDir, entry);
       let parsed: unknown;
-      try { parsed = readJson(envelopePath); } catch { continue; }
+      try { parsed = readJson(path.join(caseDir, entry)); } catch { continue; }
       if (!isEnvelope(parsed)) continue;
-      if (docType && parsed.doc_type !== docType) continue;
+      parsedEntries.push({ entry, envelope: parsed });
+    }
+    const goldEnvelopeCount = parsedEntries.length;
+    for (const { entry, envelope } of parsedEntries) {
+      if (docType && envelope.doc_type !== docType) continue;
+      const sources = resolveEnvelopeSources(caseDir, entry, goldEnvelopeCount);
       const relCase = path.relative(FIXTURE_ROOT, caseDir);
       out.push({
         fixture_id: `${relCase}/${entry}`,
-        doc_type: parsed.doc_type,
+        doc_type: envelope.doc_type,
         case_dir: caseDir,
-        envelope_path: envelopePath,
-        envelope: parsed,
+        envelope_path: path.join(caseDir, entry),
+        envelope,
         source_text_path: sources.txt,
         source_pdf_path: sources.pdf,
         meta,
