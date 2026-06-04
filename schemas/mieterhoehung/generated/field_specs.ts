@@ -59,6 +59,10 @@ export interface GroundingSpec {
   scalar: boolean;
   derived: boolean;
   labels: string[];
+  // Task 4.3c-a: present only on single-source derived fields (graded by
+  // validating the derivation); composite derived fields omit them.
+  derived_kind?: string;
+  normalization_rule?: string;
 }
 
 export const GROUNDING_SPECS: Record<string, GroundingSpec> = {

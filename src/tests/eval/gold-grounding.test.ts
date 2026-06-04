@@ -37,6 +37,16 @@ interface FieldFailure {
   grade: number | null;
 }
 
+// Task 4.3c-a: derived fields graded by c-a are REPORTED with their grade but do
+// NOT hard-fail this invariant (hard-gating of derived fields waits until 4.3c is
+// complete). Lena's unit_ref must not break the green gate regardless of grade.
+interface DerivedReport {
+  fixture_id: string;
+  field_id: string;
+  grade: number | null;
+  excluded: string | null;
+}
+
 async function main() {
 const fixtures = loadFixtures();
 ok(fixtures.length > 0, "gold-grounding: at least one fixture loaded");
@@ -44,6 +54,7 @@ ok(fixtures.length > 0, "gold-grounding: at least one fixture loaded");
 const assertedEnvelopes: string[] = [];
 const pendingSource: string[] = [];
 const failures: FieldFailure[] = [];
+const derivedReports: DerivedReport[] = [];
 
 for (const f of fixtures) {
   const ocr = f.source_text_path ? readOcrText(f) : undefined;
@@ -60,9 +71,17 @@ for (const f of fixtures) {
     if (goldField.absence_state !== "present") continue;
     const spec = specs[fieldId];
     if (!spec) continue;        // no grounding spec → not part of the invariant
-    if (spec.derived) continue; // derived/composite (unit_ref etc.) → 4.3c
 
     const r = groundingGrade(spec, goldField, ocr);
+
+    // Derived fields (e.g. unit_ref): REPORT-ONLY in c-a — captured with their
+    // grade for visibility but never gated (composite derived → derived_pending;
+    // single-source derived → 0/1/3). They do NOT contribute to `failures`.
+    if (spec.derived) {
+      derivedReports.push({ fixture_id: f.fixture_id, field_id: fieldId, grade: r.grade, excluded: r.excluded });
+      continue;
+    }
+
     if (!r.graded) continue;    // excluded (non_scalar/…) → not assertable here
 
     if (r.grade !== 3) {
@@ -81,6 +100,11 @@ for (const id of pendingSource) console.log(`  pending_src  ${id}`);
 for (const fail of failures) {
   console.log(`  BELOW GRADE 3  ${fail.fixture_id} :: ${fail.field_id} → grade ${fail.grade}`);
 }
+// Derived fields (report-only, NOT gated in 4.3c-a).
+for (const d of derivedReports) {
+  const verdict = d.excluded ? `excluded ${d.excluded}` : `grade ${d.grade}`;
+  console.log(`  derived(rpt)   ${d.fixture_id} :: ${d.field_id} → ${verdict}`);
+}
 
 // ── Lena (single-envelope dir) MUST be asserted at grade 3 ─────────────────
 const lenaId = "mietvertrag/everding-ko132-1og/expected.json";
@@ -95,6 +119,17 @@ ok(
 ok(
   !failures.some((x) => x.fixture_id === lenaId),
   "gold-grounding: Lena's present non-derived fields all ground at grade 3",
+);
+// Task 4.3c-a: Lena's unit_ref (derived) is REPORTED, never a failure. Its grade
+// is whatever is honest (her evidence is a table cell, not a clean floor phrase),
+// and it must not gate the green invariant.
+ok(
+  derivedReports.some((d) => d.fixture_id === lenaId && d.field_id === "unit_ref"),
+  "gold-grounding: Lena's unit_ref is reported as a derived field (report-only)",
+);
+ok(
+  !failures.some((x) => x.fixture_id === lenaId && x.field_id === "unit_ref"),
+  "gold-grounding: Lena's unit_ref (derived) never hard-fails the invariant in 4.3c-a",
 );
 
 // ── Known multi-envelope secondaries MUST be pending_source, not failed ────

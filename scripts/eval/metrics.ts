@@ -6,6 +6,7 @@
 import type {
   AbsenceState,
   DocTypeMetricSummary,
+  EvidenceQuote,
   ExtractionEnvelope,
   FieldEnvelope,
   FieldGroundingResult,
@@ -550,6 +551,119 @@ function gradeIdentity(
   return { ...base, graded: true, grade, excluded: null, matched_label: matchedRole, value_page: valuePage };
 }
 
+// ── floor_synonym_normalization (Task 4.3c-a) ────────────────────────────
+// The single declared, deterministic, CLOSED normalization rule for the
+// derived field unit_ref. Maps a German floor phrase found in an evidence
+// quote to the canonical floor token used by unit_ref.normalized_value.
+// Pure: (quote) -> token | null. Unknown/unmappable input -> null — an honest
+// non-match, NEVER a guess. The closed map (documented per the 4.3c-a brief):
+//   Erdgeschoss / EG                          -> "EG"
+//   N. Obergeschoss / "N. OG" / "N.OG"        -> "N.OG"  (N copied as written)
+//   erste/zweite/dritte/vierte Etage          -> "1.OG" / "2.OG" / "3.OG" / "4.OG"
+//   Dachgeschoss / DG                         -> "DG"
+//   Unter-/Kellergeschoss / UG                -> "UG"
+// A position suffix (links | rechts | mitte) anywhere in the quote is preserved
+// as a lowercased token, e.g. "1. Obergeschoss links" -> "1.OG links". A position
+// with NO floor token is not a match (returns null).
+const ORDINAL_FLOOR_WORDS: Record<string, string> = {
+  erste: "1",
+  zweite: "2",
+  dritte: "3",
+  vierte: "4",
+};
+
+export function floor_synonym_normalization(quote: string): string | null {
+  if (typeof quote !== "string" || quote.trim() === "") return null;
+  const q = quote.toLowerCase().replace(/\s+/g, " ").trim();
+
+  let floor: string | null = null;
+
+  // N. Obergeschoss / "N. OG" / "N.OG" — a leading number bound to ober­geschoss.
+  const og = q.match(/(?<![\p{L}\p{N}])(\d+)\s*\.?\s*(?:obergeschoss|og)(?![\p{L}])/u);
+  if (og) {
+    floor = `${og[1]}.OG`;
+  }
+  // erste/zweite/dritte/vierte Etage|Obergeschoss.
+  if (floor === null) {
+    const word = q.match(/(?<!\p{L})(erste|zweite|dritte|vierte)\s+(?:etage|obergeschoss)(?!\p{L})/u);
+    if (word) floor = `${ORDINAL_FLOOR_WORDS[word[1]]}.OG`;
+  }
+  // Erdgeschoss / EG.
+  if (floor === null && /(?<!\p{L})(?:erdgeschoss|eg)(?!\p{L})/u.test(q)) floor = "EG";
+  // Dachgeschoss / DG.
+  if (floor === null && /(?<!\p{L})(?:dachgeschoss|dg)(?!\p{L})/u.test(q)) floor = "DG";
+  // Unter-/Kellergeschoss / UG (the bare word "Keller" alone is NOT a match).
+  if (floor === null && /(?<!\p{L})(?:untergeschoss|kellergeschoss|ug)(?!\p{L})/u.test(q)) floor = "UG";
+
+  if (floor === null) return null;
+
+  const pos = q.match(/(?<!\p{L})(links|rechts|mitte)(?!\p{L})/u);
+  return pos ? `${floor} ${pos[1]}` : floor;
+}
+
+// ── derived grounding (Task 4.3c-a) ──────────────────────────────────────
+// A single-source DERIVED field (e.g. unit_ref) carries a value derived from
+// ONE cited source phrase by a declared deterministic normalization rule. It is
+// graded scorer-side (no re-extraction, no Sonnet) on a 0/1/3 scale:
+//   3 — quote-grounds AND rule-reproduces: the evidence.quote appears in OCR on
+//       its page AND applying the field's normalization rule to that quote
+//       reproduces the field's normalized_value (source present + derivation
+//       reproducible).
+//   1 — quote-grounds but the rule does NOT reproduce the value (source present,
+//       derivation unverified).
+//   0 — quote does not ground (cited source absent from OCR on its page).
+// Composite/multi-component derived fields (no single_source rule) stay
+// derived_pending (deferred to Task 4.3c-b).
+
+// Closed registry of declared single-source normalization rules. A derived spec
+// names its rule via normalization_rule; an unknown name reproduces nothing.
+const NORMALIZATION_RULES: Record<string, (quote: string) => string | null> = {
+  floor_synonym_normalization,
+};
+
+// First evidence entry carrying a non-empty quote (kept with its page, if any).
+function firstQuoteEvidence(candidate: FieldEnvelope): EvidenceQuote | null {
+  for (const e of candidate.evidence ?? []) {
+    if (e && typeof e.quote === "string" && e.quote.trim() !== "") return e;
+  }
+  return null;
+}
+
+// quote-grounds: the whitespace-normalized quote appears in OCR on its cited
+// page (same-page constraint, mirroring 4.3a's whitespace normalization). When
+// the quote carries no page, the whole document is searched.
+function quoteGroundsInOcr(quote: string, page: number | null, ocrText: string): boolean {
+  const needle = normalizeWhitespace(quote);
+  if (needle === "") return false;
+  const pages = parseOcrPages(ocrText);
+  const scope = page != null ? pages.filter((p) => p.page === page) : pages;
+  const haystack = normalizeWhitespace(scope.map((p) => p.lines.join("\n")).join("\n"));
+  return haystack.includes(needle);
+}
+
+function gradeDerivedSingleSource(
+  spec: GroundingSpec,
+  candidate: FieldEnvelope,
+  ocrText: string,
+  base: Omit<FieldGroundingResult, "graded" | "grade" | "excluded">,
+): FieldGroundingResult {
+  const ev = firstQuoteEvidence(candidate);
+  const page = ev && typeof ev.page === "number" && Number.isFinite(ev.page) ? ev.page : null;
+
+  // quote-grounds.
+  if (!ev || !quoteGroundsInOcr(ev.quote, page, ocrText)) {
+    return { ...base, graded: true, grade: 0, excluded: null, value_page: null };
+  }
+
+  // rule-reproduces: applying the declared rule to the quote yields the value.
+  const rule = spec.normalization_rule ? NORMALIZATION_RULES[spec.normalization_rule] : undefined;
+  const produced = rule ? rule(ev.quote) : null;
+  const expected = candidate.normalized_value;
+  const reproduces = produced !== null && typeof expected === "string" && produced === expected;
+
+  return { ...base, graded: true, grade: reproduces ? 3 : 1, excluded: null, value_page: page };
+}
+
 // Computes the grounding grade for a single field. Pure: (spec, candidate,
 // ocrText) -> result. Returns an excluded (ungraded) result for derived,
 // non-scalar, absent, or no-OCR cases.
@@ -572,8 +686,17 @@ export function groundingGrade(
     excluded: reason,
   });
 
-  // Derived/composite fields (e.g. unit_ref) are deferred to Task 4.3c.
-  if (spec.derived) return excluded("derived_pending");
+  // Derived fields (e.g. unit_ref). A single-source derived field with a declared
+  // normalization rule is graded by validating its derivation (Task 4.3c-a);
+  // composite/multi-component derived fields stay derived_pending (Task 4.3c-b).
+  if (spec.derived) {
+    if (spec.derived_kind === "single_source" && spec.normalization_rule) {
+      if (!candidate || candidate.absence_state !== "present") return excluded("absent");
+      if (!ocrText) return excluded("no_ocr");
+      return gradeDerivedSingleSource(spec, candidate, ocrText, base);
+    }
+    return excluded("derived_pending");
+  }
 
   // Identity fields (tenant_identity/landlord_identity) are routed through
   // person/company grounding (Task 4.3a-names) — they are non-scalar but carry a

@@ -114,6 +114,10 @@ fields:
     requiredness: required
     type: enum
     derived: true
+    # Task 4.3c-a: single-source derived field. Graded scorer-side by validating
+    # its derivation (quote-grounds + rule-reproduces) via the declared rule.
+    derived_kind: single_source
+    normalization_rule: floor_synonym_normalization
     enum_values:
       - "EG"
       - "1.OG"
