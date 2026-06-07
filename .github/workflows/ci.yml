@@ -49,3 +49,4 @@ jobs:
           npx tsx src/tests/eval/fixture-id.test.ts
           npx tsx src/tests/eval/grounding-grade.test.ts
           npx tsx src/tests/eval/gold-grounding.test.ts
+          npx tsx src/tests/eval/derived-grounding.test.ts

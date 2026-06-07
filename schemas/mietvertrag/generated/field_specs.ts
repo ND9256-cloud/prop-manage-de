@@ -50,11 +50,15 @@ export interface GroundingSpec {
   scalar: boolean;
   derived: boolean;
   labels: string[];
+  // Task 4.3c-a: present only on single-source derived fields (graded by
+  // validating the derivation); composite derived fields omit them.
+  derived_kind?: string;
+  normalization_rule?: string;
 }
 
 export const GROUNDING_SPECS: Record<string, GroundingSpec> = {
   "kaltmiete": { id: "kaltmiete", severity: "critical", type: "money", scalar: true, derived: false, labels: ["Kaltmiete","Grundmiete","Nettokaltmiete","Nettomiete"] },
-  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: true, labels: ["Einheit"] },
+  "unit_ref": { id: "unit_ref", severity: "critical", type: "enum", scalar: true, derived: true, labels: ["Einheit"], derived_kind: "single_source", normalization_rule: "floor_synonym_normalization" },
   "tenant_identity": { id: "tenant_identity", severity: "critical", type: "structured", scalar: false, derived: false, labels: ["Mieter"] },
   "mietbeginn": { id: "mietbeginn", severity: "critical", type: "date", scalar: true, derived: false, labels: ["Mietbeginn","Mietzeit"] },
   "mietende": { id: "mietende", severity: "important", type: "date", scalar: true, derived: false, labels: ["Mietende"] },

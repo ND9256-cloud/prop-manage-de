@@ -175,4 +175,12 @@ export interface GroundingSpec {
   scalar: boolean;
   derived: boolean;
   labels: string[];
+  // Task 4.3c-a derived-grounding metadata (scoring-only). Present only on
+  // derived fields. derived_kind === "single_source" marks a derived field
+  // whose value is reproducible from ONE cited source phrase via a declared
+  // deterministic normalization_rule (e.g. unit_ref / floor_synonym_normalization);
+  // such fields get a 0/1/3 derived grade. Derived fields WITHOUT a single_source
+  // rule (composite/multi-component, e.g. addresses) stay derived_pending (4.3c-b).
+  derived_kind?: string;
+  normalization_rule?: string;
 }

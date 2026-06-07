@@ -22,9 +22,15 @@ interface FieldDef {
   //   grounding grade may anchor on (in addition to german_label). NOT broad
   //   synonyms — e.g. kaltmiete lists Grundmiete/Nettokaltmiete but NOT Miete.
   // derived: true marks a composite/derived field (e.g. unit_ref) that the
-  //   grounding scorer must NOT grade (derived_pending; see Task 4.3c).
+  //   grounding scorer must NOT grade as a direct scalar.
+  // derived_kind + normalization_rule (Task 4.3c-a): a derived field with
+  //   derived_kind "single_source" and a declared normalization_rule is graded
+  //   by validating its derivation scorer-side (quote-grounds + rule-reproduces);
+  //   derived fields without them stay derived_pending (composites, Task 4.3c-b).
   grounding_labels?: string[];
   derived?: boolean;
+  derived_kind?: string;
+  normalization_rule?: string;
 }
 
 interface SchemaFile {
@@ -143,6 +149,11 @@ function generateFieldSpecs(schema: SchemaFile): string {
       `derived: ${field.derived === true}`,
       `labels: ${JSON.stringify(labels)}`,
     ];
+    // Task 4.3c-a derived-grounding metadata, emitted only when authored.
+    if (field.derived_kind) parts.push(`derived_kind: ${JSON.stringify(field.derived_kind)}`);
+    if (field.normalization_rule) {
+      parts.push(`normalization_rule: ${JSON.stringify(field.normalization_rule)}`);
+    }
     groundingEntries.push(`  ${JSON.stringify(field.id)}: { ${parts.join(", ")} },`);
   }
 
@@ -183,6 +194,10 @@ export interface GroundingSpec {
   scalar: boolean;
   derived: boolean;
   labels: string[];
+  // Task 4.3c-a: present only on single-source derived fields (graded by
+  // validating the derivation); composite derived fields omit them.
+  derived_kind?: string;
+  normalization_rule?: string;
 }
 
 export const GROUNDING_SPECS: Record<string, GroundingSpec> = ${groundingBody};

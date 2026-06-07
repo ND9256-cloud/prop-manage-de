@@ -42,6 +42,11 @@ const FieldDef = z
     // Task 4.3a grounding scorer metadata (scoring-only; see gen-schemas.ts).
     grounding_labels: z.array(z.string()).optional(),
     derived: z.boolean().optional(),
+    // Task 4.3c-a derived-grounding metadata (scoring-only; see gen-schemas.ts).
+    // derived_kind === "single_source" + a normalization_rule mark a derived
+    // field that is graded by validating its derivation scorer-side.
+    derived_kind: z.string().optional(),
+    normalization_rule: z.string().optional(),
     used_in_resolvers: z.boolean().default(false),
     customer_visible: z.boolean().default(true),
     classification_hints: z.string().optional(),
