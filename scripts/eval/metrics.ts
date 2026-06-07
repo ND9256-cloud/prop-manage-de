@@ -704,8 +704,12 @@ function gradeDerivedSingleSource(
 //  3. Locality (same page) — row_anchor & cell_value_raw within ±3 lines; column
 //     within the previous 10 lines of the value; total span ≤ 15 lines.
 //  4. Column licenses rule — geschoss_numeric_to_og only under a floor column.
-//  5. Ambiguity — duplicate (same cell_value_raw + column) rows with a row anchor
-//     that does not disambiguate → cap ≤ 2; row_anchor REQUIRED for grade 3.
+//  5. Row ambiguity (Task 4.3c-b-1b-i) — count CANDIDATE DATA ROWS for the column
+//     (value lines at/after the header carrying the raw token). row_anchor is
+//     REQUIRED for grade 3 ONLY in a MULTI-row block (>1 candidate row), where it
+//     must disambiguate which row supplied the cell (a non-disambiguating anchor
+//     → cap ≤ 2). A SINGLE-candidate-row block has nothing to disambiguate, so
+//     row_anchor is NOT required for 3 (a provided anchor must still ground).
 //  6. Derivation — rule(cell_value_raw) === field.normalized_value.
 // Grades: 3 grounded+local+licensed+reproduced+unambiguous; 2 value+one anchor,
 // cohesion incomplete; 1 raw on page, no row/column relationship; 0 raw absent /
@@ -788,7 +792,7 @@ function gradeTableCellOnPage(
   colQuote: string,
   rawTok: string,
   ruleId: DerivationRule,
-  maxGrade: GroundingGrade,
+  pageCap: GroundingGrade,
 ): GroundingGrade | null {
   const valueLines = rawTokenLineIndices(rawTok, lines);
   if (valueLines.length === 0) return null; // raw absent on this page
@@ -808,12 +812,15 @@ function gradeTableCellOnPage(
     return 0; // rule fails
   }
 
-  // 5. Ambiguity: data rows (value lines at/after the column header) carrying the
-  // same raw token under the same column. ≥2 such rows is ambiguous unless the
-  // row anchor pins exactly one of them (anchor on the value's own line).
+  // 5. Row ambiguity (Task 4.3c-b-1b-i): count CANDIDATE DATA ROWS for this column
+  // — value lines at/after the column header carrying the raw token. >1 such row is
+  // a MULTI-row block (ambiguity to resolve), exactly 1 is a SINGLE-row block
+  // (nothing to disambiguate). The linearized floor case keeps a whole row on one
+  // line, so a single-unit description table counts as ONE data row even when that
+  // line repeats the token across columns.
   const headerMin = Math.min(...col.indices);
   const dataValueLines = valueLines.filter((vi) => vi >= headerMin);
-  const ambiguous = dataValueLines.length >= 2;
+  const multiRow = dataValueLines.length >= 2;
 
   // 3. Locality: pick the best value line with a column header in the previous 10
   // lines and (if provided) a row anchor within ±3 lines; total span ≤ 15.
@@ -829,15 +836,23 @@ function gradeTableCellOnPage(
     const idxs = [vi, ...(columnOk ? [Math.max(...ciCands)] : []), ...(rowOk ? [riCands[0]] : [])];
     const span = Math.max(...idxs) - Math.min(...idxs);
 
-    const cohesionComplete = columnOk && rowProvided && rowOk && span <= 15;
-    const ambiguityResolved = !ambiguous || disambiguated;
     let g: GroundingGrade;
-    if (cohesionComplete && ambiguityResolved) g = 3;
-    else g = 2; // value + at least one anchor, cohesion/ambiguity incomplete
+    if (multiRow) {
+      // Multi-row block: row_anchor REQUIRED for 3 and must pin the value's own row
+      // (unchanged from 1a). A missing/weak/non-disambiguating anchor caps at 2.
+      const cohesionComplete = columnOk && rowProvided && rowOk && span <= 15;
+      g = cohesionComplete && disambiguated ? 3 : 2;
+    } else {
+      // Single-row block: nothing to disambiguate, so row_anchor is NOT required.
+      // Grade 3 on licensed column + value + locality; a provided row anchor has
+      // already been ground-checked (return 0 above) and here only tightens span.
+      const cohesionComplete = columnOk && span <= 15;
+      g = cohesionComplete ? 3 : 2;
+    }
     if (g > best) best = g;
   }
 
-  return Math.min(best, maxGrade) as GroundingGrade;
+  return Math.min(best, pageCap) as GroundingGrade;
 }
 
 function gradeTableCell(
@@ -862,11 +877,13 @@ function gradeTableCell(
   if (!isDerivationRule(ruleId) || !tableCellRuleAllowed(spec.id, ruleId)) return grade0();
 
   const page = typeof tc.page === "number" && Number.isFinite(tc.page) ? tc.page : null;
-  // row_anchor REQUIRED for grade 3; its absence caps the grade at 2.
+  // Whether the model supplied a row anchor at all. It is REQUIRED for grade 3
+  // only in a multi-row block; that decision is made per page in
+  // gradeTableCellOnPage from the candidate-data-row count (Task 4.3c-b-1b-i).
   const rowProvided = rowQuote !== "";
-  let maxGrade: GroundingGrade = rowProvided ? 3 : 2;
-  // page missing on a CRITICAL field caps at 2.
-  if (page == null && spec.severity === "critical") maxGrade = Math.min(maxGrade, 2) as GroundingGrade;
+  // page missing on a CRITICAL field caps the grade at 2 (unchanged from 1a).
+  let pageCap: GroundingGrade = 3;
+  if (page == null && spec.severity === "critical") pageCap = 2;
 
   const pages = parseOcrPages(ocrText);
   // Same-page constraint: a cited page scopes to exactly that page; without one,
@@ -879,7 +896,7 @@ function gradeTableCell(
   for (const p of scope) {
     const g = gradeTableCellOnPage(
       candidate.normalized_value, p.lines,
-      rowProvided, rowQuote, colQuote, rawTok, ruleId, maxGrade,
+      rowProvided, rowQuote, colQuote, rawTok, ruleId, pageCap,
     );
     if (g == null) continue; // raw not on this page
     if (g > bestGrade) { bestGrade = g; valuePage = p.page; }
