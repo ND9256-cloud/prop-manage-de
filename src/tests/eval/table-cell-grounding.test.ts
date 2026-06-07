@@ -241,4 +241,104 @@ function tableCell(opts: {
   eq(groundingGrade(unitRefSpec(), wrongTypeRule, ocr).grade, 0, "shape: a derived-only rule on table_cell is not allowed → 0");
 }
 
+// ══ Row ambiguity refinement (Task 4.3c-b-1b-i) ════════════════════════════
+// row_anchor is required for grade 3 ONLY when the table block has >1 candidate
+// data row for the column. A single-candidate-row block (e.g. Lena's single-unit
+// DESCRIPTION table) reaches 3 on value + licensed floor column + locality alone.
+
+// ── Lena-shape single-unit description table, NO row anchor → 3 ─────────────
+// Header "Wohnfläche ca. Geschoss Zimmer …" then ONE value row that linearizes
+// the whole unit onto a single line (multiple "1"s under different columns). That
+// is ONE candidate data row, so the unambiguous Geschoss "1" reaches 3 without a
+// tenant row anchor.
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Beschreibung der Wohnung",
+    "Wohnfläche ca. Geschoss Zimmer Küche Bad Balkon WC Lage",
+    "100,00 m² 1 3,5 1 1 0 1 – Mitte 0",
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "", // NO row anchor — single-unit table
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  const r = groundingGrade(unitRefSpec(), cand, ocr);
+  eq(r.grade, 3, "single-row description table: floor '1' under 'Geschoss', no row anchor needed → 3");
+  eq(r.value_page, 1, "single-row description table: value on page 1");
+}
+
+// ── Column-position trap on the SAME single-unit row → 0 ────────────────────
+// The row repeats "1" under Küche/Bad/WC. Declaring a NON-floor column (Küche)
+// with the floor rule must NOT pass — only the Geschoss-column "1" is a floor.
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Beschreibung der Wohnung",
+    "Wohnfläche ca. Geschoss Zimmer Küche Bad Balkon WC Lage",
+    "100,00 m² 1 3,5 1 1 0 1 – Mitte 0",
+  ].join("\n");
+  const trap = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "",
+    colQuote: "Küche", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), trap, ocr).grade, 0, "column-position trap: '1' under 'Küche' (not a floor column) → 0");
+
+  // And the Geschoss declaration on the very same OCR still grades 3 — proving it
+  // is the column anchor, not mere presence of '1', that licenses the floor.
+  const floorDecl = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "",
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), floorDecl, ocr).grade, 3, "column-position: only the 'Geschoss'-column '1' grades 3");
+}
+
+// ── Multi-row rent-roll, same floor "1" in two tenant rows, NO row anchor → ≤2
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Mieter Geschoss Grundmiete",
+    "Everding Lena 1 650,00",
+    "Schmidt Berta 1 700,00",
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "", // missing row anchor in a multi-row block
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  const r = groundingGrade(unitRefSpec(), cand, ocr);
+  ok(r.grade !== null && r.grade <= 2, "multi-row + no row anchor → capped ≤ 2 (row_anchor required for 3)");
+  eq(r.grade, 2, "multi-row + no row anchor → exactly 2");
+}
+
+// ── Multi-row rent-roll, same floor, WITH correct row anchor → 3 ────────────
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Mieter Geschoss Grundmiete",
+    "Everding Lena 1 650,00",
+    "Schmidt Berta 1 700,00",
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "Everding Lena", // disambiguating row anchor
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), cand, ocr).grade, 3, "multi-row + correct row anchor pins Everding's row → 3");
+}
+
+// ── Header-above-wrapped-value: OCR wraps the row so the floor lands on its own
+// line below the header. One candidate data row, no row anchor → 3.
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Mieter Geschoss Miete",
+    "Everding Lena",
+    "1",
+    "650,00",
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "", // no row anchor on a single wrapped row
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), cand, ocr).grade, 3, "wrapped value: floor '1' on the line below 'Geschoss', single row → 3");
+}
+
 console.log(`✓ table-cell-grounding.test.ts: ${assertions} assertions passed`);
