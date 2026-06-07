@@ -9,6 +9,7 @@
 //   DOTENV_CONFIG_PATH=.env.local npx tsx -r dotenv/config \
 //     src/tests/integration/everding-end-to-end.test.ts
 
+import "dotenv/config";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
