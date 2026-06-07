@@ -28,6 +28,29 @@ Normalize to one of: EG, 1.OG, 2.OG, 3.OG, 4.OG, DG, Keller, Souterrain.
 Common mappings: "Erdgeschoss" → EG; "1. Obergeschoss" → 1.OG; "Dachgeschoss" → DG.
 If multiple units are listed (a single lease covering multiple units), extract the unit the lease primarily concerns; if genuinely ambiguous, set absence_state: ambiguous.
 
+Evidence — direct_quote vs table_cell:
+- DEFAULT to a direct_quote when the floor comes from a clean phrase (e.g. "1. Obergeschoss", "Erdgeschoss").
+- When the floor/unit comes from a TABLE CELL rather than a clean phrase, emit a
+  SINGLE evidence entry of the form:
+  { "evidence_type": "table_cell", "page": <number>, "table_cell": {
+      "column_anchor": { "quote": "<the header that means floor —
+        Geschoss/Etage/Stockwerk/Ebene, copied verbatim from the OCR>" },
+      "cell_value_raw": "<the EXACT raw token in the cell, e.g. \\"1\\">",
+      "derivation_rule": "geschoss_numeric_to_og" } }
+  column_anchor and row_anchor are OBJECTS with a "quote" field — NOT bare
+  strings. Use derivation_rule: literal only when the cell already holds the
+  canonical token (e.g. the cell literally reads "1.OG").
+- cell_value_raw MUST be the raw token. Do NOT put the normalized value (e.g.
+  "1.OG") in cell_value_raw unless "1.OG" literally appears in the OCR.
+- Include row_anchor ONLY when the table has multiple unit/person rows that must
+  be disambiguated; then set row_anchor: { "quote": "<the row's own text>",
+  "anchor_type": "tenant_name" }. OMIT row_anchor entirely for a single-unit
+  description table. NEVER invent a row_anchor from a tenant name/address/prose
+  that sits OUTSIDE the table row.
+- Do NOT use an ambiguous column (Nr., Zimmer, Anzahl, Pos.) to derive a floor.
+- If the correct row in a multi-row table cannot be identified, set
+  absence_state: ambiguous — do not guess.
+
 ### tenant_identity (Mieter — the tenant party)
 
 Extract the tenant as written on the contract.
