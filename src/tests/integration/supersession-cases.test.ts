@@ -10,6 +10,7 @@
 //
 // All inside per-case tx that is rolled back at the end.
 
+import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
