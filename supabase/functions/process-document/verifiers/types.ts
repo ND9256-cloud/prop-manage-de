@@ -25,10 +25,36 @@ export interface FieldSpec {
   [key: string]: unknown;
 }
 
+// ── Evidence union (Task 4.3c-b-ii-A) ─────────────────────────────────────────
+// Backward-compatible discriminated union on an OPTIONAL evidence_type (absent ⇒
+// direct_quote). Inlined here (the Deno Edge Function tree cannot import from
+// src/lib) and kept value-identical to src/lib/evidence/types.ts and
+// scripts/eval/types.ts. Verifiers run on money fields only and read nothing
+// from evidence — this widening is compile-surface only; behavior is unchanged.
+export interface EvidenceQuote {
+  evidence_type?: "direct_quote";
+  quote: string;
+  page?: number | null;
+  bbox?: unknown;
+}
+
+export interface TableCellEvidence {
+  evidence_type: "table_cell";
+  page?: number | null;
+  table_cell: {
+    row_anchor?: { quote: string; anchor_type: string; canonical?: string };
+    column_anchor: { quote: string; canonical?: string };
+    cell_value_raw: string;
+    derivation_rule: string;
+  };
+}
+
+export type Evidence = EvidenceQuote | TableCellEvidence;
+
 export interface FieldEnvelope {
   raw_value: unknown;
   normalized_value: unknown;
-  evidence?: { quote: string; page?: number; bbox?: unknown };
+  evidence?: Evidence[];
   confidence?: string;
   absence_state: string;
   validation_status?: string;

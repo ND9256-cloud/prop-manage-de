@@ -151,23 +151,34 @@ export default function ProvenanceModal({ state, onClose }: Props) {
                                 {state.claims.map((c, i) => (
                                     <li
                                         key={c.id}
-                                        className="flex items-baseline gap-2"
+                                        className="flex flex-col gap-0.5"
                                         data-claim-id={c.id}
                                     >
-                                        <span className="text-muted-foreground">
-                                            {i === 0 ? '★' : '·'}
-                                        </span>
-                                        <span className="truncate" title={c.id}>
-                                            {c.id.slice(0, 8)}
-                                        </span>
-                                        {c.source_field_path && (
-                                            <span className="text-muted-foreground truncate">
-                                                {c.source_field_path}
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-muted-foreground">
+                                                {i === 0 ? '★' : '·'}
                                             </span>
-                                        )}
-                                        {c.valid_from && (
-                                            <span className="text-muted-foreground ml-auto">
-                                                {fmtDate(c.valid_from)}
+                                            <span className="truncate" title={c.id}>
+                                                {c.id.slice(0, 8)}
+                                            </span>
+                                            {c.source_field_path && (
+                                                <span className="text-muted-foreground truncate">
+                                                    {c.source_field_path}
+                                                </span>
+                                            )}
+                                            {c.valid_from && (
+                                                <span className="text-muted-foreground ml-auto">
+                                                    {fmtDate(c.valid_from)}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {c.evidence_rendered && (
+                                            <span
+                                                className="pl-5 text-muted-foreground font-sans not-italic truncate"
+                                                data-testid="claim-evidence"
+                                                title={c.evidence_rendered}
+                                            >
+                                                {c.evidence_rendered}
                                             </span>
                                         )}
                                     </li>

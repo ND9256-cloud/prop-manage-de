@@ -51,3 +51,5 @@ jobs:
           npx tsx src/tests/eval/gold-grounding.test.ts
           npx tsx src/tests/eval/derived-grounding.test.ts
           npx tsx src/tests/eval/table-cell-grounding.test.ts
+          npx tsx src/tests/evidence/render-evidence.test.ts
+          npx tsx src/tests/evidence/validate-evidence.test.ts

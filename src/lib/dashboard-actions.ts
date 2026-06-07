@@ -6,6 +6,8 @@ import { warehouseDb } from '@/lib/warehouse/db';
 import { composePropertySnapshot } from '@/lib/composer/property-snapshot';
 import type { RentRollSnapshot, RentRollRow } from '@/lib/composer/modules/rent-roll';
 import { extractLegacyTenants, type LegacyRentRollRow } from '@/lib/legacy-brain/extract-tenants';
+import { renderEvidence } from '@/lib/evidence';
+import type { Evidence } from '@/lib/evidence';
 
 export interface LastVisitStats {
     newDocs: number;
@@ -186,6 +188,28 @@ export interface ProvenanceClaim {
     confidence: 'high' | 'medium' | 'low' | null;
     source_field_path: string | null;
     source_document_id: string | null;
+    // Human-readable GERMAN source for the click-through (Task 4.3c-b-ii-A).
+    // direct_quote → the quote; table_cell → "Tabellenzelle — …". Null when the
+    // claim carries no evidence object. Today no emitter attaches a table_cell
+    // (emission is 4.3c-b-ii-B), so this is the byte-unchanged direct_quote path;
+    // the wiring is in place so a table_cell claim renders readable source, not
+    // a blank quote, the moment emission lands.
+    evidence_rendered: string | null;
+}
+
+// A claim's value jsonb may carry an evidence object (a single Evidence or an
+// array of them) under `evidence`. Render the first valid one to a German
+// provenance string; return null when none is present.
+function renderClaimEvidence(value: unknown): string | null {
+    if (typeof value !== 'object' || value === null) return null;
+    const raw = (value as { evidence?: unknown }).evidence;
+    const first = Array.isArray(raw) ? raw[0] : raw;
+    if (typeof first !== 'object' || first === null) return null;
+    try {
+        return renderEvidence(first as Evidence);
+    } catch {
+        return null;
+    }
 }
 
 
@@ -296,8 +320,9 @@ export async function getRentRollSnapshots(): Promise<RentRollSnapshotPayload[]>
                 confidence: 'high' | 'medium' | 'low' | null;
                 source_field_path: string | null;
                 source_document_id: string | null;
+                value: unknown;
             }[]>`
-                SELECT c.id, c.valid_from, c.confidence, c.source_field_path, c.source_document_id
+                SELECT c.id, c.valid_from, c.confidence, c.source_field_path, c.source_document_id, c.value
                 FROM warehouse.claims c
                 JOIN "Property" prop ON prop.id = c.property_id
                 WHERE c.id = ANY(${claimIds}::uuid[])
@@ -310,6 +335,7 @@ export async function getRentRollSnapshots(): Promise<RentRollSnapshotPayload[]>
                     confidence: c.confidence,
                     source_field_path: c.source_field_path,
                     source_document_id: c.source_document_id,
+                    evidence_rendered: renderClaimEvidence(c.value),
                 };
             }
         }

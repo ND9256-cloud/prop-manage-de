@@ -99,7 +99,7 @@ Analysiere das folgende Dokument und extrahiere die angeforderten Felder.
 Antworte NUR mit validem JSON. Kein Markdown, keine Erklärung.
 
 Das JSON muss ein Objekt sein, dessen Schlüssel die Feld-IDs sind.
-Jedes Feld ist ein Objekt mit: raw_value, normalized_value, evidence (Array von {quote, page, bbox}), confidence ("high"|"medium"|"low"), absence_state, validation_status ("valid"), severity.
+Jedes Feld ist ein Objekt mit: raw_value, normalized_value, evidence (Array; jedes Element ist entweder ein direct_quote {quote, page, bbox} oder eine table_cell {evidence_type: "table_cell", page, table_cell: {row_anchor?, column_anchor, cell_value_raw, derivation_rule}}), confidence ("high"|"medium"|"low"), absence_state, validation_status ("valid"), severity.
 
 ${cfg.prompt}
 
