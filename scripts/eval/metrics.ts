@@ -812,15 +812,23 @@ function gradeTableCellOnPage(
     return 0; // rule fails
   }
 
-  // 5. Row ambiguity (Task 4.3c-b-1b-i): count CANDIDATE DATA ROWS for this column
-  // — value lines at/after the column header carrying the raw token. >1 such row is
-  // a MULTI-row block (ambiguity to resolve), exactly 1 is a SINGLE-row block
-  // (nothing to disambiguate). The linearized floor case keeps a whole row on one
-  // line, so a single-unit description table counts as ONE data row even when that
-  // line repeats the token across columns.
-  const headerMin = Math.min(...col.indices);
-  const dataValueLines = valueLines.filter((vi) => vi >= headerMin);
-  const multiRow = dataValueLines.length >= 2;
+  // 5. Row ambiguity (Task 4.3c-b-1b-i-2): count CANDIDATE DATA ROWS for this
+  // column — value lines carrying the raw token that ALSO sit under the licensed
+  // (floor) column header within the SAME locality window used for grade-3 column
+  // grounding (a header in the previous ≤10 lines — the per-value-line `columnOk`
+  // rule applied below). >1 such row is a MULTI-row block (ambiguity to resolve,
+  // row_anchor required), exactly 1 is a SINGLE-row block (nothing to
+  // disambiguate). This counts ONLY column-aligned rows, NOT bare token
+  // occurrences anywhere on the page: an unrelated row (e.g. a garage row >10
+  // lines from any floor header) carrying a standalone token no longer inflates
+  // the block to multi-row (the 1b-i `vi >= headerMin` over-count). The
+  // linearized floor case still keeps a whole row on one line, so a single-unit
+  // description table is ONE data row even when that line repeats the token
+  // across columns.
+  const candidateRows = valueLines.filter((vi) =>
+    col.indices.some((ci) => ci <= vi && vi - ci <= 10),
+  );
+  const multiRow = candidateRows.length >= 2;
 
   // 3. Locality: pick the best value line with a column header in the previous 10
   // lines and (if provided) a row anchor within ±3 lines; total span ≤ 15.

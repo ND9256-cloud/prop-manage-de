@@ -341,6 +341,69 @@ function tableCell(opts: {
   eq(groundingGrade(unitRefSpec(), cand, ocr).grade, 3, "wrapped value: floor '1' on the line below 'Geschoss', single row → 3");
 }
 
+// ══ Row ambiguity refinement (Task 4.3c-b-1b-i-2) ══════════════════════════
+// A candidate floor row counts toward the multi-row ambiguity test ONLY when its
+// raw token sits under a LICENSED floor-column header within the locality window
+// (the same prev-≤10 column-grounding rule used for grade 3) — NOT any bare token
+// occurrence elsewhere on the page. 1b-i counted every value line at/after the
+// header (`vi >= headerMin`), which over-counted Lena's page-2 garage row.
+
+// ── Lena-shape: floor row under "Geschoss" + an UNRELATED garage row (>10 lines
+// later, no floor header in its window) that also carries a standalone "1". The
+// garage row must NOT make the block multi-row, so the single floor row reaches 3
+// WITHOUT a row anchor. (Under 1b-i this capped at 2 — exactly the Lena bug.)
+{
+  const ocr = [
+    "--- Seite 2 ---",
+    "Beschreibung der Wohnung",                                   // 0
+    "Wohnfläche ca. Geschoss Zimmer Küche Bad Balkon WC Lage",    // 1  floor header
+    "100,00 m² 1 3,5 1 1 0 1 – Mitte 0",                          // 2  floor row (raw "1")
+    "Ausstattung",                                                // 3
+    "Heizung: Zentralheizung",                                    // 4
+    "Bodenbelag: Parkett",                                        // 5
+    "Fenster: Kunststoff",                                        // 6
+    "Energieausweis vorhanden",                                   // 7
+    "Sonstiges",                                                  // 8
+    "Stellplätze",                                                // 9
+    "Nr. Typ Anzahl Stockwerk Preis",                            // 10 garage header (NON-floor)
+    "Pos Art Menge Lage Bezeichnung",                            // 11
+    "3 4 1 1 – Garage",                                          // 12 garage row (raw "1"), >10 from header 1
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "1.OG", page: 2, rowQuote: "", // NO row anchor — single floor row
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  const r = groundingGrade(unitRefSpec(), cand, ocr);
+  eq(r.grade, 3, "lena-shape: floor row + unrelated garage row (no floor header nearby) is single-row → 3 without row anchor");
+  eq(r.value_page, 2, "lena-shape: value located on page 2");
+}
+
+// ── Genuine multi-floor-row rent-roll: TWO tenant rows, each under the SAME
+// "Geschoss" header (both within its locality) → 2 candidate rows → multi-row →
+// row_anchor still REQUIRED. NO anchor caps at ≤2; a disambiguating anchor → 3.
+// (Protection unchanged — the refinement must not weaken genuine ambiguity.)
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Mieter Geschoss Miete",
+    "Albrecht Jonas 2 540,00",
+    "Brandt Petra 2 560,00",
+  ].join("\n");
+  const noAnchor = tableCell({
+    normalized: "2.OG", page: 1, rowQuote: "", // two real floor rows, no disambiguation
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "2", rule: "geschoss_numeric_to_og",
+  });
+  const rNo = groundingGrade(unitRefSpec(), noAnchor, ocr);
+  ok(rNo.grade !== null && rNo.grade <= 2, "genuine multi-floor-row: two real floor rows, no anchor → capped ≤2");
+  eq(rNo.grade, 2, "genuine multi-floor-row: two real floor rows, no anchor → exactly 2 (protection intact)");
+
+  const anchored = tableCell({
+    normalized: "2.OG", page: 1, rowQuote: "Albrecht Jonas", // disambiguating anchor
+    colQuote: "Geschoss", colCanonical: "floor", rawValue: "2", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), anchored, ocr).grade, 3, "genuine multi-floor-row: disambiguating row anchor pins Albrecht's row → 3");
+}
+
 // ══ Held-out table shapes (Task 4.3c-b-ii-B, anti-overfit to Lena) ══════════
 // §3 of the ii-B brief: prove the EMISSION guidance generalizes, not just on
 // Lena's exact "Geschoss"/numeric shape. These use DISTINCT headers ("Etage"),
