@@ -6,6 +6,7 @@
 import type {
   AbsenceState,
   DocTypeMetricSummary,
+  Evidence,
   EvidenceQuote,
   ExtractionEnvelope,
   FieldEnvelope,
@@ -16,7 +17,20 @@ import type {
   GroundingSummary,
   SchemaFieldDef,
   Severity,
+  TableCellEvidence,
 } from "./types.ts";
+import {
+  applyDerivationRule,
+  isDerivationRule,
+  tableCellAllowed,
+  tableCellRuleAllowed,
+  type DerivationRule,
+} from "./derivation-rules.ts";
+
+// Discriminates the optional-tagged evidence union (default → direct_quote).
+function isTableCellEvidence(e: Evidence): e is TableCellEvidence {
+  return (e as { evidence_type?: string }).evidence_type === "table_cell";
+}
 
 // Severity weights for the severity-weighted error rate.
 // Critical errors count 5x a nice-to-have error. The choice of weights
@@ -115,7 +129,11 @@ export function evidenceGrounded(
   if (!ocrText) return false;
   const normalizedSource = normalizeWhitespace(ocrText);
   return evidence.some((e) => {
-    if (!e || typeof e.quote !== "string" || e.quote.trim() === "") return false;
+    // The legacy verbatim-quote metric only applies to direct_quote evidence;
+    // table_cell entries carry no top-level quote and are validated by the
+    // table_cell scorer (groundingGrade), not here.
+    if (!e || isTableCellEvidence(e)) return false;
+    if (typeof e.quote !== "string" || e.quote.trim() === "") return false;
     const normalizedQuote = normalizeWhitespace(e.quote);
     return normalizedSource.includes(normalizedQuote);
   });
@@ -624,7 +642,15 @@ const NORMALIZATION_RULES: Record<string, (quote: string) => string | null> = {
 // First evidence entry carrying a non-empty quote (kept with its page, if any).
 function firstQuoteEvidence(candidate: FieldEnvelope): EvidenceQuote | null {
   for (const e of candidate.evidence ?? []) {
-    if (e && typeof e.quote === "string" && e.quote.trim() !== "") return e;
+    if (!e || isTableCellEvidence(e)) continue;
+    if (typeof e.quote === "string" && e.quote.trim() !== "") return e;
+  }
+  return null;
+}
+
+function firstTableCellEvidence(candidate: FieldEnvelope): TableCellEvidence | null {
+  for (const e of candidate.evidence ?? []) {
+    if (e && isTableCellEvidence(e)) return e;
   }
   return null;
 }
@@ -664,6 +690,204 @@ function gradeDerivedSingleSource(
   return { ...base, graded: true, grade: reproduces ? 3 : 1, excluded: null, value_page: page };
 }
 
+// ── table_cell grounding (Task 4.3c-b-1a) ────────────────────────────────────
+// The LLM PROPOSES a table cell (row anchor + column anchor + RAW cell token +
+// derivation rule); the scorer VALIDATES every part against OCR and only then
+// counts it. Scorer-only / EVAL-only: no production extractor or envelope change.
+//
+// Standard (per the task brief), routed on evidence_type === "table_cell":
+//  1. Shape — type allowed for the field; row/column/cell_value_raw/rule present;
+//     rule allowed (free-form rejected); page present (missing on critical → cap 2).
+//  2. Ground each on the cited page — row_anchor.quote, column_anchor.quote
+//     (configured header-synonym map only — uncovered header = hallucinated =
+//     fail), cell_value_raw (the RAW token, NOT the normalized value).
+//  3. Locality (same page) — row_anchor & cell_value_raw within ±3 lines; column
+//     within the previous 10 lines of the value; total span ≤ 15 lines.
+//  4. Column licenses rule — geschoss_numeric_to_og only under a floor column.
+//  5. Ambiguity — duplicate (same cell_value_raw + column) rows with a row anchor
+//     that does not disambiguate → cap ≤ 2; row_anchor REQUIRED for grade 3.
+//  6. Derivation — rule(cell_value_raw) === field.normalized_value.
+// Grades: 3 grounded+local+licensed+reproduced+unambiguous; 2 value+one anchor,
+// cohesion incomplete; 1 raw on page, no row/column relationship; 0 raw absent /
+// different pages / rule fails / wrong column / hallucinated anchor.
+
+// Configured column-header registry — the ONLY headers the scorer recognizes for
+// synonym grounding + floor licensing. A model column anchor grounds through THIS
+// map (e.g. anchor "Geschoss" grounds on OCR "Gesch."); a header that is neither
+// literally in OCR nor a configured surface is hallucinated and fails.
+interface HeaderClass {
+  // canonical id; isFloor licenses geschoss_numeric_to_og.
+  canonical: string;
+  isFloor: boolean;
+  // accepted OCR surface forms (already lowercased; matched as substrings).
+  surfaces: string[];
+}
+const COLUMN_HEADER_REGISTRY: HeaderClass[] = [
+  { canonical: "floor", isFloor: true, surfaces: ["geschoss", "gesch.", "gesch", "etage"] },
+];
+
+// The OCR surface forms acceptable for a model column anchor, plus whether the
+// anchor belongs to a configured FLOOR header class. An anchor maps to a class
+// if its (normalized) quote equals the canonical id or one of the surfaces;
+// otherwise only its own literal text is accepted (so a non-configured header
+// like "Zimmer"/"Nr." can ground literally but is never floor-licensed).
+function columnAnchorSurfaces(anchorQuote: string): { surfaces: string[]; isFloorClass: boolean } {
+  const qa = normalizeForMatch(anchorQuote);
+  if (qa === "") return { surfaces: [], isFloorClass: false };
+  const cls = COLUMN_HEADER_REGISTRY.find(
+    (c) => c.canonical === qa || c.surfaces.some((s) => normalizeForMatch(s) === qa),
+  );
+  const surfaces = new Set<string>([qa]);
+  if (cls) for (const s of cls.surfaces) surfaces.add(normalizeForMatch(s));
+  return { surfaces: [...surfaces], isFloorClass: cls?.isFloor ?? false };
+}
+
+// Line indices on a page where the column header grounds (any accepted surface),
+// and whether that header is a configured floor column.
+function columnLineIndices(anchorQuote: string, lines: string[]): { indices: number[]; isFloor: boolean } {
+  const { surfaces, isFloorClass } = columnAnchorSurfaces(anchorQuote);
+  const indices: number[] = [];
+  if (surfaces.length === 0) return { indices, isFloor: false };
+  for (let i = 0; i < lines.length; i++) {
+    const nl = normalizeForMatch(lines[i]);
+    if (surfaces.some((s) => s !== "" && nl.includes(s))) indices.push(i);
+  }
+  return { indices, isFloor: isFloorClass && indices.length > 0 };
+}
+
+// Line indices where a (possibly multi-word) anchor quote occurs as a normalized
+// substring — for row anchors like "Everding Lena".
+function substringLineIndices(quote: string, lines: string[]): number[] {
+  const n = normalizeForMatch(quote);
+  if (n === "") return [];
+  const out: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (normalizeForMatch(lines[i]).includes(n)) out.push(i);
+  }
+  return out;
+}
+
+// Line indices where the RAW cell token occurs as a standalone token (so "1"
+// does not match inside "100" or "650,00").
+function rawTokenLineIndices(raw: string, lines: string[]): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (valueOccurs(normalizeForMatch(lines[i]), raw)) out.push(i);
+  }
+  return out;
+}
+
+// Evaluates a table cell on ONE page's lines. Returns the grade achievable on
+// this page (same-page constraint), or null when the raw token is not even
+// present on it (lets the caller try other pages when no page is cited).
+function gradeTableCellOnPage(
+  normalizedValue: unknown,
+  lines: string[],
+  rowProvided: boolean,
+  rowQuote: string,
+  colQuote: string,
+  rawTok: string,
+  ruleId: DerivationRule,
+  maxGrade: GroundingGrade,
+): GroundingGrade | null {
+  const valueLines = rawTokenLineIndices(rawTok, lines);
+  if (valueLines.length === 0) return null; // raw absent on this page
+
+  const col = columnLineIndices(colQuote, lines);
+  if (col.indices.length === 0) return 0; // hallucinated column header
+
+  const rowLines = rowProvided ? substringLineIndices(rowQuote, lines) : [];
+  if (rowProvided && rowLines.length === 0) return 0; // hallucinated row anchor
+
+  // 4. Column licenses the rule: geschoss_numeric_to_og only under a floor column.
+  if (ruleId === "geschoss_numeric_to_og" && !col.isFloor) return 0; // wrong column
+
+  // 6. Derivation reproduces the normalized value from the RAW token.
+  const produced = applyDerivationRule(ruleId, rawTok);
+  if (produced === null || typeof normalizedValue !== "string" || produced !== normalizedValue) {
+    return 0; // rule fails
+  }
+
+  // 5. Ambiguity: data rows (value lines at/after the column header) carrying the
+  // same raw token under the same column. ≥2 such rows is ambiguous unless the
+  // row anchor pins exactly one of them (anchor on the value's own line).
+  const headerMin = Math.min(...col.indices);
+  const dataValueLines = valueLines.filter((vi) => vi >= headerMin);
+  const ambiguous = dataValueLines.length >= 2;
+
+  // 3. Locality: pick the best value line with a column header in the previous 10
+  // lines and (if provided) a row anchor within ±3 lines; total span ≤ 15.
+  let best: GroundingGrade = 1; // raw on page but no anchor relationship yet
+  for (const vi of valueLines) {
+    const ciCands = col.indices.filter((ci) => ci <= vi && vi - ci <= 10);
+    const columnOk = ciCands.length > 0;
+    const riCands = rowProvided ? rowLines.filter((ri) => Math.abs(ri - vi) <= 3) : [];
+    const rowOk = rowProvided && riCands.length > 0;
+    const disambiguated = rowOk && riCands.includes(vi); // anchor on the value's row
+    if (!columnOk && !rowOk) continue;
+
+    const idxs = [vi, ...(columnOk ? [Math.max(...ciCands)] : []), ...(rowOk ? [riCands[0]] : [])];
+    const span = Math.max(...idxs) - Math.min(...idxs);
+
+    const cohesionComplete = columnOk && rowProvided && rowOk && span <= 15;
+    const ambiguityResolved = !ambiguous || disambiguated;
+    let g: GroundingGrade;
+    if (cohesionComplete && ambiguityResolved) g = 3;
+    else g = 2; // value + at least one anchor, cohesion/ambiguity incomplete
+    if (g > best) best = g;
+  }
+
+  return Math.min(best, maxGrade) as GroundingGrade;
+}
+
+function gradeTableCell(
+  spec: GroundingSpec,
+  candidate: FieldEnvelope,
+  tc: TableCellEvidence,
+  ocrText: string,
+  base: Omit<FieldGroundingResult, "graded" | "grade" | "excluded">,
+): FieldGroundingResult {
+  const grade0 = (): FieldGroundingResult => ({ ...base, graded: true, grade: 0, excluded: null, value_page: null });
+  const cell = tc.table_cell;
+
+  // 1. Shape.
+  if (!tableCellAllowed(spec.id)) return grade0();
+  if (!cell || typeof cell !== "object") return grade0();
+  const rawTok = typeof cell.cell_value_raw === "string" ? cell.cell_value_raw.trim() : "";
+  const colQuote = typeof cell.column_anchor?.quote === "string" ? cell.column_anchor.quote.trim() : "";
+  const rowQuote = typeof cell.row_anchor?.quote === "string" ? cell.row_anchor.quote.trim() : "";
+  const ruleId = cell.derivation_rule;
+  // RAW token, column anchor and a usable rule are structurally required.
+  if (rawTok === "" || colQuote === "") return grade0();
+  if (!isDerivationRule(ruleId) || !tableCellRuleAllowed(spec.id, ruleId)) return grade0();
+
+  const page = typeof tc.page === "number" && Number.isFinite(tc.page) ? tc.page : null;
+  // row_anchor REQUIRED for grade 3; its absence caps the grade at 2.
+  const rowProvided = rowQuote !== "";
+  let maxGrade: GroundingGrade = rowProvided ? 3 : 2;
+  // page missing on a CRITICAL field caps at 2.
+  if (page == null && spec.severity === "critical") maxGrade = Math.min(maxGrade, 2) as GroundingGrade;
+
+  const pages = parseOcrPages(ocrText);
+  // Same-page constraint: a cited page scopes to exactly that page; without one,
+  // try each page and keep the best (anchors must still co-locate on one page).
+  const scope = page != null ? pages.filter((p) => p.page === page) : pages;
+  if (scope.length === 0) return grade0(); // cited page not in OCR
+
+  let bestGrade: GroundingGrade = 0;
+  let valuePage: number | null = null;
+  for (const p of scope) {
+    const g = gradeTableCellOnPage(
+      candidate.normalized_value, p.lines,
+      rowProvided, rowQuote, colQuote, rawTok, ruleId, maxGrade,
+    );
+    if (g == null) continue; // raw not on this page
+    if (g > bestGrade) { bestGrade = g; valuePage = p.page; }
+  }
+
+  return { ...base, graded: true, grade: bestGrade, excluded: null, value_page: bestGrade > 0 ? valuePage : null };
+}
+
 // Computes the grounding grade for a single field. Pure: (spec, candidate,
 // ocrText) -> result. Returns an excluded (ungraded) result for derived,
 // non-scalar, absent, or no-OCR cases.
@@ -685,6 +909,19 @@ export function groundingGrade(
     grade: null,
     excluded: reason,
   });
+
+  // Route on evidence_type FIRST (Task 4.3c-b-1a): a candidate proposing
+  // table_cell evidence is validated by the table_cell scorer, independent of the
+  // field's derived/scalar classification. Direct-quote (default) evidence falls
+  // through to the existing scalar/identity/derived paths unchanged — so Lena's
+  // unit_ref (a direct_quote) keeps its 4.3c-a derived grade.
+  if (candidate && candidate.absence_state === "present") {
+    const tc = firstTableCellEvidence(candidate);
+    if (tc) {
+      if (!ocrText) return excluded("no_ocr");
+      return gradeTableCell(spec, candidate, tc, ocrText, base);
+    }
+  }
 
   // Derived fields (e.g. unit_ref). A single-source derived field with a declared
   // normalization rule is graded by validating its derivation (Task 4.3c-a);

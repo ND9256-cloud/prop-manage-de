@@ -19,16 +19,58 @@ export type Severity = "critical" | "important" | "nice_to_have";
 
 export type Confidence = "high" | "medium" | "low";
 
+// ── Evidence (discriminated on OPTIONAL evidence_type) ────────────────────────
+// Backward compatible: when evidence_type is absent the entry IS a direct_quote,
+// so every existing { quote, page, bbox } fixture is unchanged and still valid.
+// Task 4.3c-b-1a adds the EVAL-only table_cell variant (the proving ground for
+// table-cell grounding); promoting it to the production envelope + teaching the
+// extractor to emit it is the separate next task (4.3c-b-1b).
+import type { DerivationRule } from "./derivation-rules.ts";
+
 export interface EvidenceQuote {
+  evidence_type?: "direct_quote";
   quote: string;
   page?: number | null;
   bbox?: unknown;
 }
 
+// Row/column anchors carry the model's CITED header/row text plus an optional
+// model-declared canonical; the scorer grounds the quote and validates the
+// canonical against OCR — it never trusts the canonical on its own.
+export interface RowAnchor {
+  quote: string;
+  anchor_type: string;
+  canonical?: string;
+}
+
+export interface ColumnAnchor {
+  quote: string;
+  canonical?: string;
+}
+
+// A proposed table cell. cell_value_raw is the RAW OCR token (e.g. "1"), stored
+// SEPARATELY from the field's normalized value; the scorer grounds the raw token
+// and reproduces the normalized value via derivation_rule. A model-declared
+// normalized cell value (if any extra key is present) is ignored + recomputed.
+export interface TableCell {
+  row_anchor: RowAnchor;
+  column_anchor: ColumnAnchor;
+  cell_value_raw: string;
+  derivation_rule: DerivationRule;
+}
+
+export interface TableCellEvidence {
+  evidence_type: "table_cell";
+  page?: number | null;
+  table_cell: TableCell;
+}
+
+export type Evidence = EvidenceQuote | TableCellEvidence;
+
 export interface FieldEnvelope {
   raw_value: unknown;
   normalized_value: unknown;
-  evidence?: EvidenceQuote[];
+  evidence?: Evidence[];
   confidence?: Confidence | null;
   absence_state: AbsenceState;
   validation_status?: string;
