@@ -10,6 +10,7 @@
 //   domain_knowledge/mietvertrag.md -- closes: [] (Mietvertrag emits no closures)
 
 import type { Claim, EmissionResult, EmitterContext } from "./types.ts";
+import type { Evidence } from "../evidence/types.ts";
 
 /**
  * Minimal envelope shape this emitter reads. Mirrors warehouse.document_extractions_v2.fields.
@@ -46,7 +47,11 @@ interface FieldBase {
     | "requires_human_review";
   confidence?: "high" | "medium" | "low";
   raw_value?: string;
-  evidence?: { page?: number; quote?: string }[];
+  // Backward-compatible evidence union (Task 4.3c-b-ii-A): a direct_quote
+  // (evidence_type absent) or a table_cell. Emitters do not read evidence today
+  // — they reference it by id via context — but the field is typed so the
+  // envelope can carry table_cell without a type break.
+  evidence?: Evidence[];
 }
 
 interface MoneyField extends FieldBase {

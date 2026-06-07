@@ -33,6 +33,7 @@ import type {
   EmissionResult,
   EmitterContext,
 } from "./types.ts";
+import type { Evidence } from "../evidence/types.ts";
 import { emitMieterhoehungClaims } from "./mieterhoehung.ts";
 
 export const EMITTER_NAME = "mietvertragsnachtrag";
@@ -56,7 +57,9 @@ interface FieldBase {
   absence_state: AbsenceState;
   confidence?: Confidence;
   raw_value?: string;
-  evidence?: { page?: number; quote?: string }[];
+  // Backward-compatible evidence union (Task 4.3c-b-ii-A): direct_quote or
+  // table_cell. Typed so the envelope can carry table_cell without a type break.
+  evidence?: Evidence[];
   normalized_value?: unknown;
 }
 
