@@ -341,4 +341,72 @@ function tableCell(opts: {
   eq(groundingGrade(unitRefSpec(), cand, ocr).grade, 3, "wrapped value: floor '1' on the line below 'Geschoss', single row → 3");
 }
 
+// ══ Held-out table shapes (Task 4.3c-b-ii-B, anti-overfit to Lena) ══════════
+// §3 of the ii-B brief: prove the EMISSION guidance generalizes, not just on
+// Lena's exact "Geschoss"/numeric shape. These use DISTINCT headers ("Etage"),
+// a distinct floor token (EG passthrough), distinct tenant names, and distinct
+// ambiguous columns ("Pos."/"Anzahl") from Lena and from every case above. As
+// in §3, the candidate table_cell evidence is hand-authored (no live Sonnet);
+// this confirms the scorer behaves on the three target shapes.
+
+// ── (1) Multi-row rent-roll (Mieter | Etage | Kaltmiete, 2 tenants):
+// row_anchor PRESENT and disambiguating → 3; the SAME table with NO row anchor
+// is ambiguous → ≤2 (so the anchor is what earns 3, not the floor token alone).
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Mieterliste Objekt Hauptstraße 5",
+    "Mieter Etage Kaltmiete",
+    "Koch Markus 2 720,00",
+    "Becker Sophie 2 810,00",
+  ].join("\n");
+  const anchored = tableCell({
+    normalized: "2.OG", page: 1, rowQuote: "Koch Markus",
+    colQuote: "Etage", colCanonical: "floor", rawValue: "2", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), anchored, ocr).grade, 3, "held-out multi-row: '2' under 'Etage', row-anchored to Koch → 3");
+
+  const noAnchor = tableCell({
+    normalized: "2.OG", page: 1, rowQuote: "", // multiple tenant rows, no disambiguation
+    colQuote: "Etage", colCanonical: "floor", rawValue: "2", rule: "geschoss_numeric_to_og",
+  });
+  const r = groundingGrade(unitRefSpec(), noAnchor, ocr);
+  ok(r.grade !== null && r.grade <= 2, "held-out multi-row: row_anchor REQUIRED → no anchor caps ≤2");
+}
+
+// ── (2) Single-row description table (distinct from Lena: "Etage" header, EG
+// passthrough, no tenant in the row): row_anchor OMITTED → 3.
+{
+  const ocr = [
+    "--- Seite 1 ---",
+    "Objektbeschreibung",
+    "Wohnfläche Etage Zimmer Bad",
+    "62,50 m² EG 2 1",
+  ].join("\n");
+  const cand = tableCell({
+    normalized: "EG", page: 1, rowQuote: "", // single-unit description table → omit row_anchor
+    colQuote: "Etage", colCanonical: "floor", rawValue: "EG", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), cand, ocr).grade, 3, "held-out single-row: 'EG' under 'Etage', no row anchor → 3");
+}
+
+// ── (3) Ambiguous numeric column ("1" under "Pos." and under "Anzahl"): even
+// row-anchored and even when the model LIES that the column is floor, an
+// ambiguous column must NOT derive a floor → NOT grade 3 (0).
+{
+  const posOcr = ["--- Seite 1 ---", "Pos. Mieter Kaltmiete", "1 Wagner Tom 650,00"].join("\n");
+  const posCand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "Wagner Tom",
+    colQuote: "Pos.", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), posCand, posOcr).grade, 0, "held-out ambiguous: '1' under 'Pos.' is not a floor column → not 3 (0)");
+
+  const anzOcr = ["--- Seite 1 ---", "Wohnung Anzahl Räume Miete", "Top 4 1 3 690,00"].join("\n");
+  const anzCand = tableCell({
+    normalized: "1.OG", page: 1, rowQuote: "Top 4",
+    colQuote: "Anzahl", colCanonical: "floor", rawValue: "1", rule: "geschoss_numeric_to_og",
+  });
+  eq(groundingGrade(unitRefSpec(), anzCand, anzOcr).grade, 0, "held-out ambiguous: '1' under 'Anzahl' is not a floor column → not 3 (0)");
+}
+
 console.log(`✓ table-cell-grounding.test.ts: ${assertions} assertions passed`);
